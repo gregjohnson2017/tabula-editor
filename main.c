@@ -1,5 +1,6 @@
 #include "SDL2/SDL.h"
 #include "SDL2/SDL_image.h"
+#include "SDL2/SDL2_framerate.h"
 
 const int SCREEN_WIDTH = 640;
 const int SCREEN_HEIGHT = 480;
@@ -54,11 +55,25 @@ SDL_Texture* load_texture(SDL_Renderer *renderer, char *path) {
 	return texture;
 }
 
+char *getIntString(char *before, Uint32 n, char *after) {
+	char intstr[11];
+	snprintf(intstr, 10, "%d", n);
+	int outsize = sizeof(before) + sizeof(intstr) + sizeof(after);
+	char *out = (char *) malloc(sizeof(char) * outsize);
+	sprintf(out, "%s%s%s", before, intstr, after);
+	return out;
+}
+
 int main(int argc, char **argv) {
 	init();
 	SDL_Window *window = create_window("test", SCREEN_WIDTH, SCREEN_HEIGHT);
 	SDL_Renderer *renderer = create_renderer(window);
 	SDL_Texture *texture = load_texture(renderer, "monkaW.png");
+	FPSmanager framerate = {0};
+	SDL_initFramerate(&framerate);
+	if(SDL_setFramerate(&framerate, 144) < 0) {
+		printf("SDL_setFramerate error: %s\n", SDL_GetError());
+	}
 
 	SDL_Rect bottom_bar;
 	bottom_bar.x = 0;
@@ -79,6 +94,8 @@ int main(int argc, char **argv) {
 
 	int running = 1;
 	SDL_Event e;
+	Uint32 time;
+	Uint32 lastTime = SDL_GetTicks();
 	while (running) {
 		while (SDL_PollEvent(&e) != 0) {
 			if (e.type == SDL_QUIT) running = 0;
@@ -86,6 +103,12 @@ int main(int argc, char **argv) {
 		SDL_RenderClear(renderer);
 		SDL_RenderCopy(renderer, texture, NULL, NULL);
 		SDL_RenderPresent(renderer);
+		SDL_framerateDelay(&framerate);
+		time = SDL_GetTicks();
+		char *str = getIntString("frametime: ", time - lastTime, " ms");
+		SDL_SetWindowTitle(window, str);
+		free(str);
+		lastTime = time;
 	}
 
 	// clean up
