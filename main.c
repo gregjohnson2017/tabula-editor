@@ -4,7 +4,7 @@
 
 const int SCREEN_WIDTH = 640;
 const int SCREEN_HEIGHT = 480;
-const int BOTTOM_BAR_HEIGHT = 20;
+const int BOTTOM_BAR_HEIGHT = 30;
 
 int init() {
 	// initialize SDL
@@ -36,7 +36,6 @@ SDL_Renderer* create_renderer(SDL_Window *window) {
 		printf("SDL_CreateRenderer error: %s\n", SDL_GetError());
 		return NULL;
 	}
-	// default pixel?
 	SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
 	return renderer;
 }
@@ -64,6 +63,23 @@ char *getIntString(char *before, Uint32 n, char *after) {
 	return out;
 }
 
+SDL_Texture* create_solid_color_texture(SDL_Renderer *renderer, int width, int height, Uint32 r, Uint32 g, Uint32 b, Uint32 a) {
+	SDL_Surface *surface = SDL_CreateRGBSurfaceWithFormat(0, width, height, 32, SDL_PIXELFORMAT_RGBA32);
+	SDL_FillRect(surface, NULL, SDL_MapRGBA(surface->format, r, g, b, a));
+
+	if (surface == NULL) {
+		printf("SDL_CreateRGBSurface error: %s\n", SDL_GetError());
+		return NULL;
+	}
+	SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
+	if (texture == NULL) {
+		printf("SDL_CreateTextureFromSurface error: %s\n", SDL_GetError());
+		return NULL;
+	}
+	SDL_FreeSurface(surface);
+	return texture;
+}
+
 int main(int argc, char **argv) {
 	init();
 	SDL_Window *window = create_window("test", SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -80,17 +96,13 @@ int main(int argc, char **argv) {
 	bottom_bar.y = SCREEN_HEIGHT - BOTTOM_BAR_HEIGHT;
 	bottom_bar.w = SCREEN_WIDTH;
 	bottom_bar.h = BOTTOM_BAR_HEIGHT;
-	SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xFF);
-	SDL_RenderSetViewport(renderer, &bottom_bar);
-	SDL_RenderCopy(renderer, NULL, NULL, NULL);
+	SDL_Texture *bottom_bar_texture = create_solid_color_texture(renderer, SCREEN_WIDTH, BOTTOM_BAR_HEIGHT, 0x80, 0x80, 0x80, 0xFF);
 
 	SDL_Rect canvas;
 	canvas.x = 0;
 	canvas.y = 0;
 	canvas.w = SCREEN_WIDTH;
 	canvas.h = SCREEN_HEIGHT - BOTTOM_BAR_HEIGHT;
-	SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
-	SDL_RenderSetViewport(renderer, &canvas);
 
 	int running = 1;
 	SDL_Event e;
@@ -101,7 +113,10 @@ int main(int argc, char **argv) {
 			if (e.type == SDL_QUIT) running = 0;
 		}
 		SDL_RenderClear(renderer);
+		SDL_RenderSetViewport(renderer, &canvas);
 		SDL_RenderCopy(renderer, texture, NULL, NULL);
+		SDL_RenderSetViewport(renderer, &bottom_bar);
+		SDL_RenderCopy(renderer, bottom_bar_texture, NULL, NULL);
 		SDL_RenderPresent(renderer);
 		SDL_framerateDelay(&framerate);
 		time = SDL_GetTicks();
