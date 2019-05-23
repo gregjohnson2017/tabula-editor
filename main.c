@@ -100,9 +100,9 @@ void render_text(SDL_Renderer *renderer, char *text, int relx, int rely, int rig
 	SDL_DestroyTexture(message_texture);
 }
 
-char *getIntString(char *before, Uint32 n, char *after) {
-	char intstr[11];
-	snprintf(intstr, 10, "%d", n);
+char *getUInt32String(char *before, Uint32 n, char *after) {
+	char intstr[12];
+	snprintf(intstr, 11, "%d", n);
 	int outsize = strlen(before) + strlen(intstr) + strlen(after) + 1;
 	char *out = (char *) malloc(outsize);
 	sprintf(out, "%s%s%s", before, intstr, after);
@@ -199,10 +199,10 @@ int main(int argc, char **argv) {
 		SDL_framerateDelay(&framerate);
 		time = SDL_GetTicks();
 		int fps = (int) 1.0/(float)((time - lastTime) / 1000.0);
-		char *fps_str = getIntString("FPS: ", fps, "");
+		char *fps_str = getUInt32String("FPS: ", fps, "");
 		// SDL_SetWindowTitle(window, str);
-		char *temp = getIntString("(", rmouse_point.x, ", ");
-		char *coord_str = getIntString(temp, rmouse_point.y, ")");
+		char *temp = getUInt32String("(", rmouse_point.x, ", ");
+		char *coord_str = getUInt32String(temp, rmouse_point.y, ")");
 		render_text(renderer, coord_str, SCREEN_WIDTH, 0, 1);
 		render_text(renderer, fps_str, 0, 0, 0);
 		free(temp);
