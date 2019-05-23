@@ -198,14 +198,15 @@ int main(int argc, char **argv) {
 		SDL_RenderCopy(renderer, bottom_bar_texture, NULL, NULL);
 		SDL_framerateDelay(&framerate);
 		time = SDL_GetTicks();
-		char *str = getIntString("frametime: ", time - lastTime, " ms");
+		int fps = (int) 1.0/(float)((time - lastTime) / 1000.0);
+		char *fps_str = getIntString("FPS: ", fps, "");
 		// SDL_SetWindowTitle(window, str);
 		char *temp = getIntString("(", rmouse_point.x, ", ");
 		char *coord_str = getIntString(temp, rmouse_point.y, ")");
 		render_text(renderer, coord_str, SCREEN_WIDTH, 0, 1);
-		render_text(renderer, str, 0, 0, 0);
+		render_text(renderer, fps_str, 0, 0, 0);
 		free(temp);
-		free(str);
+		free(fps_str);
 		free(coord_str);
 		lastTime = time;
 		SDL_RenderPresent(renderer);
