@@ -157,16 +157,36 @@ int main(int argc, char **argv) {
 	SDL_Event e;
 	Uint32 time;
 	Uint32 lastTime = SDL_GetTicks();
+	int rmouse_down = 0;
+	struct
+	{
+		int x;
+		int y;
+	} rmouse_point;
 	while (running) {
 		while (SDL_PollEvent(&e) != 0) {
 			switch (e.type) {
 			case SDL_QUIT:
 				running = 0;
 				break;
+			case SDL_MOUSEBUTTONDOWN:
+				if (e.button.button == SDL_BUTTON_RIGHT && e.button.y < bottom_bar.y) {
+					rmouse_down = 1;
+					rmouse_point.x = e.button.x;
+					rmouse_point.y = e.button.y;
+				}
+				break;
+			case SDL_MOUSEBUTTONUP:
+				if (e.button.button == SDL_BUTTON_RIGHT) {
+					rmouse_down = 0;
+				}
+				break;
 			case SDL_MOUSEMOTION:
-				if (e.motion.state == SDL_BUTTON_RMASK) {
-					canvas.x += e.motion.xrel;
-					canvas.y += e.motion.yrel;
+				if (e.motion.state == SDL_BUTTON_RMASK && rmouse_down) {
+					canvas.x += e.motion.x - rmouse_point.x;
+					rmouse_point.x = e.motion.x;
+					canvas.y += e.motion.y - rmouse_point.y;
+					rmouse_point.y = e.motion.y;
 				}
 				break;
 			}
