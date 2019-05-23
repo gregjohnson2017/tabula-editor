@@ -86,6 +86,26 @@ func renderText(conf *config, rend *sdl.Renderer, text string, relx int32, rely 
 	tex.Destroy()
 }
 
+type zoomer struct {
+	mult int32
+}
+
+func (z *zoomer) In() {
+	if z.mult == -1 {
+		z.mult = 1
+	} else {
+		z.mult++
+	}
+}
+
+func (z *zoomer) Out() {
+	if z.mult == 1 {
+		z.mult = -1
+	} else {
+		z.mult--
+	}
+}
+
 func main() {
 	conf := initConfig()
 
@@ -160,6 +180,7 @@ func main() {
 		x: 0,
 		y: 0,
 	}
+	var zoom = &zoomer{1}
 	for running {
 		var e sdl.Event
 		for e = sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
@@ -183,8 +204,16 @@ func main() {
 					rmousePoint.x = evt.X
 					rmousePoint.y = evt.Y
 				}
+			case *sdl.MouseWheelEvent:
+				if evt.Y > 0 {
+					zoom.In()
+				} else if evt.Y < 0 {
+					zoom.Out()
+				}
 			}
 		}
+		canvas.W = realW * zoom.mult
+		canvas.H = realH * zoom.mult
 		rend.Clear()
 		rend.SetViewport(canvas)
 		rend.Copy(tex, nil, nil)
