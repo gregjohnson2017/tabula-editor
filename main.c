@@ -2,10 +2,14 @@
 #include "SDL2/SDL_image.h"
 #include "SDL2/SDL2_framerate.h"
 #include "SDL2/SDL_ttf.h"
+#include <string.h>
 
-const int SCREEN_WIDTH = 640;
-const int SCREEN_HEIGHT = 480;
-const int BOTTOM_BAR_HEIGHT = 30;
+static const int SCREEN_WIDTH = 640;
+static const int SCREEN_HEIGHT = 480;
+static const int BOTTOM_BAR_HEIGHT = 30;
+static const char *font_name = "NotoMono-Regular.ttf";
+static const int font_size = 24;
+static TTF_Font *font = NULL;
 
 int init() {
 	// initialize SDL
@@ -17,6 +21,16 @@ int init() {
 	int flags = IMG_INIT_PNG;
 	if ((IMG_Init(flags) & flags) == 0) {
 		printf("SDL_image init error: %s\n", IMG_GetError());
+		return -1;
+	}
+	// initialize TTF
+	if (TTF_Init() == -1) {
+		printf("TTF init error: %s\n", TTF_GetError());
+		return -1;
+	}
+	font = TTF_OpenFont(font_name, font_size);
+	if (font == NULL) {
+		printf("TTF_OpenFont error opening \"%s\" with size %d\n", font_name, font_size);
 		return -1;
 	}
 	return 0;
@@ -55,6 +69,36 @@ SDL_Texture* load_texture(SDL_Renderer *renderer, char *path) {
 	return texture;
 }
 
+void render_text(SDL_Renderer *renderer, char *text, int relx, int rely) {
+	SDL_Color color = {255, 255, 255, 0};
+	SDL_Surface *message_surface = TTF_RenderText_Blended(font, text, color);
+	if (message_surface == NULL) {
+		printf("TTF_RenderText_Solid error: %s\n", TTF_GetError());
+		return;
+	}
+	SDL_Texture *message_texture = SDL_CreateTextureFromSurface(renderer, message_surface);
+	if (message_texture == NULL) {
+		printf("SDL_CreateTextureFromSurface error: %s\n", SDL_GetError());
+		SDL_FreeSurface(message_surface);
+		return;
+	}
+	int w, h;
+	if (TTF_SizeText(font, text, &w, &h) == -1) {
+		printf("TTF_SizeText error: %s\n", TTF_GetError());
+		SDL_FreeSurface(message_surface);
+		SDL_DestroyTexture(message_texture);
+		return;
+	}
+	SDL_Rect rect;
+	rect.x = relx;
+	rect.y = rely;
+	rect.w = w;
+	rect.h = h;
+	SDL_RenderCopy(renderer, message_texture, NULL, &rect);
+	SDL_FreeSurface(message_surface);
+	SDL_DestroyTexture(message_texture);
+}
+
 char *getIntString(char *before, Uint32 n, char *after) {
 	char intstr[11];
 	snprintf(intstr, 10, "%d", n);
@@ -82,14 +126,18 @@ SDL_Texture* create_solid_color_texture(SDL_Renderer *renderer, int width, int h
 }
 
 int main(int argc, char **argv) {
-	init();
+	if (init() == -1) {
+		printf("Initialization failed... exiting\n");
+		return -1;
+	}
 	SDL_Window *window = create_window("test", SCREEN_WIDTH, SCREEN_HEIGHT);
 	SDL_Renderer *renderer = create_renderer(window);
 	SDL_Texture *texture = load_texture(renderer, "monkaW.png");
 	FPSmanager framerate = {0};
 	SDL_initFramerate(&framerate);
-	if(SDL_setFramerate(&framerate, 144) < 0) {
+	if (SDL_setFramerate(&framerate, 144) < 0) {
 		printf("SDL_setFramerate error: %s\n", SDL_GetError());
+		return -1;
 	}
 
 	SDL_Rect bottom_bar;
@@ -128,13 +176,15 @@ int main(int argc, char **argv) {
 		SDL_RenderCopy(renderer, texture, NULL, NULL);
 		SDL_RenderSetViewport(renderer, &bottom_bar);
 		SDL_RenderCopy(renderer, bottom_bar_texture, NULL, NULL);
-		SDL_RenderPresent(renderer);
 		SDL_framerateDelay(&framerate);
 		time = SDL_GetTicks();
 		char *str = getIntString("frametime: ", time - lastTime, " ms");
-		SDL_SetWindowTitle(window, str);
+		// SDL_SetWindowTitle(window, str);
+		render_text(renderer, str, 0, 0);
 		free(str);
 		lastTime = time;
+		SDL_RenderPresent(renderer);
+
 	}
 
 	// clean up
@@ -143,6 +193,8 @@ int main(int argc, char **argv) {
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
 	IMG_Quit();
+	TTF_CloseFont(font);
+	TTF_Quit();
 	SDL_Quit();
 	return 0;
 }
