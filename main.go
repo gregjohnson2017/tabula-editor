@@ -188,6 +188,10 @@ func main() {
 		x: 0,
 		y: 0,
 	}
+	var mouseLoc = struct{ x, y int32 }{
+		x: 0,
+		y: 0,
+	}
 	var info sdl.RendererInfo
 	if info, err = rend.GetInfo(); err != nil {
 		panic(err)
@@ -216,6 +220,8 @@ func main() {
 					rmousePoint.y = evt.Y
 				}
 			case *sdl.MouseMotionEvent:
+				mouseLoc.x = evt.X
+				mouseLoc.y = evt.Y
 				if evt.State == sdl.ButtonRMask() && rmouseDown {
 					canvas.X += evt.X - rmousePoint.x
 					canvas.Y += evt.Y - rmousePoint.y
@@ -236,6 +242,9 @@ func main() {
 		canvas.H += diffH
 		canvas.X -= int32(diffW / 2.0)
 		canvas.Y -= int32(diffH / 2.0)
+		var mousePix struct{ x, y int32 }
+		mousePix.x = int32(float64(mouseLoc.x-canvas.X) / zoom.mult)
+		mousePix.y = int32(float64(mouseLoc.y-canvas.Y) / zoom.mult)
 		if err = rend.Clear(); err != nil {
 			panic(err)
 		}
@@ -254,7 +263,7 @@ func main() {
 		gfx.FramerateDelay(framerate)
 		time = sdl.GetTicks()
 		fps := int(1.0 / (float32(time-lastTime) / 1000.0))
-		coords := "(" + strconv.Itoa(int(rmousePoint.x)) + ", " + strconv.Itoa(int(rmousePoint.y)) + ")"
+		coords := "(" + strconv.Itoa(int(mousePix.x)) + ", " + strconv.Itoa(int(mousePix.y)) + ")"
 		renderText(conf, rend, coords, conf.screenWidth, 0, true)
 		renderText(conf, rend, strconv.Itoa(fps)+" FPS", 0, 0, false)
 		lastTime = time
