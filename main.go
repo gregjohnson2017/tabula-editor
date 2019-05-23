@@ -87,23 +87,31 @@ func renderText(conf *config, rend *sdl.Renderer, text string, relx int32, rely 
 }
 
 type zoomer struct {
-	mult int32
+	mult  float64
+	origW float64
+	origH float64
+	maxW  int32
+	maxH  int32
 }
 
 func (z *zoomer) In() {
-	if z.mult == -1 {
-		z.mult = 1
-	} else {
-		z.mult++
+	if int32(z.mult*z.origW*2.0) < z.maxW && int32(z.mult*z.origH*2.0) < z.maxH {
+		z.mult *= 2
 	}
 }
 
 func (z *zoomer) Out() {
-	if z.mult == 1 {
-		z.mult = -1
-	} else {
-		z.mult--
+	if int32(z.mult*z.origW/2.0) > 0 && int32(z.mult*z.origH/2.0) > 0 {
+		z.mult /= 2
 	}
+}
+
+func (z *zoomer) MultW() int32 {
+	return int32(z.origW * z.mult)
+}
+
+func (z *zoomer) MultH() int32 {
+	return int32(z.origH * z.mult)
 }
 
 func main() {
@@ -180,7 +188,17 @@ func main() {
 		x: 0,
 		y: 0,
 	}
-	var zoom = &zoomer{1}
+	var info sdl.RendererInfo
+	if info, err = rend.GetInfo(); err != nil {
+		panic(err)
+	}
+	var zoom = &zoomer{
+		1.0,
+		float64(realW),
+		float64(realH),
+		info.MaxTextureWidth,
+		info.MaxTextureHeight,
+	}
 	for running {
 		var e sdl.Event
 		for e = sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
@@ -212,13 +230,23 @@ func main() {
 				}
 			}
 		}
-		canvas.W = realW * zoom.mult
-		canvas.H = realH * zoom.mult
-		rend.Clear()
-		rend.SetViewport(canvas)
-		rend.Copy(tex, nil, nil)
-		rend.SetViewport(bottomBar)
-		rend.Copy(bottomBarTex, nil, nil)
+		canvas.W = zoom.MultW()
+		canvas.H = zoom.MultH()
+		if err = rend.Clear(); err != nil {
+			panic(err)
+		}
+		if err = rend.SetViewport(canvas); err != nil {
+			panic(err)
+		}
+		if err = rend.Copy(tex, nil, nil); err != nil {
+			panic(err)
+		}
+		if err = rend.SetViewport(bottomBar); err != nil {
+			panic(err)
+		}
+		if err = rend.Copy(bottomBarTex, nil, nil); err != nil {
+			panic(err)
+		}
 		gfx.FramerateDelay(framerate)
 		time = sdl.GetTicks()
 		fps := int(1.0 / (float32(time-lastTime) / 1000.0))
