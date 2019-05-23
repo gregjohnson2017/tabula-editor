@@ -110,7 +110,17 @@ int main(int argc, char **argv) {
 	Uint32 lastTime = SDL_GetTicks();
 	while (running) {
 		while (SDL_PollEvent(&e) != 0) {
-			if (e.type == SDL_QUIT) running = 0;
+			switch (e.type) {
+			case SDL_QUIT:
+				running = 0;
+				break;
+			case SDL_MOUSEMOTION:
+				if (e.motion.state == SDL_BUTTON_RMASK) {
+					canvas.x += e.motion.xrel;
+					canvas.y += e.motion.yrel;
+				}
+				break;
+			}
 		}
 		SDL_RenderClear(renderer);
 		SDL_RenderSetViewport(renderer, &canvas);
