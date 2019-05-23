@@ -1,6 +1,7 @@
 #include "SDL2/SDL.h"
 #include "SDL2/SDL_image.h"
 #include "SDL2/SDL2_framerate.h"
+#include "SDL2/SDL_ttf.h"
 
 const int SCREEN_WIDTH = 640;
 const int SCREEN_HEIGHT = 480;
@@ -57,8 +58,8 @@ SDL_Texture* load_texture(SDL_Renderer *renderer, char *path) {
 char *getIntString(char *before, Uint32 n, char *after) {
 	char intstr[11];
 	snprintf(intstr, 10, "%d", n);
-	int outsize = sizeof(before) + sizeof(intstr) + sizeof(after);
-	char *out = (char *) malloc(sizeof(char) * outsize);
+	int outsize = strlen(before) + strlen(intstr) + strlen(after) + 1;
+	char *out = (char *) malloc(outsize);
 	sprintf(out, "%s%s%s", before, intstr, after);
 	return out;
 }
