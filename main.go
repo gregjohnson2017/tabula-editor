@@ -230,8 +230,12 @@ func main() {
 				}
 			}
 		}
-		canvas.W = zoom.MultW()
-		canvas.H = zoom.MultH()
+		diffW := zoom.MultW() - canvas.W
+		diffH := zoom.MultH() - canvas.H
+		canvas.W += diffW
+		canvas.H += diffH
+		canvas.X -= int32(diffW / 2.0)
+		canvas.Y -= int32(diffH / 2.0)
 		if err = rend.Clear(); err != nil {
 			panic(err)
 		}
