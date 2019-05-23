@@ -9,6 +9,11 @@ import (
 	"github.com/veandco/go-sdl2/ttf"
 )
 
+type coord struct {
+	x int32
+	y int32
+}
+
 type config struct {
 	screenWidth     int32
 	screenHeight    int32
@@ -184,11 +189,11 @@ func main() {
 	var time, lastTime uint32
 	lastTime = sdl.GetTicks()
 	rmouseDown := false
-	var rmousePoint = struct{ x, y int32 }{
+	var rmousePoint = coord{
 		x: 0,
 		y: 0,
 	}
-	var mouseLoc = struct{ x, y int32 }{
+	var mouseLoc = coord{
 		x: 0,
 		y: 0,
 	}
@@ -242,7 +247,7 @@ func main() {
 		canvas.H += diffH
 		canvas.X -= int32(diffW / 2.0)
 		canvas.Y -= int32(diffH / 2.0)
-		var mousePix struct{ x, y int32 }
+		var mousePix coord
 		mousePix.x = int32(float64(mouseLoc.x-canvas.X) / zoom.mult)
 		mousePix.y = int32(float64(mouseLoc.y-canvas.Y) / zoom.mult)
 		if err = rend.Clear(); err != nil {
