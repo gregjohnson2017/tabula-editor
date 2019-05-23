@@ -25,32 +25,36 @@ SDL_Window* create_window(char *name, int width, int height) {
 	return window;
 }
 
-SDL_Surface* load_surface(char *path) {
+SDL_Renderer* create_renderer(SDL_Window *window) {
+	SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+	if (renderer == NULL) {
+		printf("SDL_CreateRenderer error: %s\n", SDL_GetError());
+		return NULL;
+	}
+	// default pixel?
+	SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
+	return renderer;
+}
+
+SDL_Texture* load_texture(SDL_Renderer *renderer, char *path) {
 	SDL_Surface *loaded_surface = IMG_Load(path);
 	if (loaded_surface == NULL) {
 		printf("IMG_load error loading \"%s\": %s\n", path, IMG_GetError());
 		return NULL;
 	}
-	return loaded_surface;
-}
-
-SDL_Surface* optimize_surface(SDL_Surface *surface, SDL_Surface *screen) {
-	SDL_Surface *optimized_surface = SDL_ConvertSurface(surface, screen->format, 0);
-	if (optimized_surface == NULL) {
-		printf("optimize_surface error: %s\n", SDL_GetError());
+	SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, loaded_surface);
+	if (texture == NULL) {
+		printf("SDL_CreateTextureFromSurface error: %s\n", SDL_GetError());
 		return NULL;
 	}
-	return optimized_surface;
+	return texture;
 }
 
 int main(int argc, char **argv) {
 	init();
 	SDL_Window *window = create_window("test", 640, 480);
-	SDL_Surface *screen = SDL_GetWindowSurface(window);
-	SDL_Surface *image = optimize_surface(load_surface("monkaW.png"), screen);
-
-	SDL_FillRect(screen, NULL, SDL_MapRGB(screen->format, 0x00, 0xFF, 0xFF));
-	SDL_BlitSurface(image, NULL, screen, NULL);
+	SDL_Renderer *renderer = create_renderer(window);
+	SDL_Texture *texture = load_texture(renderer, "monkaW.png");
 
 	int running = 1;
 	SDL_Event e;
@@ -58,15 +62,17 @@ int main(int argc, char **argv) {
 		while (SDL_PollEvent(&e) != 0) {
 			if (e.type == SDL_QUIT) running = 0;
 		}
-		SDL_UpdateWindowSurface(window);
-		SDL_Delay(200);
+		SDL_RenderClear(renderer);
+		SDL_RenderCopy(renderer, texture, NULL, NULL);
+		SDL_RenderPresent(renderer);
 	}
 
 	// clean up
 	printf("exiting\n");
-	SDL_FreeSurface(screen);
-	SDL_FreeSurface(image);
+	SDL_DestroyTexture(texture);
+	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
+	IMG_Quit();
 	SDL_Quit();
 	return 0;
 }
