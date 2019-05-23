@@ -1,6 +1,10 @@
 #include "SDL2/SDL.h"
 #include "SDL2/SDL_image.h"
 
+const int SCREEN_WIDTH = 640;
+const int SCREEN_HEIGHT = 480;
+const int BOTTOM_BAR_HEIGHT = 20;
+
 int init() {
 	// initialize SDL
 	if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -52,9 +56,26 @@ SDL_Texture* load_texture(SDL_Renderer *renderer, char *path) {
 
 int main(int argc, char **argv) {
 	init();
-	SDL_Window *window = create_window("test", 640, 480);
+	SDL_Window *window = create_window("test", SCREEN_WIDTH, SCREEN_HEIGHT);
 	SDL_Renderer *renderer = create_renderer(window);
 	SDL_Texture *texture = load_texture(renderer, "monkaW.png");
+
+	SDL_Rect bottom_bar;
+	bottom_bar.x = 0;
+	bottom_bar.y = SCREEN_HEIGHT - BOTTOM_BAR_HEIGHT;
+	bottom_bar.w = SCREEN_WIDTH;
+	bottom_bar.h = BOTTOM_BAR_HEIGHT;
+	SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xFF);
+	SDL_RenderSetViewport(renderer, &bottom_bar);
+	SDL_RenderCopy(renderer, NULL, NULL, NULL);
+
+	SDL_Rect canvas;
+	canvas.x = 0;
+	canvas.y = 0;
+	canvas.w = SCREEN_WIDTH;
+	canvas.h = SCREEN_HEIGHT - BOTTOM_BAR_HEIGHT;
+	SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
+	SDL_RenderSetViewport(renderer, &canvas);
 
 	int running = 1;
 	SDL_Event e;
