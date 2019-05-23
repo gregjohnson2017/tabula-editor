@@ -69,7 +69,7 @@ SDL_Texture* load_texture(SDL_Renderer *renderer, char *path) {
 	return texture;
 }
 
-void render_text(SDL_Renderer *renderer, char *text, int relx, int rely) {
+void render_text(SDL_Renderer *renderer, char *text, int relx, int rely, int right) {
 	SDL_Color color = {255, 255, 255, 0};
 	SDL_Surface *message_surface = TTF_RenderText_Blended(font, text, color);
 	if (message_surface == NULL) {
@@ -91,6 +91,7 @@ void render_text(SDL_Renderer *renderer, char *text, int relx, int rely) {
 	}
 	SDL_Rect rect;
 	rect.x = relx;
+	if (right) rect.x -= w;
 	rect.y = rely;
 	rect.w = w;
 	rect.h = h;
@@ -158,8 +159,7 @@ int main(int argc, char **argv) {
 	Uint32 time;
 	Uint32 lastTime = SDL_GetTicks();
 	int rmouse_down = 0;
-	struct
-	{
+	struct {
 		int x;
 		int y;
 	} rmouse_point;
@@ -200,8 +200,13 @@ int main(int argc, char **argv) {
 		time = SDL_GetTicks();
 		char *str = getIntString("frametime: ", time - lastTime, " ms");
 		// SDL_SetWindowTitle(window, str);
-		render_text(renderer, str, 0, 0);
+		char *temp = getIntString("(", rmouse_point.x, ", ");
+		char *coord_str = getIntString(temp, rmouse_point.y, ")");
+		render_text(renderer, coord_str, SCREEN_WIDTH, 0, 1);
+		render_text(renderer, str, 0, 0, 0);
+		free(temp);
 		free(str);
+		free(coord_str);
 		lastTime = time;
 		SDL_RenderPresent(renderer);
 
