@@ -163,6 +163,8 @@ int main(int argc, char **argv) {
 		int x;
 		int y;
 	} rmouse_point;
+	rmouse_point.x = 0;
+	rmouse_point.y = 0;
 	while (running) {
 		while (SDL_PollEvent(&e) != 0) {
 			switch (e.type) {
