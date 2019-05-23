@@ -139,11 +139,17 @@ func main() {
 	}
 	g := uint8(0x80)
 	bottomBarTex := createSolidColorTexture(rend, conf.screenWidth, conf.bottomBarHeight, g, g, g, 0xFF)
+
+	var realW, realH int32
+	if _, _, realW, realH, err = tex.Query(); err != nil {
+		panic(err)
+	}
+
 	var canvas = &sdl.Rect{
 		X: 0,
 		Y: 0,
-		W: conf.screenWidth,
-		H: conf.screenHeight - conf.bottomBarHeight,
+		W: realW,
+		H: realH,
 	}
 
 	running := true
