@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"strconv"
 	"unsafe"
 
@@ -121,13 +120,10 @@ func (z *zoomer) MultH() int32 {
 	return int32(z.origH * z.mult)
 }
 
-func setPixel(surf *sdl.Surface, x int32, y int32, r byte, g byte, b byte, a byte) {
-	var color uint32 = sdl.MapRGBA(surf.Format, r, g, b, a)
-	var start = surf.Pixels()[y*surf.Pitch+x*int32(surf.BytesPerPixel())]
-	var ptr = (*uint32)(unsafe.Pointer(&start))
-	fmt.Printf("%x\n", *ptr)
-	*ptr = color
-	fmt.Printf("%x\n", *ptr)
+func setPixel(surf *sdl.Surface, p coord, c sdl.Color) {
+	i := int32(surf.BytesPerPixel())*p.x + surf.Pitch*p.y
+	var ptr = (*uint32)(unsafe.Pointer(&surf.Pixels()[i]))
+	*ptr = sdl.MapRGBA(surf.Format, c.R, c.G, c.B, c.A)
 }
 
 func main() {
@@ -186,7 +182,7 @@ func main() {
 
 	var bytes []byte
 	bytes, _, err = tex.Lock(canvas)
-	setPixel(surf, 0, 0, 0, 0, 0, 255)
+	setPixel(surf, coord{x: 0, y: 0}, sdl.Color{R: 0, G: 0, B: 0, A: 255})
 	copy(bytes, surf.Pixels())
 	tex.Unlock()
 
