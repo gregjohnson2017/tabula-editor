@@ -3,6 +3,7 @@ package main
 import (
 	"strconv"
 
+	. "github.com/kroppt/IntSet"
 	"github.com/veandco/go-sdl2/gfx"
 	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
@@ -179,9 +180,7 @@ func main() {
 	if err = surf.SetRLE(true); err != nil {
 		panic(err)
 	}
-	var format uint32
-	format = surf.Format.Format
-	if tex, err = rend.CreateTexture(format, sdl.TEXTUREACCESS_STREAMING, surf.W, surf.H); err != nil {
+	if tex, err = rend.CreateTexture(surf.Format.Format, sdl.TEXTUREACCESS_STREAMING, surf.W, surf.H); err != nil {
 		panic(err)
 	}
 	tex.SetBlendMode(sdl.BLENDMODE_BLEND)
@@ -193,11 +192,12 @@ func main() {
 		H: surf.H,
 	}
 
-	var bytes []byte
-	bytes, _, err = tex.Lock(canvas)
-	setPixel(surf, coord{x: 0, y: 0}, sdl.Color{R: 0, G: 0, B: 0, A: 255})
-	copy(bytes, surf.Pixels())
-	tex.Unlock()
+	func() {
+		var bytes []byte
+		bytes, _, err = tex.Lock(canvas)
+		copy(bytes, surf.Pixels())
+		tex.Unlock()
+	}()
 
 	var framerate = &gfx.FPSmanager{}
 	gfx.InitFramerate(framerate)
@@ -225,6 +225,7 @@ func main() {
 		x: 0,
 		y: 0,
 	}
+	var mousePix coord
 	var info sdl.RendererInfo
 	if info, err = rend.GetInfo(); err != nil {
 		panic(err)
@@ -236,6 +237,43 @@ func main() {
 		float64(surf.H),
 		info.MaxTextureWidth,
 		info.MaxTextureHeight,
+	}
+	updateMousePos := func(x, y int32) {
+		mouseLoc.x = x
+		mouseLoc.y = y
+		mousePix.x = int32(float64(mouseLoc.x-canvas.X) / zoom.mult)
+		mousePix.y = int32(float64(mouseLoc.y-canvas.Y) / zoom.mult)
+	}
+	sel := NewSet()
+	var selSurf *sdl.Surface
+	if selSurf, err = sdl.CreateRGBSurfaceWithFormat(0, surf.W, surf.H, 32, uint32(sdl.PIXELFORMAT_RGBA32)); err != nil {
+		panic(err)
+	}
+	if err = selSurf.FillRect(nil, sdl.MapRGBA(selSurf.Format, 0, 0, 0, 0)); err != nil {
+		panic(err)
+	}
+	var selTex *sdl.Texture
+	if selTex, err = rend.CreateTexture(selSurf.Format.Format, sdl.TEXTUREACCESS_STREAMING, selSurf.W, selSurf.H); err != nil {
+		panic(err)
+	}
+	selTex.SetBlendMode(sdl.BLENDMODE_BLEND)
+	selFunc := func(n int) bool {
+		y := int32(n) % selSurf.W
+		x := int32(n) - y*selSurf.W
+		setPixel(selSurf, coord{x: x, y: y}, sdl.Color{R: 0, G: 0, B: 0, A: 128})
+		return true
+	}
+	onCanvas := func(x, y int32) bool {
+		if x < canvas.X || x >= canvas.X+canvas.W {
+			return false
+		}
+		if y < canvas.Y || y >= canvas.Y+canvas.H {
+			return false
+		}
+		if y >= bottomBar.Y {
+			return false
+		}
+		return true
 	}
 	for running {
 		diffW := zoom.MultW() - canvas.W
@@ -251,15 +289,13 @@ func main() {
 			canvas.Y = canvas.Y/2 + mouseLoc.y/2
 		}
 		zoom.Update()
-		var mousePix coord
-		mousePix.x = int32(float64(mouseLoc.x-canvas.X) / zoom.mult)
-		mousePix.y = int32(float64(mouseLoc.y-canvas.Y) / zoom.mult)
 		var e sdl.Event
 		for e = sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
 			switch evt := e.(type) {
 			case *sdl.QuitEvent:
 				running = false
 			case *sdl.MouseButtonEvent:
+				updateMousePos(evt.X, evt.Y)
 				if evt.Button == sdl.BUTTON_RIGHT {
 					if evt.State == sdl.PRESSED && evt.Y < bottomBar.Y {
 						rmouseDown = true
@@ -268,20 +304,26 @@ func main() {
 					}
 					rmousePoint.x = evt.X
 					rmousePoint.y = evt.Y
-				} else if evt.Button == sdl.BUTTON_LEFT {
-					// check if click is in bounds
-					if mousePix.x > 0 && mousePix.x < surf.W && mousePix.y > 0 && mousePix.y < surf.H {
-
+				}
+				if evt.Button == sdl.BUTTON_LEFT && evt.State == sdl.PRESSED && onCanvas(evt.X, evt.Y) {
+					i := int(surf.W*mousePix.y + mousePix.x)
+					if !sel.Contains(i) {
+						sel.Add(i)
 					}
 				}
 			case *sdl.MouseMotionEvent:
-				mouseLoc.x = evt.X
-				mouseLoc.y = evt.Y
+				updateMousePos(evt.X, evt.Y)
 				if evt.State == sdl.ButtonRMask() && rmouseDown {
 					canvas.X += evt.X - rmousePoint.x
 					canvas.Y += evt.Y - rmousePoint.y
 					rmousePoint.x = evt.X
 					rmousePoint.y = evt.Y
+				}
+				if evt.State == sdl.ButtonLMask() && onCanvas(evt.X, evt.Y) {
+					i := int(surf.W*mousePix.y + mousePix.x)
+					if !sel.Contains(i) {
+						sel.Add(i)
+					}
 				}
 			case *sdl.MouseWheelEvent:
 				if evt.Y > 0 {
@@ -301,12 +343,25 @@ func main() {
 		if err = rend.Copy(tex, nil, nil); err != nil {
 			panic(err)
 		}
+
+		var bytes []byte
+		if bytes, _, err = selTex.Lock(nil); err != nil {
+			panic(err)
+		}
+		sel.Range(selFunc)
+		copy(bytes, selSurf.Pixels())
+		selTex.Unlock()
+		if err = rend.Copy(selTex, nil, nil); err != nil {
+			panic(err)
+		}
+
 		if err = rend.SetViewport(bottomBar); err != nil {
 			panic(err)
 		}
 		if err = rend.Copy(bottomBarTex, nil, nil); err != nil {
 			panic(err)
 		}
+
 		gfx.FramerateDelay(framerate)
 		time = sdl.GetTicks()
 		fps := int(1.0 / (float32(time-lastTime) / 1000.0))
