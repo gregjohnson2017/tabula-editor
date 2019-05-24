@@ -2,7 +2,6 @@ package main
 
 import (
 	"strconv"
-	"unsafe"
 
 	"github.com/veandco/go-sdl2/gfx"
 	"github.com/veandco/go-sdl2/img"
@@ -121,9 +120,10 @@ func (z *zoomer) MultH() int32 {
 }
 
 func setPixel(surf *sdl.Surface, p coord, c sdl.Color) {
+	d := sdl.MapRGBA(surf.Format, c.R, c.G, c.B, c.A)
+	bs := []byte{byte(d), byte(d >> 8), byte(d >> 16), byte(d >> 24)}
 	i := int32(surf.BytesPerPixel())*p.x + surf.Pitch*p.y
-	var ptr = (*uint32)(unsafe.Pointer(&surf.Pixels()[i]))
-	*ptr = sdl.MapRGBA(surf.Format, c.R, c.G, c.B, c.A)
+	copy(surf.Pixels()[i:], bs)
 }
 
 func main() {
