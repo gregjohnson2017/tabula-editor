@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"strconv"
+	"unsafe"
 
 	"github.com/veandco/go-sdl2/gfx"
 	"github.com/veandco/go-sdl2/img"
@@ -119,6 +121,15 @@ func (z *zoomer) MultH() int32 {
 	return int32(z.origH * z.mult)
 }
 
+func setPixel(surf *sdl.Surface, x int32, y int32, r byte, g byte, b byte, a byte) {
+	var color uint32 = sdl.MapRGBA(surf.Format, r, g, b, a)
+	var start = surf.Pixels()[y*surf.Pitch+x*int32(surf.BytesPerPixel())]
+	var ptr = (*uint32)(unsafe.Pointer(&start))
+	fmt.Printf("%x\n", *ptr)
+	*ptr = color
+	fmt.Printf("%x\n", *ptr)
+}
+
 func main() {
 	conf := initConfig()
 
@@ -172,8 +183,10 @@ func main() {
 		W: surf.W,
 		H: surf.H,
 	}
+
 	var bytes []byte
 	bytes, _, err = tex.Lock(canvas)
+	setPixel(surf, 0, 0, 0, 0, 0, 255)
 	copy(bytes, surf.Pixels())
 	tex.Unlock()
 
@@ -215,6 +228,15 @@ func main() {
 		info.MaxTextureHeight,
 	}
 	for running {
+		diffW := zoom.MultW() - canvas.W
+		diffH := zoom.MultH() - canvas.H
+		canvas.W += diffW
+		canvas.H += diffH
+		canvas.X -= int32(diffW / 2.0)
+		canvas.Y -= int32(diffH / 2.0)
+		var mousePix coord
+		mousePix.x = int32(float64(mouseLoc.x-canvas.X) / zoom.mult)
+		mousePix.y = int32(float64(mouseLoc.y-canvas.Y) / zoom.mult)
 		var e sdl.Event
 		for e = sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
 			switch evt := e.(type) {
@@ -229,6 +251,11 @@ func main() {
 					}
 					rmousePoint.x = evt.X
 					rmousePoint.y = evt.Y
+				} else if evt.Button == sdl.BUTTON_LEFT {
+					// check if click is in bounds
+					if mousePix.x > 0 && mousePix.x < surf.W && mousePix.y > 0 && mousePix.y < surf.H {
+
+					}
 				}
 			case *sdl.MouseMotionEvent:
 				mouseLoc.x = evt.X
@@ -247,15 +274,7 @@ func main() {
 				}
 			}
 		}
-		diffW := zoom.MultW() - canvas.W
-		diffH := zoom.MultH() - canvas.H
-		canvas.W += diffW
-		canvas.H += diffH
-		canvas.X -= int32(diffW / 2.0)
-		canvas.Y -= int32(diffH / 2.0)
-		var mousePix coord
-		mousePix.x = int32(float64(mouseLoc.x-canvas.X) / zoom.mult)
-		mousePix.y = int32(float64(mouseLoc.y-canvas.Y) / zoom.mult)
+
 		if err = rend.Clear(); err != nil {
 			panic(err)
 		}
