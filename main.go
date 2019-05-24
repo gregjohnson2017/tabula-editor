@@ -156,6 +156,9 @@ func main() {
 	if surf, err = img.Load("monkaW.png"); err != nil {
 		panic(err)
 	}
+	if err = surf.SetRLE(true); err != nil {
+		panic(err)
+	}
 	var format uint32
 	format = surf.Format.Format
 	if tex, err = rend.CreateTexture(format, sdl.TEXTUREACCESS_STREAMING, surf.W, surf.H); err != nil {
