@@ -92,11 +92,12 @@ func renderText(conf *config, rend *sdl.Renderer, text string, relx int32, rely 
 }
 
 type zoomer struct {
-	mult  float64
-	origW float64
-	origH float64
-	maxW  int32
-	maxH  int32
+	lastMult float64
+	mult     float64
+	origW    float64
+	origH    float64
+	maxW     int32
+	maxH     int32
 }
 
 func (z *zoomer) In() {
@@ -117,6 +118,18 @@ func (z *zoomer) MultW() int32 {
 
 func (z *zoomer) MultH() int32 {
 	return int32(z.origH * z.mult)
+}
+
+func (z *zoomer) IsIn() bool {
+	return z.lastMult < z.mult
+}
+
+func (z *zoomer) IsOut() bool {
+	return z.lastMult > z.mult
+}
+
+func (z *zoomer) Update() {
+	z.lastMult = z.mult
 }
 
 func setPixel(surf *sdl.Surface, p coord, c sdl.Color) {
@@ -218,6 +231,7 @@ func main() {
 	}
 	var zoom = &zoomer{
 		1.0,
+		1.0,
 		float64(surf.W),
 		float64(surf.H),
 		info.MaxTextureWidth,
@@ -228,8 +242,15 @@ func main() {
 		diffH := zoom.MultH() - canvas.H
 		canvas.W += diffW
 		canvas.H += diffH
-		canvas.X -= int32(diffW / 2.0)
-		canvas.Y -= int32(diffH / 2.0)
+		if zoom.IsIn() {
+			canvas.X = 2*canvas.X - mouseLoc.x
+			canvas.Y = 2*canvas.Y - mouseLoc.y
+		}
+		if zoom.IsOut() {
+			canvas.X = canvas.X/2 + mouseLoc.x/2
+			canvas.Y = canvas.Y/2 + mouseLoc.y/2
+		}
+		zoom.Update()
 		var mousePix coord
 		mousePix.x = int32(float64(mouseLoc.x-canvas.X) / zoom.mult)
 		mousePix.y = int32(float64(mouseLoc.y-canvas.Y) / zoom.mult)
