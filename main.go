@@ -156,9 +156,23 @@ func main() {
 	if surf, err = img.Load("monkaW.png"); err != nil {
 		panic(err)
 	}
-	if tex, err = rend.CreateTextureFromSurface(surf); err != nil {
+	var format uint32
+	format, _ = win.GetPixelFormat()
+	if tex, err = rend.CreateTexture(format, sdl.TEXTUREACCESS_STREAMING, surf.W, surf.H); err != nil {
 		panic(err)
 	}
+
+	var canvas = &sdl.Rect{
+		X: 0,
+		Y: 0,
+		W: surf.W,
+		H: surf.H,
+	}
+	var bytes []byte
+	bytes, _, err = tex.Lock(canvas)
+	copy(bytes, surf.Pixels())
+	tex.Unlock()
+
 	var framerate = &gfx.FPSmanager{}
 	gfx.InitFramerate(framerate)
 	if gfx.SetFramerate(framerate, conf.framerate) != true {
@@ -172,18 +186,6 @@ func main() {
 	}
 	g := uint8(0x80)
 	bottomBarTex := createSolidColorTexture(rend, conf.screenWidth, conf.bottomBarHeight, g, g, g, 0xFF)
-
-	var realW, realH int32
-	if _, _, realW, realH, err = tex.Query(); err != nil {
-		panic(err)
-	}
-
-	var canvas = &sdl.Rect{
-		X: 0,
-		Y: 0,
-		W: realW,
-		H: realH,
-	}
 
 	running := true
 	var time, lastTime uint32
@@ -203,8 +205,8 @@ func main() {
 	}
 	var zoom = &zoomer{
 		1.0,
-		float64(realW),
-		float64(realH),
+		float64(surf.W),
+		float64(surf.H),
 		info.MaxTextureWidth,
 		info.MaxTextureHeight,
 	}
