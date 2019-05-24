@@ -157,10 +157,11 @@ func main() {
 		panic(err)
 	}
 	var format uint32
-	format, _ = win.GetPixelFormat()
+	format = surf.Format.Format
 	if tex, err = rend.CreateTexture(format, sdl.TEXTUREACCESS_STREAMING, surf.W, surf.H); err != nil {
 		panic(err)
 	}
+	tex.SetBlendMode(sdl.BLENDMODE_BLEND)
 
 	var canvas = &sdl.Rect{
 		X: 0,
