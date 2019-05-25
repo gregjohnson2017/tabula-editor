@@ -162,7 +162,7 @@ func main() {
 	defer conf.font.Close()
 
 	var win *sdl.Window
-	if win, err = sdl.CreateWindow("test", 0, 0, conf.screenWidth, conf.screenHeight, 0); err != nil {
+	if win, err = sdl.CreateWindow("test", 50, 50, conf.screenWidth, conf.screenHeight, 0); err != nil {
 		panic(err)
 	}
 	var rend *sdl.Renderer
