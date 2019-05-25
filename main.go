@@ -3,7 +3,7 @@ package main
 import (
 	"strconv"
 
-	. "github.com/kroppt/IntSet"
+	"github.com/kroppt/IntSet"
 	"github.com/veandco/go-sdl2/gfx"
 	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
@@ -244,7 +244,7 @@ func main() {
 		mousePix.x = int32(float64(mouseLoc.x-canvas.X) / zoom.mult)
 		mousePix.y = int32(float64(mouseLoc.y-canvas.Y) / zoom.mult)
 	}
-	sel := NewSet()
+	sel := set.NewSet()
 	var selSurf *sdl.Surface
 	if selSurf, err = sdl.CreateRGBSurfaceWithFormat(0, surf.W, surf.H, 32, uint32(sdl.PIXELFORMAT_RGBA32)); err != nil {
 		panic(err)
