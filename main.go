@@ -3,7 +3,7 @@ package main
 import (
 	"strconv"
 
-	"github.com/kroppt/IntSet"
+	set "github.com/kroppt/IntSet"
 	"github.com/veandco/go-sdl2/gfx"
 	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
