@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"strconv"
 
 	set "github.com/kroppt/IntSet"
@@ -229,6 +230,12 @@ func main() {
 	var info sdl.RendererInfo
 	if info, err = rend.GetInfo(); err != nil {
 		panic(err)
+	}
+	if info.MaxTextureWidth == 0 {
+		info.MaxTextureWidth = math.MaxInt32
+	}
+	if info.MaxTextureHeight == 0 {
+		info.MaxTextureHeight = math.MaxInt32
 	}
 	var zoom = &zoomer{
 		1.0,
