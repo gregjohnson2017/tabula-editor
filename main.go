@@ -144,6 +144,9 @@ func setPixel(surf *sdl.Surface, p coord, c sdl.Color) {
 func main() {
 	conf := initConfig()
 
+	if sdl.SetHint(sdl.HINT_RENDER_DRIVER, "opengl") != true {
+		panic("failed to set opengl render driver hint")
+	}
 	var err error
 	if err = sdl.Init(sdl.INIT_VIDEO); err != nil {
 		panic(err)
