@@ -166,8 +166,23 @@ func (z *zoomer) Update() {
 	z.lastMult = z.mult
 }
 
+func mapRGBA(form *sdl.PixelFormat, r, g, b, a uint8) uint32 {
+	ur := uint32(r)
+	ur |= ur<<8 | ur<<16 | ur<<24
+	ug := uint32(g)
+	ug |= ug<<8 | ug<<16 | ug<<24
+	ub := uint32(b)
+	ub |= ub<<8 | ub<<16 | ub<<24
+	ua := uint32(a)
+	ua |= ua<<8 | ua<<16 | ua<<24
+	return form.Rmask&ur |
+		form.Gmask&ug |
+		form.Bmask&ub |
+		form.Amask&ua
+}
+
 func setPixel(surf *sdl.Surface, p coord, c sdl.Color) {
-	d := sdl.MapRGBA(surf.Format, c.R, c.G, c.B, c.A)
+	d := mapRGBA(surf.Format, c.R, c.G, c.B, c.A)
 	bs := []byte{byte(d), byte(d >> 8), byte(d >> 16), byte(d >> 24)}
 	i := int32(surf.BytesPerPixel())*p.x + surf.Pitch*p.y
 	copy(surf.Pixels()[i:], bs)
