@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math"
 	"strconv"
 
@@ -203,7 +204,7 @@ func main() {
 	var framerate = &gfx.FPSmanager{}
 	gfx.InitFramerate(framerate)
 	if gfx.SetFramerate(framerate, conf.framerate) != true {
-		panic("could not set Framerate")
+		panic(fmt.Errorf("could not set framerate: %v", sdl.GetError()))
 	}
 	var bottomBar = &sdl.Rect{
 		X: 0,
