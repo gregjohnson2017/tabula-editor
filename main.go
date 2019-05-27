@@ -12,6 +12,36 @@ import (
 	"github.com/veandco/go-sdl2/ttf"
 )
 
+// AlignV is used for the positioning of elements vertically
+type AlignV int
+
+const (
+	// AlignBelow puts the top side at the y coordinate
+	AlignBelow AlignV = iota - 1
+	// AlignMiddle puts the top and bottom sides equidistant from the middle
+	AlignMiddle
+	// AlignAbove puts the bottom side on the y coordinate
+	AlignAbove
+)
+
+// AlignH is used for the positioning of elements horizontally
+type AlignH int
+
+const (
+	// AlignLeft puts the left side on the x coordinate
+	AlignLeft AlignH = iota - 1
+	//AlignCenter puts the left and right sides equidistant from the center
+	AlignCenter
+	// AlignRight puts the right side at the x coordinate
+	AlignRight
+)
+
+// Align holds vertical and horizontal alignments
+type Align struct {
+	v AlignV
+	h AlignH
+}
+
 type coord struct {
 	x int32
 	y int32
@@ -56,7 +86,7 @@ func createSolidColorTexture(rend *sdl.Renderer, w int32, h int32, r uint8, g ui
 	return tex
 }
 
-func renderText(conf *config, rend *sdl.Renderer, text string, relx int32, rely int32, right bool) {
+func renderText(conf *config, rend *sdl.Renderer, text string, pos coord, align Align) {
 	col := sdl.Color{
 		R: 255,
 		G: 255,
@@ -78,12 +108,13 @@ func renderText(conf *config, rend *sdl.Renderer, text string, relx int32, rely 
 		tex.Destroy()
 		panic(err)
 	}
-	if right {
-		relx -= int32(w)
-	}
+	w2 := int32(float64(w) / 2.0)
+	h2 := int32(float64(h) / 2.0)
+	offx := -w2 - int32(align.h)*int32(w2)
+	offy := -h2 - int32(align.v)*int32(h2)
 	var rect = &sdl.Rect{
-		X: relx,
-		Y: rely,
+		X: pos.x + offx,
+		Y: pos.y + offy,
 		W: int32(w),
 		H: int32(h),
 	}
@@ -374,8 +405,10 @@ func main() {
 		time = sdl.GetTicks()
 		fps := int(1.0 / (float32(time-lastTime) / 1000.0))
 		coords := "(" + strconv.Itoa(int(mousePix.x)) + ", " + strconv.Itoa(int(mousePix.y)) + ")"
-		renderText(conf, rend, coords, conf.screenWidth, 0, true)
-		renderText(conf, rend, strconv.Itoa(fps)+" FPS", 0, 0, false)
+		pos := coord{conf.screenWidth, int32(float64(bottomBar.H) / 2.0)}
+		renderText(conf, rend, coords, pos, Align{AlignMiddle, AlignRight})
+		pos.x = 0
+		renderText(conf, rend, strconv.Itoa(fps)+" FPS", pos, Align{AlignMiddle, AlignLeft})
 		lastTime = time
 		rend.Present()
 	}
