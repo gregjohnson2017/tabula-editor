@@ -211,8 +211,8 @@ func initialize(conf *config) error {
 func quit(conf *config) {
 	sdl.Quit()
 	img.Quit()
-	ttf.Quit()
 	conf.font.Close()
+	ttf.Quit()
 }
 
 func copyToTexture(tex *sdl.Texture, surf *sdl.Surface, region *sdl.Rect) error {
