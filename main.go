@@ -188,9 +188,7 @@ func setPixel(surf *sdl.Surface, p coord, c sdl.Color) {
 	copy(surf.Pixels()[i:], bs)
 }
 
-func main() {
-	conf := initConfig()
-
+func initialize(conf *config) {
 	if sdl.SetHint(sdl.HINT_RENDER_DRIVER, "opengl") != true {
 		panic("failed to set opengl render driver hint")
 	}
@@ -198,20 +196,38 @@ func main() {
 	if err = sdl.Init(sdl.INIT_VIDEO); err != nil {
 		panic(err)
 	}
-	defer sdl.Quit()
 	if img.Init(img.INIT_PNG) != img.INIT_PNG {
 		panic("could not initialize PNG")
 	}
-	defer img.Quit()
-	if err = ttf.Init(); err != nil {
-		panic(err)
-	}
-	defer ttf.Quit()
 	if conf.font, err = ttf.OpenFont(conf.fontName, conf.fontSize); err != nil {
 		panic(err)
 	}
-	defer conf.font.Close()
+	if err = ttf.Init(); err != nil {
+		panic(err)
+	}
+}
 
+func quit(conf *config) {
+	sdl.Quit()
+	img.Quit()
+	ttf.Quit()
+	conf.font.Close()
+}
+
+func copyToTexture(tex *sdl.Texture, surf *sdl.Surface, canvas *sdl.Rect) error {
+	var bytes []byte
+	var err error
+	bytes, _, err = tex.Lock(canvas)
+	copy(bytes, surf.Pixels())
+	tex.Unlock()
+	return err
+}
+
+func main() {
+	conf := initConfig()
+	initialize(conf)
+
+	var err error
 	var win *sdl.Window
 	if win, err = sdl.CreateWindow("test", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, conf.screenWidth, conf.screenHeight, 0); err != nil {
 		panic(err)
@@ -231,7 +247,10 @@ func main() {
 	if tex, err = rend.CreateTexture(surf.Format.Format, sdl.TEXTUREACCESS_STREAMING, surf.W, surf.H); err != nil {
 		panic(err)
 	}
-	tex.SetBlendMode(sdl.BLENDMODE_BLEND)
+	err = tex.SetBlendMode(sdl.BLENDMODE_BLEND)
+	if err != nil {
+		panic(err)
+	}
 
 	var canvas = &sdl.Rect{
 		X: 0,
@@ -427,4 +446,6 @@ func main() {
 		lastTime = time
 		rend.Present()
 	}
+
+	quit(conf)
 }
