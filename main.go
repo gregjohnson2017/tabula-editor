@@ -188,23 +188,22 @@ func setPixel(surf *sdl.Surface, p coord, c sdl.Color) {
 	copy(surf.Pixels()[i:], bs)
 }
 
-func initialize(conf *config) {
+func initialize(conf *config) error {
 	if sdl.SetHint(sdl.HINT_RENDER_DRIVER, "opengl") != true {
-		panic("failed to set opengl render driver hint")
+		return fmt.Errorf("failed to set opengl render driver hint")
 	}
 	var err error
 	if err = sdl.Init(sdl.INIT_VIDEO); err != nil {
-		panic(err)
+		return err
 	}
 	if img.Init(img.INIT_PNG) != img.INIT_PNG {
-		panic("could not initialize PNG")
+		return fmt.Errorf("could not initialize PNG")
 	}
 	if conf.font, err = ttf.OpenFont(conf.fontName, conf.fontSize); err != nil {
-		panic(err)
+		return err
 	}
-	if err = ttf.Init(); err != nil {
-		panic(err)
-	}
+	err = ttf.Init()
+	return err
 }
 
 func quit(conf *config) {
@@ -225,9 +224,11 @@ func copyToTexture(tex *sdl.Texture, surf *sdl.Surface, canvas *sdl.Rect) error 
 
 func main() {
 	conf := initConfig()
-	initialize(conf)
-
 	var err error
+	if err = initialize(conf); err != nil {
+		panic(err)
+	}
+
 	var win *sdl.Window
 	if win, err = sdl.CreateWindow("test", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, conf.screenWidth, conf.screenHeight, 0); err != nil {
 		panic(err)
