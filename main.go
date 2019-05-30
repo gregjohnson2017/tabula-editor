@@ -199,10 +199,10 @@ func initialize(conf *config) {
 	if img.Init(img.INIT_PNG) != img.INIT_PNG {
 		panic("could not initialize PNG")
 	}
-	if conf.font, err = ttf.OpenFont(conf.fontName, conf.fontSize); err != nil {
+	if err = ttf.Init(); err != nil {
 		panic(err)
 	}
-	if err = ttf.Init(); err != nil {
+	if conf.font, err = ttf.OpenFont(conf.fontName, conf.fontSize); err != nil {
 		panic(err)
 	}
 }
@@ -214,10 +214,10 @@ func quit(conf *config) {
 	conf.font.Close()
 }
 
-func copyToTexture(tex *sdl.Texture, surf *sdl.Surface, canvas *sdl.Rect) error {
+func copyToTexture(tex *sdl.Texture, surf *sdl.Surface, region *sdl.Rect) error {
 	var bytes []byte
 	var err error
-	bytes, _, err = tex.Lock(canvas)
+	bytes, _, err = tex.Lock(region)
 	copy(bytes, surf.Pixels())
 	tex.Unlock()
 	return err
