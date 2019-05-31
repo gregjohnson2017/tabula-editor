@@ -235,6 +235,26 @@ func copyToTexture(tex *sdl.Texture, pixels []byte, region *sdl.Rect) error {
 	return err
 }
 
+func loadImage(rend *sdl.Renderer, filename string) (*sdl.Surface, *sdl.Texture, error) {
+	var tex *sdl.Texture
+	var surf *sdl.Surface
+	var err error
+	if surf, err = img.Load(filename); err != nil {
+		return nil, nil, err
+	}
+	if tex, err = rend.CreateTexture(surf.Format.Format, sdl.TEXTUREACCESS_STREAMING, surf.W, surf.H); err != nil {
+		return nil, nil, err
+	}
+	err = tex.SetBlendMode(sdl.BLENDMODE_BLEND)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err = copyToTexture(tex, surf.Pixels(), nil); err != nil {
+		return nil, nil, err
+	}
+	return surf, tex, err
+}
+
 func main() {
 	conf := initConfig()
 	var err error
@@ -254,21 +274,7 @@ func main() {
 		panic(err)
 	}
 
-	var tex *sdl.Texture
-	var surf *sdl.Surface
-	if surf, err = img.Load("monkaW.png"); err != nil {
-		panic(err)
-	}
-	if tex, err = rend.CreateTexture(surf.Format.Format, sdl.TEXTUREACCESS_STREAMING, surf.W, surf.H); err != nil {
-		panic(err)
-	}
-	err = tex.SetBlendMode(sdl.BLENDMODE_BLEND)
-	if err != nil {
-		panic(err)
-	}
-	if err = copyToTexture(tex, surf.Pixels(), nil); err != nil {
-		panic(err)
-	}
+	surf, tex, err := loadImage(rend, "monkaW.png")
 
 	var canvas = &sdl.Rect{
 		X: 0,
