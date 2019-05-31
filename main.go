@@ -69,24 +69,24 @@ func initConfig() *config {
 	return &c
 }
 
-func createSolidColorTexture(rend *sdl.Renderer, w int32, h int32, r uint8, g uint8, b uint8, a uint8) *sdl.Texture {
+func createSolidColorTexture(rend *sdl.Renderer, w int32, h int32, r uint8, g uint8, b uint8, a uint8) (*sdl.Texture, error) {
 	var surf *sdl.Surface
 	var err error
 	if surf, err = sdl.CreateRGBSurfaceWithFormat(0, w, h, 32, uint32(sdl.PIXELFORMAT_RGBA32)); err != nil {
-		panic(err)
+		return nil, err
 	}
 	if err = surf.FillRect(nil, mapRGBA(surf.Format, r, g, b, a)); err != nil {
-		panic(err)
+		return nil, err
 	}
 	var tex *sdl.Texture
 	if tex, err = rend.CreateTextureFromSurface(surf); err != nil {
-		panic(err)
+		return nil, err
 	}
 	surf.Free()
-	return tex
+	return tex, nil
 }
 
-func renderText(conf *config, rend *sdl.Renderer, text string, pos coord, align Align) {
+func renderText(conf *config, rend *sdl.Renderer, text string, pos coord, align Align) error {
 	col := sdl.Color{
 		R: 255,
 		G: 255,
@@ -96,17 +96,17 @@ func renderText(conf *config, rend *sdl.Renderer, text string, pos coord, align 
 	var surf *sdl.Surface
 	var err error
 	if surf, err = conf.font.RenderUTF8Blended(text, col); err != nil {
-		panic(err)
+		return err
 	}
 	var tex *sdl.Texture
 	if tex, err = rend.CreateTexture(surf.Format.Format, sdl.TEXTUREACCESS_STREAMING, surf.W, int32(conf.fontSize)); err != nil {
 		surf.Free()
-		panic(err)
+		return err
 	}
 	if err = tex.SetBlendMode(sdl.BLENDMODE_BLEND); err != nil {
 		surf.Free()
 		tex.Destroy()
-		panic(err)
+		return err
 	}
 	sliceOffset := surf.Pitch * (surf.H - conf.fontSize)
 	copyToTexture(tex, surf.Pixels()[sliceOffset:], nil)
@@ -121,11 +121,10 @@ func renderText(conf *config, rend *sdl.Renderer, text string, pos coord, align 
 		W: int32(surf.W),
 		H: int32(conf.fontSize),
 	}
-	if err = rend.Copy(tex, nil, rect); err != nil {
-		panic(err)
-	}
+	err = rend.Copy(tex, nil, rect)
 	surf.Free()
 	tex.Destroy()
+	return err
 }
 
 type zoomer struct {
@@ -280,7 +279,10 @@ func main() {
 		H: conf.bottomBarHeight,
 	}
 	g := uint8(0x80)
-	bottomBarTex := createSolidColorTexture(rend, conf.screenWidth, conf.bottomBarHeight, g, g, g, 0xFF)
+	var bottomBarTex *sdl.Texture
+	if bottomBarTex, err = createSolidColorTexture(rend, conf.screenWidth, conf.bottomBarHeight, g, g, g, 0xFF); err != nil {
+		panic(err)
+	}
 
 	running := true
 	var time, lastTime uint32
@@ -437,9 +439,13 @@ func main() {
 		fps := int(1.0 / (float32(time-lastTime) / 1000.0))
 		coords := "(" + strconv.Itoa(int(mousePix.x)) + ", " + strconv.Itoa(int(mousePix.y)) + ")"
 		pos := coord{conf.screenWidth, int32(float64(bottomBar.H) / 2.0)}
-		renderText(conf, rend, coords, pos, Align{AlignMiddle, AlignRight})
+		if err = renderText(conf, rend, coords, pos, Align{AlignMiddle, AlignRight}); err != nil {
+			panic(err)
+		}
 		pos.x = 0
-		renderText(conf, rend, strconv.Itoa(fps)+" FPS", pos, Align{AlignMiddle, AlignLeft})
+		if err = renderText(conf, rend, strconv.Itoa(fps)+" FPS", pos, Align{AlignMiddle, AlignLeft}); err != nil {
+			panic(err)
+		}
 		lastTime = time
 		rend.Present()
 	}
