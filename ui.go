@@ -10,5 +10,7 @@ type UIComponent interface {
 	render() (*sdl.Texture, error)
 	onEnter(*sdl.MouseMotionEvent)
 	onLeave(*sdl.MouseMotionEvent)
+	onMotion(*sdl.MouseMotionEvent)
+	onScroll(*sdl.MouseWheelEvent)
 	onClick(*sdl.MouseButtonEvent)
 }
