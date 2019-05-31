@@ -52,7 +52,7 @@ type config struct {
 	screenHeight    int32
 	bottomBarHeight int32
 	fontName        string
-	fontSize        int
+	fontSize        int32
 	font            *ttf.Font
 	framerate       uint32
 }
@@ -75,7 +75,7 @@ func createSolidColorTexture(rend *sdl.Renderer, w int32, h int32, r uint8, g ui
 	if surf, err = sdl.CreateRGBSurfaceWithFormat(0, w, h, 32, uint32(sdl.PIXELFORMAT_RGBA32)); err != nil {
 		panic(err)
 	}
-	if err = surf.FillRect(nil, sdl.MapRGBA(surf.Format, r, g, b, a)); err != nil {
+	if err = surf.FillRect(nil, mapRGBA(surf.Format, r, g, b, a)); err != nil {
 		panic(err)
 	}
 	var tex *sdl.Texture
@@ -99,24 +99,27 @@ func renderText(conf *config, rend *sdl.Renderer, text string, pos coord, align 
 		panic(err)
 	}
 	var tex *sdl.Texture
-	if tex, err = rend.CreateTextureFromSurface(surf); err != nil {
+	if tex, err = rend.CreateTexture(surf.Format.Format, sdl.TEXTUREACCESS_STREAMING, surf.W, int32(conf.fontSize)); err != nil {
+		surf.Free()
 		panic(err)
 	}
-	var w, h int
-	if w, h, err = conf.font.SizeUTF8(text); err != nil {
+	if err = tex.SetBlendMode(sdl.BLENDMODE_BLEND); err != nil {
 		surf.Free()
 		tex.Destroy()
 		panic(err)
 	}
-	w2 := int32(float64(w) / 2.0)
-	h2 := int32(float64(h) / 2.0)
+	sliceOffset := surf.Pitch * (surf.H - conf.fontSize)
+	copyToTexture(tex, surf.Pixels()[sliceOffset:], nil)
+
+	w2 := int32(float64(surf.W) / 2.0)
+	h2 := int32(float64(conf.fontSize) / 2.0)
 	offx := -w2 - int32(align.h)*int32(w2)
 	offy := -h2 - int32(align.v)*int32(h2)
 	var rect = &sdl.Rect{
 		X: pos.x + offx,
 		Y: pos.y + offy,
-		W: int32(w),
-		H: int32(h),
+		W: int32(surf.W),
+		H: int32(conf.fontSize),
 	}
 	if err = rend.Copy(tex, nil, rect); err != nil {
 		panic(err)
@@ -202,7 +205,7 @@ func initialize(conf *config) error {
 	if err = ttf.Init(); err != nil {
 		return err
 	}
-	if conf.font, err = ttf.OpenFont(conf.fontName, conf.fontSize); err != nil {
+	if conf.font, err = ttf.OpenFont(conf.fontName, int(conf.fontSize)); err != nil {
 		return err
 	}
 	return err
@@ -215,11 +218,11 @@ func quit(conf *config) {
 	ttf.Quit()
 }
 
-func copyToTexture(tex *sdl.Texture, surf *sdl.Surface, region *sdl.Rect) error {
+func copyToTexture(tex *sdl.Texture, pixels []byte, region *sdl.Rect) error {
 	var bytes []byte
 	var err error
 	bytes, _, err = tex.Lock(region)
-	copy(bytes, surf.Pixels())
+	copy(bytes, pixels)
 	tex.Unlock()
 	return err
 }
@@ -254,7 +257,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
 	var canvas = &sdl.Rect{
 		X: 0,
 		Y: 0,
@@ -262,12 +264,9 @@ func main() {
 		H: surf.H,
 	}
 
-	func() {
-		var bytes []byte
-		bytes, _, err = tex.Lock(canvas)
-		copy(bytes, surf.Pixels())
-		tex.Unlock()
-	}()
+	if err = copyToTexture(tex, surf.Pixels(), nil); err != nil {
+		panic(err)
+	}
 
 	var framerate = &gfx.FPSmanager{}
 	gfx.InitFramerate(framerate)
@@ -419,18 +418,13 @@ func main() {
 		if err = rend.Copy(tex, nil, nil); err != nil {
 			panic(err)
 		}
-
-		var bytes []byte
-		if bytes, _, err = selTex.Lock(nil); err != nil {
+		sel.Range(selFunc)
+		if err = copyToTexture(selTex, selSurf.Pixels(), nil); err != nil {
 			panic(err)
 		}
-		sel.Range(selFunc)
-		copy(bytes, selSurf.Pixels())
-		selTex.Unlock()
 		if err = rend.Copy(selTex, nil, nil); err != nil {
 			panic(err)
 		}
-
 		if err = rend.SetViewport(bottomBar); err != nil {
 			panic(err)
 		}
