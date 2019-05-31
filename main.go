@@ -57,6 +57,15 @@ type config struct {
 	framerate       uint32
 }
 
+// UIComponent says what functions a UIComponent must implement
+type UIComponent interface {
+	getBoundary() *sdl.Rect
+	render() (*sdl.Texture, error)
+	onEnter(*sdl.Event)
+	onLeave(*sdl.Event)
+	onClick(*sdl.Event)
+}
+
 func initConfig() *config {
 	c := config{
 		screenWidth:     640,
@@ -244,6 +253,7 @@ func main() {
 	if err = rend.SetDrawColor(0xFF, 0xFF, 0xFF, 0xFF); err != nil {
 		panic(err)
 	}
+
 	var tex *sdl.Texture
 	var surf *sdl.Surface
 	if surf, err = img.Load("monkaW.png"); err != nil {
@@ -256,15 +266,15 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	if err = copyToTexture(tex, surf.Pixels(), nil); err != nil {
+		panic(err)
+	}
+
 	var canvas = &sdl.Rect{
 		X: 0,
 		Y: 0,
 		W: surf.W,
 		H: surf.H,
-	}
-
-	if err = copyToTexture(tex, surf.Pixels(), nil); err != nil {
-		panic(err)
 	}
 
 	var framerate = &gfx.FPSmanager{}
