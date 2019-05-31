@@ -57,15 +57,6 @@ type config struct {
 	framerate       uint32
 }
 
-// UIComponent says what functions a UIComponent must implement
-type UIComponent interface {
-	getBoundary() *sdl.Rect
-	render() (*sdl.Texture, error)
-	onEnter(*sdl.Event)
-	onLeave(*sdl.Event)
-	onClick(*sdl.Event)
-}
-
 func initConfig() *config {
 	c := config{
 		screenWidth:     640,
