@@ -5,7 +5,6 @@ import (
 	"math"
 	"strconv"
 
-	set "github.com/kroppt/IntSet"
 	"github.com/veandco/go-sdl2/gfx"
 	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
@@ -127,47 +126,6 @@ func renderText(conf *config, rend *sdl.Renderer, text string, pos coord, align 
 	return err
 }
 
-type zoomer struct {
-	lastMult float64
-	mult     float64
-	origW    float64
-	origH    float64
-	maxW     int32
-	maxH     int32
-}
-
-func (z *zoomer) In() {
-	if int32(z.mult*z.origW*2.0) < z.maxW && int32(z.mult*z.origH*2.0) < z.maxH {
-		z.mult *= 2
-	}
-}
-
-func (z *zoomer) Out() {
-	if int32(z.mult*z.origW/2.0) > 0 && int32(z.mult*z.origH/2.0) > 0 {
-		z.mult /= 2
-	}
-}
-
-func (z *zoomer) MultW() int32 {
-	return int32(z.origW * z.mult)
-}
-
-func (z *zoomer) MultH() int32 {
-	return int32(z.origH * z.mult)
-}
-
-func (z *zoomer) IsIn() bool {
-	return z.lastMult < z.mult
-}
-
-func (z *zoomer) IsOut() bool {
-	return z.lastMult > z.mult
-}
-
-func (z *zoomer) Update() {
-	z.lastMult = z.mult
-}
-
 func mapRGBA(form *sdl.PixelFormat, r, g, b, a uint8) uint32 {
 	ur := uint32(r)
 	ur |= ur<<8 | ur<<16 | ur<<24
@@ -226,11 +184,11 @@ func copyToTexture(tex *sdl.Texture, pixels []byte, region *sdl.Rect) error {
 	return err
 }
 
-func loadImage(rend *sdl.Renderer, filename string) (*sdl.Surface, *sdl.Texture, error) {
+func loadImage(rend *sdl.Renderer, fileName string) (*sdl.Surface, *sdl.Texture, error) {
 	var tex *sdl.Texture
 	var surf *sdl.Surface
 	var err error
-	if surf, err = img.Load(filename); err != nil {
+	if surf, err = img.Load(fileName); err != nil {
 		return nil, nil, err
 	}
 	if tex, err = rend.CreateTexture(surf.Format.Format, sdl.TEXTUREACCESS_STREAMING, surf.W, surf.H); err != nil {
@@ -244,6 +202,13 @@ func loadImage(rend *sdl.Renderer, filename string) (*sdl.Surface, *sdl.Texture,
 		return nil, nil, err
 	}
 	return surf, tex, err
+}
+
+func inBounds(area *sdl.Rect, x int32, y int32) bool {
+	if x < area.X || x >= area.X+area.W || y < area.Y || y >= area.Y+area.H {
+		return false
+	}
+	return true
 }
 
 func main() {
@@ -263,15 +228,6 @@ func main() {
 	}
 	if err = rend.SetDrawColor(0xFF, 0xFF, 0xFF, 0xFF); err != nil {
 		panic(err)
-	}
-
-	surf, tex, err := loadImage(rend, "monkaW.png")
-
-	var canvas = &sdl.Rect{
-		X: 0,
-		Y: 0,
-		W: surf.W,
-		H: surf.H,
 	}
 
 	var framerate = &gfx.FPSmanager{}
@@ -294,16 +250,6 @@ func main() {
 	running := true
 	var time, lastTime uint32
 	lastTime = sdl.GetTicks()
-	rmouseDown := false
-	var rmousePoint = coord{
-		x: 0,
-		y: 0,
-	}
-	var mouseLoc = coord{
-		x: 0,
-		y: 0,
-	}
-	var mousePix coord
 	var info sdl.RendererInfo
 	if info, err = rend.GetInfo(); err != nil {
 		panic(err)
@@ -314,124 +260,48 @@ func main() {
 	if info.MaxTextureHeight == 0 {
 		info.MaxTextureHeight = math.MaxInt32
 	}
-	var zoom = &zoomer{
-		1.0,
-		1.0,
-		float64(surf.W),
-		float64(surf.H),
-		info.MaxTextureWidth,
-		info.MaxTextureHeight,
+	ctx := &context{win, rend, &info}
+	area := &sdl.Rect{
+		X: 0,
+		Y: 0,
+		W: conf.screenWidth,
+		H: conf.screenHeight,
 	}
-	updateMousePos := func(x, y int32) {
-		mouseLoc.x = x
-		mouseLoc.y = y
-		mousePix.x = int32(float64(mouseLoc.x-canvas.X) / zoom.mult)
-		mousePix.y = int32(float64(mouseLoc.y-canvas.Y) / zoom.mult)
-	}
-	sel := set.NewSet()
-	var selSurf *sdl.Surface
-	if selSurf, err = sdl.CreateRGBSurfaceWithFormat(0, surf.W, surf.H, 32, uint32(sdl.PIXELFORMAT_RGBA32)); err != nil {
-		panic(err)
-	}
-	if err = selSurf.FillRect(nil, sdl.MapRGBA(selSurf.Format, 0, 0, 0, 0)); err != nil {
-		panic(err)
-	}
-	var selTex *sdl.Texture
-	if selTex, err = rend.CreateTexture(selSurf.Format.Format, sdl.TEXTUREACCESS_STREAMING, selSurf.W, selSurf.H); err != nil {
-		panic(err)
-	}
-	selTex.SetBlendMode(sdl.BLENDMODE_BLEND)
-	selFunc := func(n int) bool {
-		y := int32(n) % selSurf.W
-		x := int32(n) - y*selSurf.W
-		setPixel(selSurf, coord{x: x, y: y}, sdl.Color{R: 0, G: 0, B: 0, A: 128})
-		return true
-	}
-	onCanvas := func(x, y int32) bool {
-		if x < canvas.X || x >= canvas.X+canvas.W {
-			return false
-		}
-		if y < canvas.Y || y >= canvas.Y+canvas.H {
-			return false
-		}
-		if y >= bottomBar.Y {
-			return false
-		}
-		return true
-	}
+	iv, err := newImageView(area, "monkaW.png", ctx)
 	for running {
-		diffW := zoom.MultW() - canvas.W
-		diffH := zoom.MultH() - canvas.H
-		canvas.W += diffW
-		canvas.H += diffH
-		if zoom.IsIn() {
-			canvas.X = 2*canvas.X - mouseLoc.x
-			canvas.Y = 2*canvas.Y - mouseLoc.y
-		}
-		if zoom.IsOut() {
-			canvas.X = canvas.X/2 + mouseLoc.x/2
-			canvas.Y = canvas.Y/2 + mouseLoc.y/2
-		}
-		zoom.Update()
 		var e sdl.Event
 		for e = sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
 			switch evt := e.(type) {
 			case *sdl.QuitEvent:
 				running = false
 			case *sdl.MouseButtonEvent:
-				updateMousePos(evt.X, evt.Y)
-				if evt.Button == sdl.BUTTON_RIGHT {
-					if evt.State == sdl.PRESSED && evt.Y < bottomBar.Y {
-						rmouseDown = true
-					} else if evt.State == sdl.RELEASED {
-						rmouseDown = false
-					}
-					rmousePoint.x = evt.X
-					rmousePoint.y = evt.Y
-				}
-				if evt.Button == sdl.BUTTON_LEFT && evt.State == sdl.PRESSED && onCanvas(evt.X, evt.Y) {
-					i := int(surf.W*mousePix.y + mousePix.x)
-					if !sel.Contains(i) {
-						sel.Add(i)
-					}
+				// TODO
+				if inBounds(iv.area, evt.X, evt.Y) {
+					iv.onClick(evt)
 				}
 			case *sdl.MouseMotionEvent:
-				updateMousePos(evt.X, evt.Y)
-				if evt.State == sdl.ButtonRMask() && rmouseDown {
-					canvas.X += evt.X - rmousePoint.x
-					canvas.Y += evt.Y - rmousePoint.y
-					rmousePoint.x = evt.X
-					rmousePoint.y = evt.Y
-				}
-				if evt.State == sdl.ButtonLMask() && onCanvas(evt.X, evt.Y) {
-					i := int(surf.W*mousePix.y + mousePix.x)
-					if !sel.Contains(i) {
-						sel.Add(i)
-					}
+				// TODO
+				if inBounds(iv.area, evt.X, evt.Y) {
+					iv.onMotion(evt)
 				}
 			case *sdl.MouseWheelEvent:
-				if evt.Y > 0 {
-					zoom.In()
-				} else if evt.Y < 0 {
-					zoom.Out()
-				}
+				// TODO
+				iv.onScroll(evt)
 			}
 		}
 
 		if err = rend.Clear(); err != nil {
 			panic(err)
 		}
-		if err = rend.SetViewport(canvas); err != nil {
+		// TODO
+		if err = rend.SetViewport(iv.getBoundary()); err != nil {
+			panic(err)
+		}
+		tex, err := iv.render()
+		if err != nil {
 			panic(err)
 		}
 		if err = rend.Copy(tex, nil, nil); err != nil {
-			panic(err)
-		}
-		sel.Range(selFunc)
-		if err = copyToTexture(selTex, selSurf.Pixels(), nil); err != nil {
-			panic(err)
-		}
-		if err = rend.Copy(selTex, nil, nil); err != nil {
 			panic(err)
 		}
 		if err = rend.SetViewport(bottomBar); err != nil {
@@ -444,8 +314,9 @@ func main() {
 		gfx.FramerateDelay(framerate)
 		time = sdl.GetTicks()
 		fps := int(1.0 / (float32(time-lastTime) / 1000.0))
-		coords := "(" + strconv.Itoa(int(mousePix.x)) + ", " + strconv.Itoa(int(mousePix.y)) + ")"
+		coords := "(" + strconv.Itoa(int(iv.mousePix.x)) + ", " + strconv.Itoa(int(iv.mousePix.y)) + ")"
 		pos := coord{conf.screenWidth, int32(float64(bottomBar.H) / 2.0)}
+		// TODO
 		if err = renderText(conf, rend, coords, pos, Align{AlignMiddle, AlignRight}); err != nil {
 			panic(err)
 		}
