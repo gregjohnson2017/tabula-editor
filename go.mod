@@ -1,4 +1,4 @@
-module github.com/gregjohnson2017/greg-editor
+module github.com/gregjohnson2017/tabula-editor
 
 go 1.12
 

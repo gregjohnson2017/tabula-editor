@@ -219,7 +219,7 @@ func main() {
 	}
 
 	var win *sdl.Window
-	if win, err = sdl.CreateWindow("test", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, conf.screenWidth, conf.screenHeight, 0); err != nil {
+	if win, err = sdl.CreateWindow("Tabula Editor", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, conf.screenWidth, conf.screenHeight, 0); err != nil {
 		panic(err)
 	}
 	var rend *sdl.Renderer
