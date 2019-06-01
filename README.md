@@ -1,2 +1,2 @@
-# greg-editor
+# tabula-editor
 Greg and Tyler's editor
