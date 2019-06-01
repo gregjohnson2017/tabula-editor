@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	set "github.com/kroppt/IntSet"
 	"github.com/veandco/go-sdl2/sdl"
 )
@@ -10,7 +8,7 @@ import (
 // UIComponent says what functions a UIComponent must implement
 type UIComponent interface {
 	getBoundary() *sdl.Rect
-	render() (*sdl.Texture, error)
+	render() ([]*sdl.Texture, error)
 	onEnter(*sdl.MouseMotionEvent)
 	onLeave(*sdl.MouseMotionEvent)
 	onMotion(*sdl.MouseMotionEvent)
@@ -80,8 +78,6 @@ type imageView struct {
 	tex       *sdl.Texture
 	selSurf   *sdl.Surface
 	selTex    *sdl.Texture
-	outSurf   *sdl.Surface
-	outTex    *sdl.Texture
 }
 
 func newImageView(area *sdl.Rect, fileName string, ctx *context) (*imageView, error) {
@@ -98,15 +94,6 @@ func newImageView(area *sdl.Rect, fileName string, ctx *context) (*imageView, er
 		return nil, err
 	}
 	selTex.SetBlendMode(sdl.BLENDMODE_BLEND)
-	var outSurf *sdl.Surface
-	if outSurf, err = sdl.CreateRGBSurfaceWithFormat(0, area.W, area.H, 32, uint32(sdl.PIXELFORMAT_RGBA32)); err != nil {
-		return nil, err
-	}
-	var outTex *sdl.Texture
-	if outTex, err = ctx.Rend.CreateTexture(outSurf.Format.Format, sdl.TEXTUREACCESS_STREAMING, outSurf.W, outSurf.H); err != nil {
-		return nil, err
-	}
-	outTex.SetBlendMode(sdl.BLENDMODE_BLEND)
 	var zoom = zoomer{
 		1.0,
 		1.0,
@@ -133,8 +120,6 @@ func newImageView(area *sdl.Rect, fileName string, ctx *context) (*imageView, er
 		sel:     set.NewSet(),
 		selSurf: selSurf,
 		selTex:  selTex,
-		outSurf: outSurf,
-		outTex:  outTex,
 	}, nil
 }
 
@@ -146,10 +131,10 @@ func (iv *imageView) updateMousePos(x, y int32) {
 }
 
 func (iv *imageView) getBoundary() *sdl.Rect {
-	return iv.area
+	return iv.canvas
 }
 
-func (iv *imageView) render() (*sdl.Texture, error) {
+func (iv *imageView) render() ([]*sdl.Texture, error) {
 	diffW := iv.zoom.MultW() - iv.canvas.W
 	diffH := iv.zoom.MultH() - iv.canvas.H
 	iv.canvas.W += diffW
@@ -173,21 +158,10 @@ func (iv *imageView) render() (*sdl.Texture, error) {
 	if err = copyToTexture(iv.selTex, iv.selSurf.Pixels(), nil); err != nil {
 		return nil, err
 	}
-	iv.outSurf.FillRect(nil, 0)
-	// blit textures together
-	fmt.Printf("iv.canvas=%v\n", iv.canvas)
-	tmp := *iv.canvas
-	if err = iv.surf.BlitScaled(nil, iv.outSurf, &tmp); err != nil {
+	if err = copyToTexture(iv.tex, iv.surf.Pixels(), nil); err != nil {
 		return nil, err
 	}
-	tmp = *iv.canvas
-	if err = iv.selSurf.BlitScaled(nil, iv.outSurf, &tmp); err != nil {
-		return nil, err
-	}
-	if err = copyToTexture(iv.outTex, iv.outSurf.Pixels(), nil); err != nil {
-		return nil, err
-	}
-	return iv.outTex, nil
+	return []*sdl.Texture{iv.tex, iv.selTex}, nil
 }
 
 func (iv *imageView) onEnter(evt *sdl.MouseMotionEvent) {
