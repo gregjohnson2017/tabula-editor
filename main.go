@@ -324,19 +324,12 @@ func main() {
 		if err = rend.Clear(); err != nil {
 			panic(err)
 		}
-		// TODO
-		if err = rend.SetViewport(iv.getBoundary()); err != nil {
-			panic(err)
-		}
-		textures, err := iv.render()
-		if err != nil {
-			panic(err)
-		}
-		for _, tex := range textures {
-			if err = rend.Copy(tex, nil, nil); err != nil {
+		for _, comp := range comps {
+			if err = comp.render(rend); err != nil {
 				panic(err)
 			}
 		}
+
 		if err = rend.SetViewport(bottomBar); err != nil {
 			panic(err)
 		}

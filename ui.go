@@ -8,7 +8,7 @@ import (
 // UIComponent says what functions a UIComponent must implement
 type UIComponent interface {
 	getBoundary() *sdl.Rect
-	render() ([]*sdl.Texture, error)
+	render(*sdl.Renderer) error
 	onEnter(*sdl.MouseMotionEvent) bool
 	onLeave(*sdl.MouseMotionEvent) bool
 	onMotion(*sdl.MouseMotionEvent) bool
@@ -96,7 +96,9 @@ func newImageView(area *sdl.Rect, fileName string, ctx *context) (*imageView, er
 	if selTex, err = ctx.Rend.CreateTexture(selSurf.Format.Format, sdl.TEXTUREACCESS_STREAMING, selSurf.W, selSurf.H); err != nil {
 		return nil, err
 	}
-	selTex.SetBlendMode(sdl.BLENDMODE_BLEND)
+	if err = selTex.SetBlendMode(sdl.BLENDMODE_BLEND); err != nil {
+		return nil, err
+	}
 	var zoom = zoomer{
 		1.0,
 		1.0,
@@ -134,10 +136,10 @@ func (iv *imageView) updateMousePos(x, y int32) {
 }
 
 func (iv *imageView) getBoundary() *sdl.Rect {
-	return iv.canvas
+	return iv.area
 }
 
-func (iv *imageView) render() ([]*sdl.Texture, error) {
+func (iv *imageView) render(rend *sdl.Renderer) error {
 	diffW := iv.zoom.MultW() - iv.canvas.W
 	diffH := iv.zoom.MultH() - iv.canvas.H
 	iv.canvas.W += diffW
@@ -158,13 +160,22 @@ func (iv *imageView) render() ([]*sdl.Texture, error) {
 		return true
 	})
 	var err error
-	if err = copyToTexture(iv.selTex, iv.selSurf.Pixels(), nil); err != nil {
-		return nil, err
+	if err = rend.SetViewport(iv.canvas); err != nil {
+		return err
 	}
 	if err = copyToTexture(iv.tex, iv.surf.Pixels(), nil); err != nil {
-		return nil, err
+		return err
 	}
-	return []*sdl.Texture{iv.tex, iv.selTex}, nil
+	if err = rend.Copy(iv.tex, nil, nil); err != nil {
+		panic(err)
+	}
+	if err = copyToTexture(iv.selTex, iv.selSurf.Pixels(), nil); err != nil {
+		return err
+	}
+	if err = rend.Copy(iv.selTex, nil, nil); err != nil {
+		panic(err)
+	}
+	return nil
 }
 
 func (iv *imageView) onEnter(evt *sdl.MouseMotionEvent) bool {
@@ -182,10 +193,10 @@ func (iv *imageView) onLeave(evt *sdl.MouseMotionEvent) bool {
 }
 
 func (iv *imageView) onMotion(evt *sdl.MouseMotionEvent) bool {
+	iv.updateMousePos(evt.X, evt.Y)
 	if !inBounds(iv.canvas, evt.X, evt.Y) {
 		return false
 	}
-	iv.updateMousePos(evt.X, evt.Y)
 	if evt.State == sdl.ButtonRMask() && iv.dragging {
 		iv.canvas.X += evt.X - iv.dragPoint.x
 		iv.canvas.Y += evt.Y - iv.dragPoint.y
