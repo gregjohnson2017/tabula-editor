@@ -327,9 +327,10 @@ func main() {
 				panic(err)
 			}
 		}
-		rend.Present()
 
+		// wait remainder of frame-time before presenting
 		gfx.FramerateDelay(framerate)
+		rend.Present()
 	}
 
 	quit(conf)
