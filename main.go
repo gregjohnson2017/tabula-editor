@@ -267,7 +267,10 @@ func main() {
 		W: conf.screenWidth,
 		H: conf.screenHeight,
 	}
-	iv, err := newImageView(area, "monkaW.png", ctx)
+	iv, err := newImageView(area, "monkaDetect.png", ctx)
+	if err != nil {
+		panic(err)
+	}
 	for running {
 		var e sdl.Event
 		for e = sdl.PollEvent(); e != nil; e = sdl.PollEvent() {

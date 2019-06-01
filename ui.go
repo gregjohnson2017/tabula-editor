@@ -82,6 +82,9 @@ type imageView struct {
 
 func newImageView(area *sdl.Rect, fileName string, ctx *context) (*imageView, error) {
 	surf, tex, err := loadImage(ctx.Rend, fileName)
+	if err != nil {
+		return nil, err
+	}
 	var selSurf *sdl.Surface
 	if selSurf, err = sdl.CreateRGBSurfaceWithFormat(0, surf.W, surf.H, 32, uint32(sdl.PIXELFORMAT_RGBA32)); err != nil {
 		return nil, err
