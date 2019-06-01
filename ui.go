@@ -176,10 +176,12 @@ func (iv *imageView) render() (*sdl.Texture, error) {
 	iv.outSurf.FillRect(nil, 0)
 	// blit textures together
 	fmt.Printf("iv.canvas=%v\n", iv.canvas)
-	if err = iv.surf.Blit(nil, iv.outSurf, iv.canvas); err != nil {
+	tmp := *iv.canvas
+	if err = iv.surf.Blit(nil, iv.outSurf, &tmp); err != nil {
 		return nil, err
 	}
-	if err = iv.selSurf.Blit(nil, iv.outSurf, iv.canvas); err != nil {
+	tmp = *iv.canvas
+	if err = iv.selSurf.Blit(nil, iv.outSurf, &tmp); err != nil {
 		return nil, err
 	}
 	if err = copyToTexture(iv.outTex, iv.outSurf.Pixels(), nil); err != nil {
