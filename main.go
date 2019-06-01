@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"math"
-	"strconv"
 
 	"github.com/veandco/go-sdl2/gfx"
 	"github.com/veandco/go-sdl2/img"
@@ -235,21 +234,8 @@ func main() {
 	if gfx.SetFramerate(framerate, conf.framerate) != true {
 		panic(fmt.Errorf("could not set framerate: %v", sdl.GetError()))
 	}
-	var bottomBar = &sdl.Rect{
-		X: 0,
-		Y: conf.screenHeight - conf.bottomBarHeight,
-		W: conf.screenWidth,
-		H: conf.bottomBarHeight,
-	}
-	g := uint8(0x80)
-	var bottomBarTex *sdl.Texture
-	if bottomBarTex, err = createSolidColorTexture(rend, conf.screenWidth, conf.bottomBarHeight, g, g, g, 0xFF); err != nil {
-		panic(err)
-	}
 
 	running := true
-	var time, lastTime uint32
-	lastTime = sdl.GetTicks()
 	var info sdl.RendererInfo
 	if info, err = rend.GetInfo(); err != nil {
 		panic(err)
@@ -260,18 +246,29 @@ func main() {
 	if info.MaxTextureHeight == 0 {
 		info.MaxTextureHeight = math.MaxInt32
 	}
-	ctx := &context{win, rend, &info}
-	area := &sdl.Rect{
+	ctx := &context{win, rend, &info, conf}
+	imageViewArea := &sdl.Rect{
 		X: 0,
 		Y: 0,
 		W: conf.screenWidth,
 		H: conf.screenHeight,
 	}
-	iv, err := newImageView(area, "monkaDetect.png", ctx)
+	bottomBarArea := &sdl.Rect{
+		X: 0,
+		Y: conf.screenHeight - conf.bottomBarHeight,
+		W: conf.screenWidth,
+		H: conf.bottomBarHeight,
+	}
+	mouseComms := make(chan coord)
+	iv, err := NewImageView(imageViewArea, "monkaDetect.png", ctx, mouseComms)
 	if err != nil {
 		panic(err)
 	}
-	comps := []UIComponent{iv}
+	bb, err := NewBottomBar(bottomBarArea, mouseComms, ctx)
+	if err != nil {
+		panic(err)
+	}
+	comps := []UIComponent{iv, bb}
 	var lastHover UIComponent
 	var currHover UIComponent
 	for running {
@@ -282,34 +279,34 @@ func main() {
 				running = false
 			case *sdl.MouseButtonEvent:
 				for _, comp := range comps {
-					if inBounds(comp.getBoundary(), evt.X, evt.Y) {
-						comp.onClick(evt)
+					if inBounds(comp.GetBoundary(), evt.X, evt.Y) {
+						comp.OnClick(evt)
 						break
 					}
 				}
 			case *sdl.MouseMotionEvent:
 				for _, comp := range comps {
-					if inBounds(comp.getBoundary(), evt.X, evt.Y) {
+					if inBounds(comp.GetBoundary(), evt.X, evt.Y) {
 						if lastHover != comp && currHover != comp {
-							comp.onEnter(evt)
+							comp.OnEnter(evt)
 							currHover = comp
 						} else if lastHover == comp {
 							currHover = lastHover
 						}
-						if comp.onMotion(evt) {
+						if comp.OnMotion(evt) {
 							break
 						}
 					}
 				}
 				if lastHover != nil && lastHover != currHover {
-					lastHover.onLeave(evt)
+					lastHover.OnLeave(evt)
 					lastHover = nil
 				}
 			case *sdl.MouseWheelEvent:
 				for _, comp := range comps {
 					x, y, _ := sdl.GetMouseState()
-					if inBounds(comp.getBoundary(), x, y) {
-						if comp.onScroll(evt) {
+					if inBounds(comp.GetBoundary(), x, y) {
+						if comp.OnScroll(evt) {
 							break
 						}
 					}
@@ -325,32 +322,12 @@ func main() {
 			panic(err)
 		}
 		for _, comp := range comps {
-			if err = comp.render(rend); err != nil {
+			if err = comp.Render(rend); err != nil {
 				panic(err)
 			}
 		}
 
-		if err = rend.SetViewport(bottomBar); err != nil {
-			panic(err)
-		}
-		if err = rend.Copy(bottomBarTex, nil, nil); err != nil {
-			panic(err)
-		}
-
 		gfx.FramerateDelay(framerate)
-		time = sdl.GetTicks()
-		fps := int(1.0 / (float32(time-lastTime) / 1000.0))
-		coords := "(" + strconv.Itoa(int(iv.mousePix.x)) + ", " + strconv.Itoa(int(iv.mousePix.y)) + ")"
-		pos := coord{conf.screenWidth, int32(float64(bottomBar.H) / 2.0)}
-		// TODO
-		if err = renderText(conf, rend, coords, pos, Align{AlignMiddle, AlignRight}); err != nil {
-			panic(err)
-		}
-		pos.x = 0
-		if err = renderText(conf, rend, strconv.Itoa(fps)+" FPS", pos, Align{AlignMiddle, AlignLeft}); err != nil {
-			panic(err)
-		}
-		lastTime = time
 		rend.Present()
 	}
 

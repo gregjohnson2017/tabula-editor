@@ -46,24 +46,27 @@ func (z *zoomer) Update() {
 	z.lastMult = z.mult
 }
 
-var _ UIComponent = UIComponent(&imageView{})
+var _ UIComponent = UIComponent(&ImageView{})
 
-type imageView struct {
-	area      *sdl.Rect
-	canvas    *sdl.Rect
-	mouseLoc  coord
-	mousePix  coord
-	dragging  bool
-	dragPoint coord
-	zoom      zoomer
-	sel       set.Set
-	surf      *sdl.Surface
-	tex       *sdl.Texture
-	selSurf   *sdl.Surface
-	selTex    *sdl.Texture
+// ImageView defines an interactable image viewing pane
+type ImageView struct {
+	area       *sdl.Rect
+	canvas     *sdl.Rect
+	mouseLoc   coord
+	mousePix   coord
+	dragging   bool
+	dragPoint  coord
+	zoom       zoomer
+	sel        set.Set
+	surf       *sdl.Surface
+	tex        *sdl.Texture
+	selSurf    *sdl.Surface
+	selTex     *sdl.Texture
+	mouseComms chan<- coord
 }
 
-func newImageView(area *sdl.Rect, fileName string, ctx *context) (*imageView, error) {
+// NewImageView returns a pointer to a new ImageView struct that implements UIComponent
+func NewImageView(area *sdl.Rect, fileName string, ctx *context, mouseComms chan<- coord) (*ImageView, error) {
 	surf, tex, err := loadImage(ctx.Rend, fileName)
 	if err != nil {
 		return nil, err
@@ -99,30 +102,36 @@ func newImageView(area *sdl.Rect, fileName string, ctx *context) (*imageView, er
 		W: surf.W,
 		H: surf.H,
 	}
-	return &imageView{
-		area:    area,
-		canvas:  canvas,
-		surf:    surf,
-		tex:     tex,
-		zoom:    zoom,
-		sel:     set.NewSet(),
-		selSurf: selSurf,
-		selTex:  selTex,
+	return &ImageView{
+		area:       area,
+		canvas:     canvas,
+		surf:       surf,
+		tex:        tex,
+		zoom:       zoom,
+		sel:        set.NewSet(),
+		selSurf:    selSurf,
+		selTex:     selTex,
+		mouseComms: mouseComms,
 	}, nil
 }
 
-func (iv *imageView) updateMousePos(x, y int32) {
+func (iv *ImageView) updateMousePos(x, y int32) {
 	iv.mouseLoc.x = x
 	iv.mouseLoc.y = y
 	iv.mousePix.x = int32(float64(iv.mouseLoc.x-iv.canvas.X) / iv.zoom.mult)
 	iv.mousePix.y = int32(float64(iv.mouseLoc.y-iv.canvas.Y) / iv.zoom.mult)
 }
 
-func (iv *imageView) getBoundary() *sdl.Rect {
+// GetBoundary returns the clickable region of the UIComponent
+func (iv *ImageView) GetBoundary() *sdl.Rect {
 	return iv.area
 }
 
-func (iv *imageView) render(rend *sdl.Renderer) error {
+// Render draws the UIComponent
+func (iv *ImageView) Render(rend *sdl.Renderer) error {
+	go func() {
+		iv.mouseComms <- iv.mousePix
+	}()
 	diffW := iv.zoom.MultW() - iv.canvas.W
 	diffH := iv.zoom.MultH() - iv.canvas.H
 	iv.canvas.W += diffW
@@ -150,32 +159,35 @@ func (iv *imageView) render(rend *sdl.Renderer) error {
 		return err
 	}
 	if err = rend.Copy(iv.tex, nil, nil); err != nil {
-		panic(err)
+		return err
 	}
 	if err = copyToTexture(iv.selTex, iv.selSurf.Pixels(), nil); err != nil {
 		return err
 	}
 	if err = rend.Copy(iv.selTex, nil, nil); err != nil {
-		panic(err)
+		return err
 	}
 	return nil
 }
 
-func (iv *imageView) onEnter(evt *sdl.MouseMotionEvent) bool {
+// OnEnter is called when the cursor enters the UIComponent's region
+func (iv *ImageView) OnEnter(evt *sdl.MouseMotionEvent) bool {
 	if !inBounds(iv.canvas, evt.X, evt.Y) {
 		return false
 	}
 	return true
 }
 
-func (iv *imageView) onLeave(evt *sdl.MouseMotionEvent) bool {
+// OnLeave is called when the cursor leaves the UIComponent's region
+func (iv *ImageView) OnLeave(evt *sdl.MouseMotionEvent) bool {
 	if !inBounds(iv.canvas, evt.X, evt.Y) {
 		return false
 	}
 	return true
 }
 
-func (iv *imageView) onMotion(evt *sdl.MouseMotionEvent) bool {
+// OnMotion is called when the cursor moves within the UIComponent's region
+func (iv *ImageView) OnMotion(evt *sdl.MouseMotionEvent) bool {
 	iv.updateMousePos(evt.X, evt.Y)
 	if !inBounds(iv.canvas, evt.X, evt.Y) {
 		return false
@@ -195,7 +207,8 @@ func (iv *imageView) onMotion(evt *sdl.MouseMotionEvent) bool {
 	return true
 }
 
-func (iv *imageView) onScroll(evt *sdl.MouseWheelEvent) bool {
+// OnScroll is called when the user scrolls within the UIComponent's region
+func (iv *ImageView) OnScroll(evt *sdl.MouseWheelEvent) bool {
 	if evt.Y > 0 {
 		iv.zoom.In()
 	} else if evt.Y < 0 {
@@ -204,7 +217,8 @@ func (iv *imageView) onScroll(evt *sdl.MouseWheelEvent) bool {
 	return true
 }
 
-func (iv *imageView) onClick(evt *sdl.MouseButtonEvent) bool {
+// OnClick is called when the user clicks within the UIComponent's region
+func (iv *ImageView) OnClick(evt *sdl.MouseButtonEvent) bool {
 	iv.updateMousePos(evt.X, evt.Y)
 	if evt.Button == sdl.BUTTON_RIGHT {
 		if evt.State == sdl.PRESSED {
