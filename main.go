@@ -271,6 +271,9 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	comps := []UIComponent{iv}
+	var lastHover UIComponent
+	var currHover UIComponent
 	for running {
 		var e sdl.Event
 		for e = sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
@@ -278,19 +281,44 @@ func main() {
 			case *sdl.QuitEvent:
 				running = false
 			case *sdl.MouseButtonEvent:
-				// TODO
-				if inBounds(iv.area, evt.X, evt.Y) {
-					iv.onClick(evt)
+				for _, comp := range comps {
+					if inBounds(comp.getBoundary(), evt.X, evt.Y) {
+						comp.onClick(evt)
+						break
+					}
 				}
 			case *sdl.MouseMotionEvent:
-				// TODO
-				if inBounds(iv.area, evt.X, evt.Y) {
-					iv.onMotion(evt)
+				for _, comp := range comps {
+					if inBounds(comp.getBoundary(), evt.X, evt.Y) {
+						if lastHover != comp && currHover != comp {
+							comp.onEnter(evt)
+							currHover = comp
+						} else if lastHover == comp {
+							currHover = lastHover
+						}
+						if comp.onMotion(evt) {
+							break
+						}
+					}
+				}
+				if lastHover != nil && lastHover != currHover {
+					lastHover.onLeave(evt)
+					lastHover = nil
 				}
 			case *sdl.MouseWheelEvent:
-				// TODO
-				iv.onScroll(evt)
+				for _, comp := range comps {
+					x, y, _ := sdl.GetMouseState()
+					if inBounds(comp.getBoundary(), x, y) {
+						if comp.onScroll(evt) {
+							break
+						}
+					}
+				}
 			}
+		}
+		if currHover != nil {
+			lastHover = currHover
+			currHover = nil
 		}
 
 		if err = rend.Clear(); err != nil {

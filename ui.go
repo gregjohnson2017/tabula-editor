@@ -9,11 +9,11 @@ import (
 type UIComponent interface {
 	getBoundary() *sdl.Rect
 	render() ([]*sdl.Texture, error)
-	onEnter(*sdl.MouseMotionEvent)
-	onLeave(*sdl.MouseMotionEvent)
-	onMotion(*sdl.MouseMotionEvent)
-	onScroll(*sdl.MouseWheelEvent)
-	onClick(*sdl.MouseButtonEvent)
+	onEnter(*sdl.MouseMotionEvent) bool
+	onLeave(*sdl.MouseMotionEvent) bool
+	onMotion(*sdl.MouseMotionEvent) bool
+	onScroll(*sdl.MouseWheelEvent) bool
+	onClick(*sdl.MouseButtonEvent) bool
 }
 
 type context struct {
@@ -167,13 +167,24 @@ func (iv *imageView) render() ([]*sdl.Texture, error) {
 	return []*sdl.Texture{iv.tex, iv.selTex}, nil
 }
 
-func (iv *imageView) onEnter(evt *sdl.MouseMotionEvent) {
+func (iv *imageView) onEnter(evt *sdl.MouseMotionEvent) bool {
+	if !inBounds(iv.canvas, evt.X, evt.Y) {
+		return false
+	}
+	return true
 }
 
-func (iv *imageView) onLeave(evt *sdl.MouseMotionEvent) {
+func (iv *imageView) onLeave(evt *sdl.MouseMotionEvent) bool {
+	if !inBounds(iv.canvas, evt.X, evt.Y) {
+		return false
+	}
+	return true
 }
 
-func (iv *imageView) onMotion(evt *sdl.MouseMotionEvent) {
+func (iv *imageView) onMotion(evt *sdl.MouseMotionEvent) bool {
+	if !inBounds(iv.canvas, evt.X, evt.Y) {
+		return false
+	}
 	iv.updateMousePos(evt.X, evt.Y)
 	if evt.State == sdl.ButtonRMask() && iv.dragging {
 		iv.canvas.X += evt.X - iv.dragPoint.x
@@ -187,17 +198,19 @@ func (iv *imageView) onMotion(evt *sdl.MouseMotionEvent) {
 			iv.sel.Add(i)
 		}
 	}
+	return true
 }
 
-func (iv *imageView) onScroll(evt *sdl.MouseWheelEvent) {
+func (iv *imageView) onScroll(evt *sdl.MouseWheelEvent) bool {
 	if evt.Y > 0 {
 		iv.zoom.In()
 	} else if evt.Y < 0 {
 		iv.zoom.Out()
 	}
+	return true
 }
 
-func (iv *imageView) onClick(evt *sdl.MouseButtonEvent) {
+func (iv *imageView) onClick(evt *sdl.MouseButtonEvent) bool {
 	iv.updateMousePos(evt.X, evt.Y)
 	if evt.Button == sdl.BUTTON_RIGHT {
 		if evt.State == sdl.PRESSED {
@@ -214,4 +227,5 @@ func (iv *imageView) onClick(evt *sdl.MouseButtonEvent) {
 			iv.sel.Add(i)
 		}
 	}
+	return true
 }
