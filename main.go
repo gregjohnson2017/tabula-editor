@@ -228,14 +228,6 @@ func main() {
 	if err = rend.SetDrawColor(0xFF, 0xFF, 0xFF, 0xFF); err != nil {
 		panic(err)
 	}
-
-	var framerate = &gfx.FPSmanager{}
-	gfx.InitFramerate(framerate)
-	if gfx.SetFramerate(framerate, conf.framerate) != true {
-		panic(fmt.Errorf("could not set framerate: %v", sdl.GetError()))
-	}
-
-	running := true
 	var info sdl.RendererInfo
 	if info, err = rend.GetInfo(); err != nil {
 		panic(err)
@@ -247,6 +239,13 @@ func main() {
 		info.MaxTextureHeight = math.MaxInt32
 	}
 	ctx := &context{win, rend, &info, conf}
+
+	var framerate = &gfx.FPSmanager{}
+	gfx.InitFramerate(framerate)
+	if gfx.SetFramerate(framerate, conf.framerate) != true {
+		panic(fmt.Errorf("could not set framerate: %v", sdl.GetError()))
+	}
+
 	imageViewArea := &sdl.Rect{
 		X: 0,
 		Y: 0,
@@ -269,8 +268,10 @@ func main() {
 		panic(err)
 	}
 	comps := []UIComponent{iv, bb}
+
 	var lastHover UIComponent
 	var currHover UIComponent
+	running := true
 	for running {
 		var e sdl.Event
 		for e = sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
@@ -326,9 +327,9 @@ func main() {
 				panic(err)
 			}
 		}
+		rend.Present()
 
 		gfx.FramerateDelay(framerate)
-		rend.Present()
 	}
 
 	quit(conf)
