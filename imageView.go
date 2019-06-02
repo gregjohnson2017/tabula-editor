@@ -43,6 +43,7 @@ type ImageView struct {
 	tex        *sdl.Texture
 	selSurf    *sdl.Surface
 	selTex     *sdl.Texture
+	backTex    *sdl.Texture
 	mouseComms chan<- coord
 	ctx        *context
 }
@@ -67,6 +68,27 @@ func NewImageView(area *sdl.Rect, fileName string, mouseComms chan<- coord, ctx 
 	if err = selTex.SetBlendMode(sdl.BLENDMODE_BLEND); err != nil {
 		return nil, err
 	}
+	var backSurf *sdl.Surface
+	if backSurf, err = sdl.CreateRGBSurfaceWithFormat(0, surf.W, surf.H, 32, uint32(sdl.PIXELFORMAT_RGBA32)); err != nil {
+		return nil, err
+	}
+	light := mapRGBA(backSurf.Format, 0xEE, 0xEE, 0xEE, 0xFF)
+	backSurf.FillRect(nil, light)
+	rects := []sdl.Rect{}
+	for i := int32(0); i < surf.W; i += 4 {
+		for j := int32(0); j < surf.H; j += 2 {
+			off := ((j/2 + 1) % 2) * 2
+			r := sdl.Rect{X: i + off, Y: j, W: 2, H: 2}
+			rects = append(rects, r)
+		}
+	}
+	dark := mapRGBA(backSurf.Format, 0x99, 0x99, 0x99, 0xFF)
+	backSurf.FillRects(rects, dark)
+	var backTex *sdl.Texture
+	if backTex, err = ctx.Rend.CreateTextureFromSurface(backSurf); err != nil {
+		return nil, err
+	}
+	backSurf.Free()
 	var canvas = &sdl.Rect{
 		X: int32(float64(area.W)/2.0 - float64(surf.W)/2.0),
 		Y: int32(float64(area.H)/2.0 - float64(surf.H)/2.0),
@@ -82,6 +104,7 @@ func NewImageView(area *sdl.Rect, fileName string, mouseComms chan<- coord, ctx 
 		sel:        set.NewSet(),
 		selSurf:    selSurf,
 		selTex:     selTex,
+		backTex:    backTex,
 		mouseComms: mouseComms,
 		ctx:        ctx,
 	}, nil
@@ -93,6 +116,7 @@ func (iv *ImageView) Destroy() {
 	iv.selSurf.Free()
 	iv.tex.Destroy()
 	iv.selTex.Destroy()
+	iv.backTex.Destroy()
 }
 
 func (iv *ImageView) updateMousePos(x, y int32) {
@@ -120,6 +144,9 @@ func (iv *ImageView) Render() error {
 	})
 	var err error
 	if err = iv.ctx.Rend.SetViewport(iv.canvas); err != nil {
+		return err
+	}
+	if err = iv.ctx.Rend.Copy(iv.backTex, nil, nil); err != nil {
 		return err
 	}
 	if err = copyToTexture(iv.tex, iv.surf.Pixels(), nil); err != nil {
