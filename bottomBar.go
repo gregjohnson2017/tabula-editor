@@ -17,10 +17,10 @@ type BottomBar struct {
 }
 
 // NewBottomBar returns a pointer to a new BottomBar struct that implements UIComponent
-func NewBottomBar(area *sdl.Rect, mouseComms <-chan coord, ctx *context) (*BottomBar, error) {
+func NewBottomBar(area *sdl.Rect, mouseComms <-chan coord, ctx *context, color *sdl.Color) (*BottomBar, error) {
 	var err error
 	var bottomBarTex *sdl.Texture
-	if bottomBarTex, err = createSolidColorTexture(ctx.Rend, ctx.Conf.screenWidth, ctx.Conf.bottomBarHeight, 0x80, 0x80, 0x80, 0xFF); err != nil {
+	if bottomBarTex, err = createSolidColorTexture(ctx.Rend, ctx.Conf.screenWidth, ctx.Conf.bottomBarHeight, color.R, color.G, color.B, color.A); err != nil {
 		return nil, err
 	}
 	return &BottomBar{

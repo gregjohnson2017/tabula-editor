@@ -132,7 +132,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	bb, err := NewBottomBar(bottomBarArea, mouseComms, ctx)
+	bb, err := NewBottomBar(bottomBarArea, mouseComms, ctx, &sdl.Color{0x80, 0x80, 0x80, 0xFF})
 	if err != nil {
 		panic(err)
 	}
