@@ -3,12 +3,13 @@ package main
 import (
 	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
+	"github.com/veandco/go-sdl2/ttf"
 )
 
 // UIComponent says what functions a UIComponent must implement
 type UIComponent interface {
 	GetBoundary() *sdl.Rect
-	Render(*sdl.Renderer) error
+	Render() error
 	Destroy()
 	OnEnter(*sdl.MouseMotionEvent) bool
 	OnLeave(*sdl.MouseMotionEvent) bool
@@ -76,44 +77,46 @@ func createSolidColorTexture(rend *sdl.Renderer, w int32, h int32, r uint8, g ui
 	return tex, nil
 }
 
-func renderText(conf *config, rend *sdl.Renderer, text string, pos coord, align Align) error {
-	col := sdl.Color{
-		R: 255,
-		G: 255,
-		B: 255,
-		A: 0,
-	}
+func renderText(rend *sdl.Renderer, fontName string, fontSize int32, text string, pos coord, align Align, col *sdl.Color) error {
 	var surf *sdl.Surface
 	var err error
-	if surf, err = conf.font.RenderUTF8Blended(text, col); err != nil {
+	var font *ttf.Font
+	if font, err = ttf.OpenFont(fontName, int(fontSize)); err != nil {
+		return err
+	}
+	if surf, err = font.RenderUTF8Blended(text, *col); err != nil {
+		font.Close()
 		return err
 	}
 	var tex *sdl.Texture
-	if tex, err = rend.CreateTexture(surf.Format.Format, sdl.TEXTUREACCESS_STREAMING, surf.W, int32(conf.fontSize)); err != nil {
+	if tex, err = rend.CreateTexture(surf.Format.Format, sdl.TEXTUREACCESS_STREAMING, surf.W, int32(fontSize)); err != nil {
 		surf.Free()
+		font.Close()
 		return err
 	}
 	if err = tex.SetBlendMode(sdl.BLENDMODE_BLEND); err != nil {
 		surf.Free()
 		tex.Destroy()
+		font.Close()
 		return err
 	}
-	sliceOffset := surf.Pitch * (surf.H - conf.fontSize)
+	sliceOffset := surf.Pitch * (surf.H - fontSize)
 	copyToTexture(tex, surf.Pixels()[sliceOffset:], nil)
 
 	w2 := int32(float64(surf.W) / 2.0)
-	h2 := int32(float64(conf.fontSize) / 2.0)
+	h2 := int32(float64(fontSize) / 2.0)
 	offx := -w2 - int32(align.h)*int32(w2)
 	offy := -h2 - int32(align.v)*int32(h2)
 	var rect = &sdl.Rect{
 		X: pos.x + offx,
 		Y: pos.y + offy,
 		W: int32(surf.W),
-		H: int32(conf.fontSize),
+		H: int32(fontSize),
 	}
 	err = rend.Copy(tex, nil, rect)
 	surf.Free()
 	tex.Destroy()
+	font.Close()
 	return err
 }
 

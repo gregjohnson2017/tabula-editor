@@ -15,8 +15,6 @@ type config struct {
 	screenHeight    int32
 	bottomBarHeight int32
 	fontName        string
-	fontSize        int32
-	font            *ttf.Font
 	framerate       uint32
 }
 
@@ -26,7 +24,6 @@ func initConfig() *config {
 		screenHeight:    480,
 		bottomBarHeight: 30,
 		fontName:        "NotoMono-Regular.ttf",
-		fontSize:        24,
 		framerate:       144,
 	}
 	return &c
@@ -46,16 +43,12 @@ func initLibraries(conf *config) error {
 	if err = ttf.Init(); err != nil {
 		return err
 	}
-	if conf.font, err = ttf.OpenFont(conf.fontName, int(conf.fontSize)); err != nil {
-		return err
-	}
 	return err
 }
 
 func quit(conf *config) {
 	sdl.Quit()
 	img.Quit()
-	conf.font.Close()
 	ttf.Quit()
 }
 
@@ -126,17 +119,26 @@ func main() {
 		W: ctx.Conf.screenWidth,
 		H: ctx.Conf.bottomBarHeight,
 	}
+	buttonArea := &sdl.Rect{
+		X: 0,
+		Y: 0,
+		W: 125,
+		H: 20,
+	}
 	mouseComms := make(chan coord)
 
 	iv, err := NewImageView(imageViewArea, "monkaDetect.png", mouseComms, ctx)
 	if err != nil {
 		panic(err)
 	}
-	bb, err := NewBottomBar(bottomBarArea, mouseComms, ctx, &sdl.Color{0x80, 0x80, 0x80, 0xFF})
+	bb, err := NewBottomBar(bottomBarArea, mouseComms, ctx, &sdl.Color{R: 0x80, G: 0x80, B: 0x80, A: 0xFF})
 	if err != nil {
 		panic(err)
 	}
-	comps := []UIComponent{iv, bb}
+	b, err := NewButton(buttonArea, ctx, &sdl.Color{R: 0xD6, G: 0xCF, B: 0xCF, A: 0xFF}, nil, "Press Me!", func() {
+		fmt.Printf("Action!\n")
+	})
+	comps := []UIComponent{iv, bb, b}
 
 	var lastHover UIComponent
 	var currHover UIComponent
@@ -195,7 +197,7 @@ func main() {
 			panic(err)
 		}
 		for _, comp := range comps {
-			if err = comp.Render(ctx.Rend); err != nil {
+			if err = comp.Render(); err != nil {
 				panic(err)
 			}
 		}

@@ -42,20 +42,20 @@ func (bb *BottomBar) GetBoundary() *sdl.Rect {
 }
 
 // Render draws the UIComponent
-func (bb *BottomBar) Render(rend *sdl.Renderer) error {
+func (bb *BottomBar) Render() error {
 	mousePix := <-bb.mouseComms
 	var err error
-	if err = rend.SetViewport(bb.area); err != nil {
+	if err = bb.ctx.Rend.SetViewport(bb.area); err != nil {
 		return err
 	}
 	// first render grey background
-	if err = rend.Copy(bb.tex, nil, nil); err != nil {
+	if err = bb.ctx.Rend.Copy(bb.tex, nil, nil); err != nil {
 		return err
 	}
 	// second render white text on top
 	coords := "(" + strconv.Itoa(int(mousePix.x)) + ", " + strconv.Itoa(int(mousePix.y)) + ")"
 	pos := coord{bb.ctx.Conf.screenWidth, int32(float64(bb.ctx.Conf.bottomBarHeight) / 2.0)}
-	if err = renderText(bb.ctx.Conf, rend, coords, pos, Align{AlignMiddle, AlignRight}); err != nil {
+	if err = renderText(bb.ctx.Rend, bb.ctx.Conf.fontName, 24, coords, pos, Align{AlignMiddle, AlignRight}, &sdl.Color{0xFF, 0xFF, 0xFF, 0xFF}); err != nil {
 		return err
 	}
 	return nil

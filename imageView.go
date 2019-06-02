@@ -108,7 +108,7 @@ func (iv *ImageView) GetBoundary() *sdl.Rect {
 }
 
 // Render draws the UIComponent
-func (iv *ImageView) Render(rend *sdl.Renderer) error {
+func (iv *ImageView) Render() error {
 	go func() {
 		iv.mouseComms <- iv.mousePix
 	}()
@@ -119,19 +119,19 @@ func (iv *ImageView) Render(rend *sdl.Renderer) error {
 		return true
 	})
 	var err error
-	if err = rend.SetViewport(iv.canvas); err != nil {
+	if err = iv.ctx.Rend.SetViewport(iv.canvas); err != nil {
 		return err
 	}
 	if err = copyToTexture(iv.tex, iv.surf.Pixels(), nil); err != nil {
 		return err
 	}
-	if err = rend.Copy(iv.tex, nil, nil); err != nil {
+	if err = iv.ctx.Rend.Copy(iv.tex, nil, nil); err != nil {
 		return err
 	}
 	if err = copyToTexture(iv.selTex, iv.selSurf.Pixels(), nil); err != nil {
 		return err
 	}
-	if err = rend.Copy(iv.selTex, nil, nil); err != nil {
+	if err = iv.ctx.Rend.Copy(iv.selTex, nil, nil); err != nil {
 		return err
 	}
 	return nil
