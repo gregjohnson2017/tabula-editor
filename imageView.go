@@ -176,12 +176,15 @@ func (iv *ImageView) OnMotion(evt *sdl.MouseMotionEvent) bool {
 
 // OnScroll is called when the user scrolls within the UIComponent's region
 func (iv *ImageView) OnScroll(evt *sdl.MouseWheelEvent) bool {
+	if iv.dragging {
+		return true
+	}
 	if evt.Y > 0 {
 		if int32(iv.mult*float64(iv.surf.W)*2.0) < iv.ctx.RendInfo.MaxTextureWidth && int32(iv.mult*float64(iv.surf.H)*2.0) < iv.ctx.RendInfo.MaxTextureHeight {
 			iv.zoomIn()
 		}
 	} else if evt.Y < 0 {
-		if int32(iv.mult*float64(iv.surf.W)/2.0) > 0 && int32(iv.mult*float64(iv.surf.H)/2.0) > 0 {
+		if int32(iv.mult*float64(iv.surf.W)/2.0) > 0 && int32(iv.mult*float64(iv.surf.H)/2.0) > 0 && iv.mult > 0.25 {
 			iv.zoomOut()
 		}
 	}

@@ -14,11 +14,12 @@ type Button struct {
 	text         string
 	ctx          *context
 	pressed      bool
-	hover        bool
+	hovering     bool
 	action       func()
 }
 
 // NewButton returns a pointer to a new BottomBar struct that implements UIComponent
+// defaultColor and highlightColor default to white and blue respectively, if nil
 func NewButton(area *sdl.Rect, ctx *context, defaultColor *sdl.Color, highlightColor *sdl.Color, text string, action func()) (*Button, error) {
 	if defaultColor == nil {
 		defaultColor = &sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}
@@ -62,7 +63,7 @@ func (b *Button) Render() error {
 	// choose correct pair of text/background color
 	var backgroundTex *sdl.Texture
 	var textColor *sdl.Color
-	if b.hover {
+	if b.hovering {
 		backgroundTex = b.highlightTex
 		textColor = &sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}
 	} else {
@@ -87,13 +88,13 @@ func (b *Button) Render() error {
 
 // OnEnter is called when the cursor enters the UIComponent's region
 func (b *Button) OnEnter(evt *sdl.MouseMotionEvent) bool {
-	b.hover = true
+	b.hovering = true
 	return true
 }
 
 // OnLeave is called when the cursor leaves the UIComponent's region
 func (b *Button) OnLeave(evt *sdl.MouseMotionEvent) bool {
-	b.hover = false
+	b.hovering = false
 	b.pressed = false
 	return true
 }
