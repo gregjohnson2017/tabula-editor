@@ -87,16 +87,14 @@ func (b *Button) Render() error {
 }
 
 // OnEnter is called when the cursor enters the UIComponent's region
-func (b *Button) OnEnter(evt *sdl.MouseMotionEvent) bool {
+func (b *Button) OnEnter() {
 	b.hovering = true
-	return true
 }
 
 // OnLeave is called when the cursor leaves the UIComponent's region
-func (b *Button) OnLeave(evt *sdl.MouseMotionEvent) bool {
+func (b *Button) OnLeave() {
 	b.hovering = false
 	b.pressed = false
-	return true
 }
 
 // OnMotion is called when the cursor moves within the UIComponent's region
