@@ -176,7 +176,6 @@ func main() {
 					lastHover.OnLeave()
 					lastHover = nil
 				}
-				fmt.Printf("last:%v, curr:%v\n", lastHover, currHover)
 			case *sdl.MouseWheelEvent:
 				for i := range comps {
 					comp := comps[len(comps)-i-1]
