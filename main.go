@@ -279,14 +279,16 @@ func main() {
 			case *sdl.QuitEvent:
 				running = false
 			case *sdl.MouseButtonEvent:
-				for _, comp := range comps {
+				for i := range comps {
+					comp := comps[len(comps)-i-1]
 					if inBounds(comp.GetBoundary(), evt.X, evt.Y) {
 						comp.OnClick(evt)
 						break
 					}
 				}
 			case *sdl.MouseMotionEvent:
-				for _, comp := range comps {
+				for i := range comps {
+					comp := comps[len(comps)-i-1]
 					if inBounds(comp.GetBoundary(), evt.X, evt.Y) {
 						if lastHover != comp && currHover != comp {
 							comp.OnEnter(evt)
@@ -304,7 +306,8 @@ func main() {
 					lastHover = nil
 				}
 			case *sdl.MouseWheelEvent:
-				for _, comp := range comps {
+				for i := range comps {
+					comp := comps[len(comps)-i-1]
 					x, y, _ := sdl.GetMouseState()
 					if inBounds(comp.GetBoundary(), x, y) {
 						if comp.OnScroll(evt) {
