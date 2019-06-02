@@ -87,6 +87,14 @@ func NewImageView(area *sdl.Rect, fileName string, mouseComms chan<- coord, ctx 
 	}, nil
 }
 
+// Destroy frees all surfaces and textures in the ImageView
+func (iv *ImageView) Destroy() {
+	iv.surf.Free()
+	iv.selSurf.Free()
+	iv.tex.Destroy()
+	iv.selTex.Destroy()
+}
+
 func (iv *ImageView) updateMousePos(x, y int32) {
 	iv.mouseLoc.x = x
 	iv.mouseLoc.y = y
@@ -173,7 +181,7 @@ func (iv *ImageView) OnScroll(evt *sdl.MouseWheelEvent) bool {
 			iv.zoomIn()
 		}
 	} else if evt.Y < 0 {
-		if int32(iv.mult*float64(iv.surf.W)/2.0) > 0 && int32(iv.mult*float64(iv.surf.H)/2.0) > 0 && iv.mult > 1 {
+		if int32(iv.mult*float64(iv.surf.W)/2.0) > 0 && int32(iv.mult*float64(iv.surf.H)/2.0) > 0 {
 			iv.zoomOut()
 		}
 	}

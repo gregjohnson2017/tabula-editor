@@ -6,6 +6,7 @@ import "github.com/veandco/go-sdl2/sdl"
 type UIComponent interface {
 	GetBoundary() *sdl.Rect
 	Render(*sdl.Renderer) error
+	Destroy()
 	OnEnter(*sdl.MouseMotionEvent) bool
 	OnLeave(*sdl.MouseMotionEvent) bool
 	OnMotion(*sdl.MouseMotionEvent) bool

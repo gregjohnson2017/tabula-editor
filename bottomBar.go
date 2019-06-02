@@ -11,17 +11,29 @@ var _ UIComponent = UIComponent(&BottomBar{})
 // BottomBar defines a solid color bar with text displays
 type BottomBar struct {
 	area       *sdl.Rect
+	tex        *sdl.Texture
 	mouseComms <-chan coord
 	ctx        *context
 }
 
 // NewBottomBar returns a pointer to a new BottomBar struct that implements UIComponent
 func NewBottomBar(area *sdl.Rect, mouseComms <-chan coord, ctx *context) (*BottomBar, error) {
+	var err error
+	var bottomBarTex *sdl.Texture
+	if bottomBarTex, err = createSolidColorTexture(ctx.Rend, ctx.Conf.screenWidth, ctx.Conf.bottomBarHeight, 0x80, 0x80, 0x80, 0xFF); err != nil {
+		return nil, err
+	}
 	return &BottomBar{
 		area:       area,
+		tex:        bottomBarTex,
 		mouseComms: mouseComms,
 		ctx:        ctx,
 	}, nil
+}
+
+// Destroy frees all surfaces and textures in the BottomBar
+func (bb *BottomBar) Destroy() {
+	bb.tex.Destroy()
 }
 
 // GetBoundary returns the clickable region of the UIComponent
@@ -33,16 +45,11 @@ func (bb *BottomBar) GetBoundary() *sdl.Rect {
 func (bb *BottomBar) Render(rend *sdl.Renderer) error {
 	mousePix := <-bb.mouseComms
 	var err error
-	g := uint8(0x80)
-	var bottomBarTex *sdl.Texture
-	if bottomBarTex, err = createSolidColorTexture(rend, bb.ctx.Conf.screenWidth, bb.ctx.Conf.bottomBarHeight, g, g, g, 0xFF); err != nil {
-		return err
-	}
 	if err = rend.SetViewport(bb.area); err != nil {
 		return err
 	}
 	// first render grey background
-	if err = rend.Copy(bottomBarTex, nil, nil); err != nil {
+	if err = rend.Copy(bb.tex, nil, nil); err != nil {
 		return err
 	}
 	// second render white text on top

@@ -337,5 +337,10 @@ func main() {
 		rend.Present()
 	}
 
+	// free UIComponent SDL assets
+	for _, comp := range comps {
+		comp.Destroy()
+	}
+
 	quit(conf)
 }
