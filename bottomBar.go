@@ -10,24 +10,25 @@ var _ UIComponent = UIComponent(&BottomBar{})
 
 // BottomBar defines a solid color bar with text displays
 type BottomBar struct {
-	area       *sdl.Rect
-	tex        *sdl.Texture
-	mouseComms <-chan coord
-	ctx        *context
+	area     *sdl.Rect
+	tex      *sdl.Texture
+	comms    <-chan imageComm
+	mousePix coord
+	ctx      *context
 }
 
 // NewBottomBar returns a pointer to a new BottomBar struct that implements UIComponent
-func NewBottomBar(area *sdl.Rect, mouseComms <-chan coord, ctx *context, color *sdl.Color) (*BottomBar, error) {
+func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, ctx *context, color *sdl.Color) (*BottomBar, error) {
 	var err error
 	var bottomBarTex *sdl.Texture
 	if bottomBarTex, err = createSolidColorTexture(ctx.Rend, ctx.Conf.screenWidth, ctx.Conf.bottomBarHeight, color.R, color.G, color.B, color.A); err != nil {
 		return nil, err
 	}
 	return &BottomBar{
-		area:       area,
-		tex:        bottomBarTex,
-		mouseComms: mouseComms,
-		ctx:        ctx,
+		area:  area,
+		tex:   bottomBarTex,
+		comms: comms,
+		ctx:   ctx,
 	}, nil
 }
 
@@ -43,7 +44,8 @@ func (bb *BottomBar) GetBoundary() *sdl.Rect {
 
 // Render draws the UIComponent
 func (bb *BottomBar) Render() error {
-	mousePix := <-bb.mouseComms
+	msg := <-bb.comms
+
 	var err error
 	if err = bb.ctx.Rend.SetViewport(bb.area); err != nil {
 		return err
@@ -53,23 +55,27 @@ func (bb *BottomBar) Render() error {
 		return err
 	}
 	// second render white text on top
-	coords := "(" + strconv.Itoa(int(mousePix.x)) + ", " + strconv.Itoa(int(mousePix.y)) + ")"
+	coords := "(" + strconv.Itoa(int(msg.mousePix.x)) + ", " + strconv.Itoa(int(msg.mousePix.y)) + ")"
 	pos := coord{bb.ctx.Conf.screenWidth, int32(float64(bb.ctx.Conf.bottomBarHeight) / 2.0)}
-	if err = renderText(bb.ctx.Rend, bb.ctx.Conf.fontName, 24, coords, pos, Align{AlignMiddle, AlignRight}, &sdl.Color{0xFF, 0xFF, 0xFF, 0xFF}); err != nil {
+	if err = renderText(bb.ctx.Rend, bb.ctx.Conf.fontName, 24, coords, pos, Align{AlignMiddle, AlignRight}, &sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}); err != nil {
+		return err
+	}
+	pos.x = 0
+	if err = renderText(bb.ctx.Rend, bb.ctx.Conf.fontName, 24, msg.fileName, pos, Align{AlignMiddle, AlignLeft}, &sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}); err != nil {
+		return err
+	}
+	pos.x = bb.ctx.Conf.screenWidth / 2
+	if err = renderText(bb.ctx.Rend, bb.ctx.Conf.fontName, 24, strconv.FormatFloat(msg.mult, 'f', 2, 64)+"x", pos, Align{AlignMiddle, AlignCenter}, &sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}); err != nil {
 		return err
 	}
 	return nil
 }
 
 // OnEnter is called when the cursor enters the UIComponent's region
-func (bb *BottomBar) OnEnter(evt *sdl.MouseMotionEvent) bool {
-	return true
-}
+func (bb *BottomBar) OnEnter() {}
 
 // OnLeave is called when the cursor leaves the UIComponent's region
-func (bb *BottomBar) OnLeave(evt *sdl.MouseMotionEvent) bool {
-	return true
-}
+func (bb *BottomBar) OnLeave() {}
 
 // OnMotion is called when the cursor moves within the UIComponent's region
 func (bb *BottomBar) OnMotion(evt *sdl.MouseMotionEvent) bool {

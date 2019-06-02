@@ -11,8 +11,8 @@ type UIComponent interface {
 	GetBoundary() *sdl.Rect
 	Render() error
 	Destroy()
-	OnEnter(*sdl.MouseMotionEvent) bool
-	OnLeave(*sdl.MouseMotionEvent) bool
+	OnEnter()
+	OnLeave()
 	OnMotion(*sdl.MouseMotionEvent) bool
 	OnScroll(*sdl.MouseWheelEvent) bool
 	OnClick(*sdl.MouseButtonEvent) bool

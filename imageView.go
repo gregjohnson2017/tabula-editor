@@ -31,25 +31,32 @@ var _ UIComponent = UIComponent(&ImageView{})
 
 // ImageView defines an interactable image viewing pane
 type ImageView struct {
-	area       *sdl.Rect
-	canvas     *sdl.Rect
-	mouseLoc   coord
-	mousePix   coord
-	dragging   bool
-	dragPoint  coord
-	mult       float64
-	sel        set.Set
-	surf       *sdl.Surface
-	tex        *sdl.Texture
-	selSurf    *sdl.Surface
-	selTex     *sdl.Texture
-	backTex    *sdl.Texture
-	mouseComms chan<- coord
-	ctx        *context
+	area      *sdl.Rect
+	canvas    *sdl.Rect
+	mouseLoc  coord
+	mousePix  coord
+	dragging  bool
+	dragPoint coord
+	mult      float64
+	sel       set.Set
+	surf      *sdl.Surface
+	tex       *sdl.Texture
+	selSurf   *sdl.Surface
+	selTex    *sdl.Texture
+	backTex   *sdl.Texture
+	comms     chan<- imageComm
+	ctx       *context
+	fileName  string
+}
+
+type imageComm struct {
+	fileName string
+	mousePix coord
+	mult     float64
 }
 
 // NewImageView returns a pointer to a new ImageView struct that implements UIComponent
-func NewImageView(area *sdl.Rect, fileName string, mouseComms chan<- coord, ctx *context) (*ImageView, error) {
+func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, ctx *context) (*ImageView, error) {
 	surf, tex, err := loadImage(ctx.Rend, fileName)
 	if err != nil {
 		return nil, err
@@ -95,18 +102,20 @@ func NewImageView(area *sdl.Rect, fileName string, mouseComms chan<- coord, ctx 
 		W: surf.W,
 		H: surf.H,
 	}
+
 	return &ImageView{
-		area:       area,
-		canvas:     canvas,
-		surf:       surf,
-		tex:        tex,
-		mult:       1.0,
-		sel:        set.NewSet(),
-		selSurf:    selSurf,
-		selTex:     selTex,
-		backTex:    backTex,
-		mouseComms: mouseComms,
-		ctx:        ctx,
+		area:     area,
+		canvas:   canvas,
+		surf:     surf,
+		tex:      tex,
+		mult:     1.0,
+		sel:      set.NewSet(),
+		selSurf:  selSurf,
+		selTex:   selTex,
+		backTex:  backTex,
+		comms:    comms,
+		ctx:      ctx,
+		fileName: fileName,
 	}, nil
 }
 
@@ -134,7 +143,7 @@ func (iv *ImageView) GetBoundary() *sdl.Rect {
 // Render draws the UIComponent
 func (iv *ImageView) Render() error {
 	go func() {
-		iv.mouseComms <- iv.mousePix
+		iv.comms <- imageComm{fileName: iv.fileName, mousePix: iv.mousePix, mult: iv.mult}
 	}()
 	iv.sel.Range(func(n int) bool {
 		y := int32(n) % iv.selSurf.W
@@ -165,20 +174,10 @@ func (iv *ImageView) Render() error {
 }
 
 // OnEnter is called when the cursor enters the UIComponent's region
-func (iv *ImageView) OnEnter(evt *sdl.MouseMotionEvent) bool {
-	if !inBounds(iv.canvas, evt.X, evt.Y) {
-		return false
-	}
-	return true
-}
+func (iv *ImageView) OnEnter() {}
 
 // OnLeave is called when the cursor leaves the UIComponent's region
-func (iv *ImageView) OnLeave(evt *sdl.MouseMotionEvent) bool {
-	if !inBounds(iv.canvas, evt.X, evt.Y) {
-		return false
-	}
-	return true
-}
+func (iv *ImageView) OnLeave() {}
 
 // OnMotion is called when the cursor moves within the UIComponent's region
 func (iv *ImageView) OnMotion(evt *sdl.MouseMotionEvent) bool {

@@ -125,13 +125,13 @@ func main() {
 		W: 125,
 		H: 20,
 	}
-	mouseComms := make(chan coord)
+	comms := make(chan imageComm)
 
-	iv, err := NewImageView(imageViewArea, "monkaDetect.png", mouseComms, ctx)
+	iv, err := NewImageView(imageViewArea, "monkaDetect.png", comms, ctx)
 	if err != nil {
 		panic(err)
 	}
-	bb, err := NewBottomBar(bottomBarArea, mouseComms, ctx, &sdl.Color{R: 0x80, G: 0x80, B: 0x80, A: 0xFF})
+	bb, err := NewBottomBar(bottomBarArea, comms, ctx, &sdl.Color{R: 0x80, G: 0x80, B: 0x80, A: 0xFF})
 	if err != nil {
 		panic(err)
 	}
@@ -162,7 +162,7 @@ func main() {
 					comp := comps[len(comps)-i-1]
 					if inBounds(comp.GetBoundary(), evt.X, evt.Y) {
 						if lastHover != comp && currHover != comp {
-							comp.OnEnter(evt)
+							comp.OnEnter()
 							currHover = comp
 						} else if lastHover == comp {
 							currHover = lastHover
@@ -173,9 +173,10 @@ func main() {
 					}
 				}
 				if lastHover != nil && lastHover != currHover {
-					lastHover.OnLeave(evt)
+					lastHover.OnLeave()
 					lastHover = nil
 				}
+				fmt.Printf("last:%v, curr:%v\n", lastHover, currHover)
 			case *sdl.MouseWheelEvent:
 				for i := range comps {
 					comp := comps[len(comps)-i-1]
@@ -184,6 +185,14 @@ func main() {
 						if comp.OnScroll(evt) {
 							break
 						}
+					}
+				}
+			case *sdl.WindowEvent:
+				if evt.Event == sdl.WINDOWEVENT_LEAVE || evt.Event == sdl.WINDOWEVENT_FOCUS_LOST || evt.Event == sdl.WINDOWEVENT_MINIMIZED {
+					if lastHover != nil {
+						lastHover.OnLeave()
+						currHover = nil
+						lastHover = nil
 					}
 				}
 			}
