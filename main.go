@@ -250,7 +250,7 @@ func main() {
 		X: 0,
 		Y: 0,
 		W: conf.screenWidth,
-		H: conf.screenHeight,
+		H: conf.screenHeight - conf.bottomBarHeight,
 	}
 	bottomBarArea := &sdl.Rect{
 		X: 0,
@@ -259,7 +259,8 @@ func main() {
 		H: conf.bottomBarHeight,
 	}
 	mouseComms := make(chan coord)
-	iv, err := NewImageView(imageViewArea, "monkaDetect.png", ctx, mouseComms)
+
+	iv, err := NewImageView(imageViewArea, "monkaDetect.png", mouseComms, ctx)
 	if err != nil {
 		panic(err)
 	}

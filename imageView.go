@@ -1,6 +1,8 @@
 package main
 
 import (
+	"math"
+
 	set "github.com/kroppt/IntSet"
 	"github.com/veandco/go-sdl2/sdl"
 )
@@ -16,13 +18,13 @@ type zoomer struct {
 
 func (z *zoomer) In() {
 	if int32(z.mult*z.origW*2.0) < z.maxW && int32(z.mult*z.origH*2.0) < z.maxH {
-		z.mult *= 2
+		z.mult *= 2.0
 	}
 }
 
 func (z *zoomer) Out() {
 	if int32(z.mult*z.origW/2.0) > 0 && int32(z.mult*z.origH/2.0) > 0 {
-		z.mult /= 2
+		z.mult /= 2.0
 	}
 }
 
@@ -63,10 +65,11 @@ type ImageView struct {
 	selSurf    *sdl.Surface
 	selTex     *sdl.Texture
 	mouseComms chan<- coord
+	ctx        *context
 }
 
 // NewImageView returns a pointer to a new ImageView struct that implements UIComponent
-func NewImageView(area *sdl.Rect, fileName string, ctx *context, mouseComms chan<- coord) (*ImageView, error) {
+func NewImageView(area *sdl.Rect, fileName string, mouseComms chan<- coord, ctx *context) (*ImageView, error) {
 	surf, tex, err := loadImage(ctx.Rend, fileName)
 	if err != nil {
 		return nil, err
@@ -97,11 +100,12 @@ func NewImageView(area *sdl.Rect, fileName string, ctx *context, mouseComms chan
 		return nil, err
 	}
 	var canvas = &sdl.Rect{
-		X: 0,
-		Y: 0,
+		X: int32(float64(area.W)/2.0 - float64(surf.W)/2.0),
+		Y: int32(float64(area.H)/2.0 - float64(surf.H)/2.0),
 		W: surf.W,
 		H: surf.H,
 	}
+
 	return &ImageView{
 		area:       area,
 		canvas:     canvas,
@@ -112,6 +116,7 @@ func NewImageView(area *sdl.Rect, fileName string, ctx *context, mouseComms chan
 		selSurf:    selSurf,
 		selTex:     selTex,
 		mouseComms: mouseComms,
+		ctx:        ctx,
 	}, nil
 }
 
@@ -137,12 +142,12 @@ func (iv *ImageView) Render(rend *sdl.Renderer) error {
 	iv.canvas.W += diffW
 	iv.canvas.H += diffH
 	if iv.zoom.IsIn() {
-		iv.canvas.X = 2*iv.canvas.X - iv.mouseLoc.x
-		iv.canvas.Y = 2*iv.canvas.Y - iv.mouseLoc.y
+		iv.canvas.X = 2*iv.canvas.X - int32(math.Round(float64(iv.area.W)/2.0)) //iv.mouseLoc.x
+		iv.canvas.Y = 2*iv.canvas.Y - int32(math.Round(float64(iv.area.H)/2.0)) //iv.mouseLoc.y
 	}
 	if iv.zoom.IsOut() {
-		iv.canvas.X = iv.canvas.X/2 + iv.mouseLoc.x/2
-		iv.canvas.Y = iv.canvas.Y/2 + iv.mouseLoc.y/2
+		iv.canvas.X = int32(math.Round(float64(iv.canvas.X)/2.0 + float64(iv.area.W)/4.0)) //iv.mouseLoc.x/2
+		iv.canvas.Y = int32(math.Round(float64(iv.canvas.Y)/2.0 + float64(iv.area.H)/4.0)) //iv.mouseLoc.y/2
 	}
 	iv.zoom.Update()
 	iv.sel.Range(func(n int) bool {
