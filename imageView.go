@@ -76,16 +76,17 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, ctx *
 		return nil, err
 	}
 	var backSurf *sdl.Surface
-	if backSurf, err = sdl.CreateRGBSurfaceWithFormat(0, surf.W, surf.H, 32, uint32(sdl.PIXELFORMAT_RGBA32)); err != nil {
+	if backSurf, err = sdl.CreateRGBSurfaceWithFormat(0, area.W, area.H, 32, uint32(sdl.PIXELFORMAT_RGBA32)); err != nil {
 		return nil, err
 	}
 	light := mapRGBA(backSurf.Format, 0xEE, 0xEE, 0xEE, 0xFF)
 	backSurf.FillRect(nil, light)
 	rects := []sdl.Rect{}
-	for i := int32(0); i < surf.W; i += 4 {
-		for j := int32(0); j < surf.H; j += 2 {
-			off := ((j/2 + 1) % 2) * 2
-			r := sdl.Rect{X: i + off, Y: j, W: 2, H: 2}
+	sqsize := int32(4)
+	for i := int32(0); i < backSurf.W; i += 2 * sqsize {
+		for j := int32(0); j < backSurf.H; j += sqsize {
+			off := ((j/sqsize + 1) % 2) * sqsize
+			r := sdl.Rect{X: i + off, Y: j, W: sqsize, H: sqsize}
 			rects = append(rects, r)
 		}
 	}
@@ -152,10 +153,28 @@ func (iv *ImageView) Render() error {
 		return true
 	})
 	var err error
-	if err = iv.ctx.Rend.SetViewport(iv.canvas); err != nil {
+	r := &sdl.Rect{X: iv.canvas.X, Y: iv.canvas.Y, W: iv.canvas.W, H: iv.canvas.H}
+	if r.X < 0 {
+		r.W += r.X
+		r.X = 0
+	}
+	if r.Y < 0 {
+		r.H += r.Y
+		r.Y = 0
+	}
+	if r.W > iv.area.W {
+		r.W = iv.area.W
+	}
+	if r.H > iv.area.H {
+		r.H = iv.area.H
+	}
+	if err = iv.ctx.Rend.SetViewport(r); err != nil {
 		return err
 	}
-	if err = iv.ctx.Rend.Copy(iv.backTex, nil, nil); err != nil {
+	if err = iv.ctx.Rend.Copy(iv.backTex, &sdl.Rect{X: 0, Y: 0, W: r.W, H: r.H}, nil); err != nil {
+		return err
+	}
+	if err = iv.ctx.Rend.SetViewport(iv.canvas); err != nil {
 		return err
 	}
 	if err = copyToTexture(iv.tex, iv.surf.Pixels(), nil); err != nil {
