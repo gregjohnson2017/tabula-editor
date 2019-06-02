@@ -220,6 +220,9 @@ func (iv *ImageView) OnScroll(evt *sdl.MouseWheelEvent) bool {
 // OnClick is called when the user clicks within the UIComponent's region
 func (iv *ImageView) OnClick(evt *sdl.MouseButtonEvent) bool {
 	iv.updateMousePos(evt.X, evt.Y)
+	if !inBounds(iv.canvas, evt.X, evt.Y) {
+		return true
+	}
 	if evt.Button == sdl.BUTTON_RIGHT {
 		if evt.State == sdl.PRESSED {
 			iv.dragging = true
@@ -229,7 +232,7 @@ func (iv *ImageView) OnClick(evt *sdl.MouseButtonEvent) bool {
 		iv.dragPoint.x = evt.X
 		iv.dragPoint.y = evt.Y
 	}
-	if evt.Button == sdl.BUTTON_LEFT && evt.State == sdl.PRESSED && inBounds(iv.canvas, evt.X, evt.Y) {
+	if evt.Button == sdl.BUTTON_LEFT && evt.State == sdl.PRESSED {
 		i := int(iv.surf.W*iv.mousePix.y + iv.mousePix.x)
 		if !iv.sel.Contains(i) {
 			iv.sel.Add(i)
