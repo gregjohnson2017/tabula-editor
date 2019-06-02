@@ -7,45 +7,24 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 )
 
-type zoomer struct {
-	lastMult float64
-	mult     float64
-	origW    float64
-	origH    float64
-	maxW     int32
-	maxH     int32
+func (iv *ImageView) zoomIn() {
+	iv.mult *= 2.0
+	diffW := int32(float64(iv.surf.W)*iv.mult) - iv.canvas.W
+	diffH := int32(float64(iv.surf.H)*iv.mult) - iv.canvas.H
+	iv.canvas.W += diffW
+	iv.canvas.H += diffH
+	iv.canvas.X = 2*iv.canvas.X - int32(math.Round(float64(iv.area.W)/2.0)) //iv.mouseLoc.x
+	iv.canvas.Y = 2*iv.canvas.Y - int32(math.Round(float64(iv.area.H)/2.0)) //iv.mouseLoc.y
 }
 
-func (z *zoomer) In() {
-	if int32(z.mult*z.origW*2.0) < z.maxW && int32(z.mult*z.origH*2.0) < z.maxH {
-		z.mult *= 2.0
-	}
-}
-
-func (z *zoomer) Out() {
-	if int32(z.mult*z.origW/2.0) > 0 && int32(z.mult*z.origH/2.0) > 0 {
-		z.mult /= 2.0
-	}
-}
-
-func (z *zoomer) MultW() int32 {
-	return int32(z.origW * z.mult)
-}
-
-func (z *zoomer) MultH() int32 {
-	return int32(z.origH * z.mult)
-}
-
-func (z *zoomer) IsIn() bool {
-	return z.lastMult < z.mult
-}
-
-func (z *zoomer) IsOut() bool {
-	return z.lastMult > z.mult
-}
-
-func (z *zoomer) Update() {
-	z.lastMult = z.mult
+func (iv *ImageView) zoomOut() {
+	iv.mult /= 2.0
+	diffW := int32(float64(iv.surf.W)*iv.mult) - iv.canvas.W
+	diffH := int32(float64(iv.surf.H)*iv.mult) - iv.canvas.H
+	iv.canvas.W += diffW
+	iv.canvas.H += diffH
+	iv.canvas.X = int32(math.Round(float64(iv.canvas.X)/2.0 + float64(iv.area.W)/4.0)) //iv.mouseLoc.x/2
+	iv.canvas.Y = int32(math.Round(float64(iv.canvas.Y)/2.0 + float64(iv.area.H)/4.0)) //iv.mouseLoc.y/2
 }
 
 var _ UIComponent = UIComponent(&ImageView{})
@@ -58,7 +37,7 @@ type ImageView struct {
 	mousePix   coord
 	dragging   bool
 	dragPoint  coord
-	zoom       zoomer
+	mult       float64
 	sel        set.Set
 	surf       *sdl.Surface
 	tex        *sdl.Texture
@@ -88,30 +67,18 @@ func NewImageView(area *sdl.Rect, fileName string, mouseComms chan<- coord, ctx 
 	if err = selTex.SetBlendMode(sdl.BLENDMODE_BLEND); err != nil {
 		return nil, err
 	}
-	var zoom = zoomer{
-		1.0,
-		1.0,
-		float64(surf.W),
-		float64(surf.H),
-		ctx.RendInfo.MaxTextureWidth,
-		ctx.RendInfo.MaxTextureHeight,
-	}
-	if err != nil {
-		return nil, err
-	}
 	var canvas = &sdl.Rect{
 		X: int32(float64(area.W)/2.0 - float64(surf.W)/2.0),
 		Y: int32(float64(area.H)/2.0 - float64(surf.H)/2.0),
 		W: surf.W,
 		H: surf.H,
 	}
-
 	return &ImageView{
 		area:       area,
 		canvas:     canvas,
 		surf:       surf,
 		tex:        tex,
-		zoom:       zoom,
+		mult:       1.0,
 		sel:        set.NewSet(),
 		selSurf:    selSurf,
 		selTex:     selTex,
@@ -123,8 +90,8 @@ func NewImageView(area *sdl.Rect, fileName string, mouseComms chan<- coord, ctx 
 func (iv *ImageView) updateMousePos(x, y int32) {
 	iv.mouseLoc.x = x
 	iv.mouseLoc.y = y
-	iv.mousePix.x = int32(float64(iv.mouseLoc.x-iv.canvas.X) / iv.zoom.mult)
-	iv.mousePix.y = int32(float64(iv.mouseLoc.y-iv.canvas.Y) / iv.zoom.mult)
+	iv.mousePix.x = int32(float64(iv.mouseLoc.x-iv.canvas.X) / iv.mult)
+	iv.mousePix.y = int32(float64(iv.mouseLoc.y-iv.canvas.Y) / iv.mult)
 }
 
 // GetBoundary returns the clickable region of the UIComponent
@@ -137,19 +104,6 @@ func (iv *ImageView) Render(rend *sdl.Renderer) error {
 	go func() {
 		iv.mouseComms <- iv.mousePix
 	}()
-	diffW := iv.zoom.MultW() - iv.canvas.W
-	diffH := iv.zoom.MultH() - iv.canvas.H
-	iv.canvas.W += diffW
-	iv.canvas.H += diffH
-	if iv.zoom.IsIn() {
-		iv.canvas.X = 2*iv.canvas.X - int32(math.Round(float64(iv.area.W)/2.0)) //iv.mouseLoc.x
-		iv.canvas.Y = 2*iv.canvas.Y - int32(math.Round(float64(iv.area.H)/2.0)) //iv.mouseLoc.y
-	}
-	if iv.zoom.IsOut() {
-		iv.canvas.X = int32(math.Round(float64(iv.canvas.X)/2.0 + float64(iv.area.W)/4.0)) //iv.mouseLoc.x/2
-		iv.canvas.Y = int32(math.Round(float64(iv.canvas.Y)/2.0 + float64(iv.area.H)/4.0)) //iv.mouseLoc.y/2
-	}
-	iv.zoom.Update()
 	iv.sel.Range(func(n int) bool {
 		y := int32(n) % iv.selSurf.W
 		x := int32(n) - y*iv.selSurf.W
@@ -215,9 +169,13 @@ func (iv *ImageView) OnMotion(evt *sdl.MouseMotionEvent) bool {
 // OnScroll is called when the user scrolls within the UIComponent's region
 func (iv *ImageView) OnScroll(evt *sdl.MouseWheelEvent) bool {
 	if evt.Y > 0 {
-		iv.zoom.In()
+		if int32(iv.mult*float64(iv.surf.W)*2.0) < iv.ctx.RendInfo.MaxTextureWidth && int32(iv.mult*float64(iv.surf.H)*2.0) < iv.ctx.RendInfo.MaxTextureHeight {
+			iv.zoomIn()
+		}
 	} else if evt.Y < 0 {
-		iv.zoom.Out()
+		if int32(iv.mult*float64(iv.surf.W)/2.0) > 0 && int32(iv.mult*float64(iv.surf.H)/2.0) > 0 && iv.mult > 1 {
+			iv.zoomOut()
+		}
 	}
 	return true
 }
