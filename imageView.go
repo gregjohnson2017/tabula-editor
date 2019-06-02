@@ -162,16 +162,16 @@ func (iv *ImageView) Render() error {
 		r.H += r.Y
 		r.Y = 0
 	}
-	if r.W > iv.area.W {
-		r.W = iv.area.W
+	if r.X+r.W > iv.area.W {
+		r.W = iv.area.W - r.X
 	}
-	if r.H > iv.area.H {
-		r.H = iv.area.H
+	if r.Y+r.H > iv.area.H {
+		r.H = iv.area.H - r.Y
 	}
 	if err = iv.ctx.Rend.SetViewport(r); err != nil {
 		return err
 	}
-	if err = iv.ctx.Rend.Copy(iv.backTex, &sdl.Rect{X: 0, Y: 0, W: r.W, H: r.H}, nil); err != nil {
+	if err = iv.ctx.Rend.Copy(iv.backTex, r, nil); err != nil {
 		return err
 	}
 	if err = iv.ctx.Rend.SetViewport(iv.canvas); err != nil {
