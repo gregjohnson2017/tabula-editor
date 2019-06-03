@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math"
+	"os"
 
 	"github.com/veandco/go-sdl2/gfx"
 	"github.com/veandco/go-sdl2/img"
@@ -127,21 +128,26 @@ func main() {
 	}
 	comms := make(chan imageComm)
 
-	iv, err := NewImageView(imageViewArea, "monkaDetect.png", comms, ctx)
+	fileName := "monkaDetect.png"
+	if len(os.Args) == 2 {
+		fileName = os.Args[1]
+	}
+	iv, err := NewImageView(imageViewArea, fileName, comms, ctx)
 	if err != nil {
 		panic(err)
 	}
-	bb, err := NewBottomBar(bottomBarArea, comms, ctx, &sdl.Color{R: 0x80, G: 0x80, B: 0x80, A: 0xFF})
+	bb, err := NewBottomBar(bottomBarArea, comms, ctx, nil)
 	if err != nil {
 		panic(err)
 	}
-	b, err := NewButton(buttonArea, ctx, &sdl.Color{R: 0xD6, G: 0xCF, B: 0xCF, A: 0xFF}, nil, "Press Me!", func() {
+	b, err := NewButton(buttonArea, ctx, nil, nil, "Press Me!", func() {
 		fmt.Printf("Action!\n")
 	})
 	comps := []UIComponent{iv, bb, b}
 
 	var lastHover UIComponent
 	var currHover UIComponent
+	var moved bool
 	running := true
 	for running {
 		var e sdl.Event
@@ -158,23 +164,25 @@ func main() {
 					}
 				}
 			case *sdl.MouseMotionEvent:
+				// search top down through components until exhausted or one absorbs the event
 				for i := range comps {
 					comp := comps[len(comps)-i-1]
 					if inBounds(comp.GetBoundary(), evt.X, evt.Y) {
-						if lastHover != comp && currHover != comp {
+						if currHover != comp {
+							// entered a new component
 							comp.OnEnter()
+							lastHover = currHover
 							currHover = comp
-						} else if lastHover == comp {
-							currHover = lastHover
+							moved = true
 						}
 						if comp.OnMotion(evt) {
 							break
 						}
 					}
 				}
-				if lastHover != nil && lastHover != currHover {
+				if lastHover != nil && moved {
 					lastHover.OnLeave()
-					lastHover = nil
+					moved = false
 				}
 			case *sdl.MouseWheelEvent:
 				for i := range comps {
@@ -188,17 +196,14 @@ func main() {
 				}
 			case *sdl.WindowEvent:
 				if evt.Event == sdl.WINDOWEVENT_LEAVE || evt.Event == sdl.WINDOWEVENT_FOCUS_LOST || evt.Event == sdl.WINDOWEVENT_MINIMIZED {
-					if lastHover != nil {
-						lastHover.OnLeave()
+					if currHover != nil {
+						currHover.OnLeave()
+						lastHover = currHover
 						currHover = nil
-						lastHover = nil
+						moved = false
 					}
 				}
 			}
-		}
-		if currHover != nil {
-			lastHover = currHover
-			currHover = nil
 		}
 
 		if err = ctx.Rend.Clear(); err != nil {

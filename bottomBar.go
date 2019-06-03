@@ -18,7 +18,11 @@ type BottomBar struct {
 }
 
 // NewBottomBar returns a pointer to a new BottomBar struct that implements UIComponent
+// the background color defaults to grey (0x808080FF)
 func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, ctx *context, color *sdl.Color) (*BottomBar, error) {
+	if color == nil {
+		color = &sdl.Color{R: 0x80, G: 0x80, B: 0x80, A: 0xFF}
+	}
 	var err error
 	var bottomBarTex *sdl.Texture
 	if bottomBarTex, err = createSolidColorTexture(ctx.Rend, ctx.Conf.screenWidth, ctx.Conf.bottomBarHeight, color.R, color.G, color.B, color.A); err != nil {

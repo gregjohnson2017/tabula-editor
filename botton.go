@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -19,10 +21,10 @@ type Button struct {
 }
 
 // NewButton returns a pointer to a new BottomBar struct that implements UIComponent
-// defaultColor and highlightColor default to white and blue respectively, if nil
+// defaultColor and highlightColor default to light grey (0xD6CFCFFF) and blue (0X0046AFFF) respectively, if nil
 func NewButton(area *sdl.Rect, ctx *context, defaultColor *sdl.Color, highlightColor *sdl.Color, text string, action func()) (*Button, error) {
 	if defaultColor == nil {
-		defaultColor = &sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}
+		defaultColor = &sdl.Color{R: 0xD6, G: 0xCF, B: 0xCF, A: 0xFF}
 	}
 	if highlightColor == nil {
 		highlightColor = &sdl.Color{R: 0x00, G: 0x46, B: 0xAF, A: 0xFF}
@@ -88,11 +90,13 @@ func (b *Button) Render() error {
 
 // OnEnter is called when the cursor enters the UIComponent's region
 func (b *Button) OnEnter() {
+	fmt.Printf("Entered button\n")
 	b.hovering = true
 }
 
 // OnLeave is called when the cursor leaves the UIComponent's region
 func (b *Button) OnLeave() {
+	fmt.Printf("Left button\n")
 	b.hovering = false
 	b.pressed = false
 }

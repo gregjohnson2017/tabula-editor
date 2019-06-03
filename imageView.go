@@ -82,7 +82,7 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, ctx *
 	light := mapRGBA(backSurf.Format, 0xEE, 0xEE, 0xEE, 0xFF)
 	backSurf.FillRect(nil, light)
 	rects := []sdl.Rect{}
-	sqsize := int32(4)
+	sqsize := int32(8)
 	for i := int32(0); i < backSurf.W; i += 2 * sqsize {
 		for j := int32(0); j < backSurf.H; j += sqsize {
 			off := ((j/sqsize + 1) % 2) * sqsize
@@ -252,6 +252,7 @@ func (iv *ImageView) OnClick(evt *sdl.MouseButtonEvent) bool {
 		iv.dragPoint.y = evt.Y
 	}
 	if evt.Button == sdl.BUTTON_LEFT && evt.State == sdl.PRESSED {
+
 		i := int(iv.surf.W*iv.mousePix.y + iv.mousePix.x)
 		if !iv.sel.Contains(i) {
 			iv.sel.Add(i)
