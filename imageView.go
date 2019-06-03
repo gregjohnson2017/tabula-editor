@@ -196,7 +196,9 @@ func (iv *ImageView) Render() error {
 func (iv *ImageView) OnEnter() {}
 
 // OnLeave is called when the cursor leaves the UIComponent's region
-func (iv *ImageView) OnLeave() {}
+func (iv *ImageView) OnLeave() {
+	iv.dragging = false
+}
 
 // OnMotion is called when the cursor moves within the UIComponent's region
 func (iv *ImageView) OnMotion(evt *sdl.MouseMotionEvent) bool {

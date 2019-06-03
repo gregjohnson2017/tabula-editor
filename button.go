@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -90,13 +88,11 @@ func (b *Button) Render() error {
 
 // OnEnter is called when the cursor enters the UIComponent's region
 func (b *Button) OnEnter() {
-	fmt.Printf("Entered button\n")
 	b.hovering = true
 }
 
 // OnLeave is called when the cursor leaves the UIComponent's region
 func (b *Button) OnLeave() {
-	fmt.Printf("Left button\n")
 	b.hovering = false
 	b.pressed = false
 }
