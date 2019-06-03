@@ -2,6 +2,7 @@ package main
 
 import (
 	"math"
+	"strings"
 
 	set "github.com/kroppt/IntSet"
 	"github.com/veandco/go-sdl2/sdl"
@@ -45,6 +46,7 @@ type ImageView struct {
 	selTex    *sdl.Texture
 	backTex   *sdl.Texture
 	comms     chan<- imageComm
+	fileComm  <-chan func()
 	ctx       *context
 	fileName  string
 }
@@ -55,29 +57,28 @@ type imageComm struct {
 	mult     float64
 }
 
-// NewImageView returns a pointer to a new ImageView struct that implements UIComponent
-func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, ctx *context) (*ImageView, error) {
+func (iv *ImageView) loadFromFile(fileName string, area *sdl.Rect, ctx *context) error {
 	surf, tex, err := loadImage(ctx.Rend, fileName)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	var selSurf *sdl.Surface
 	if selSurf, err = sdl.CreateRGBSurfaceWithFormat(0, surf.W, surf.H, 32, uint32(sdl.PIXELFORMAT_RGBA32)); err != nil {
-		return nil, err
+		return err
 	}
 	if err = selSurf.FillRect(nil, mapRGBA(selSurf.Format, 0, 0, 0, 0)); err != nil {
-		return nil, err
+		return err
 	}
 	var selTex *sdl.Texture
 	if selTex, err = ctx.Rend.CreateTexture(selSurf.Format.Format, sdl.TEXTUREACCESS_STREAMING, selSurf.W, selSurf.H); err != nil {
-		return nil, err
+		return err
 	}
 	if err = selTex.SetBlendMode(sdl.BLENDMODE_BLEND); err != nil {
-		return nil, err
+		return err
 	}
 	var backSurf *sdl.Surface
 	if backSurf, err = sdl.CreateRGBSurfaceWithFormat(0, area.W, area.H, 32, uint32(sdl.PIXELFORMAT_RGBA32)); err != nil {
-		return nil, err
+		return err
 	}
 	light := mapRGBA(backSurf.Format, 0xEE, 0xEE, 0xEE, 0xFF)
 	backSurf.FillRect(nil, light)
@@ -94,7 +95,7 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, ctx *
 	backSurf.FillRects(rects, dark)
 	var backTex *sdl.Texture
 	if backTex, err = ctx.Rend.CreateTextureFromSurface(backSurf); err != nil {
-		return nil, err
+		return err
 	}
 	backSurf.Free()
 	var canvas = &sdl.Rect{
@@ -103,21 +104,31 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, ctx *
 		W: surf.W,
 		H: surf.H,
 	}
+	iv.surf = surf
+	iv.selSurf = selSurf
+	iv.tex = tex
+	iv.selTex = selTex
+	iv.backTex = backTex
+	iv.canvas = canvas
+	fileParts := strings.Split(fileName, "/")
+	iv.fileName = fileParts[len(fileParts)-1]
+	return nil
+}
 
-	return &ImageView{
-		area:     area,
-		canvas:   canvas,
-		surf:     surf,
-		tex:      tex,
-		mult:     1.0,
-		sel:      set.NewSet(),
-		selSurf:  selSurf,
-		selTex:   selTex,
-		backTex:  backTex,
-		comms:    comms,
-		ctx:      ctx,
-		fileName: fileName,
-	}, nil
+// NewImageView returns a pointer to a new ImageView struct that implements UIComponent
+func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, fileComm <-chan func(), ctx *context) (*ImageView, error) {
+	var iv = &ImageView{}
+	var err error
+	if err = iv.loadFromFile(fileName, area, ctx); err != nil {
+		return nil, err
+	}
+	iv.area = area
+	iv.mult = 1.0
+	iv.sel = set.NewSet()
+	iv.comms = comms
+	iv.fileComm = fileComm
+	iv.ctx = ctx
+	return iv, nil
 }
 
 // Destroy frees all surfaces and textures in the ImageView

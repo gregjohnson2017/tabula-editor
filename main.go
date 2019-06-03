@@ -5,6 +5,7 @@ import (
 	"math"
 	"os"
 
+	"github.com/jcmuller/gozenity"
 	"github.com/veandco/go-sdl2/gfx"
 	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
@@ -97,6 +98,17 @@ func initialize(title string) (*context, error) {
 
 func main() {
 	var err error
+	var fileName string
+	if len(os.Args) == 2 {
+		fileName = os.Args[1]
+	} else {
+		files, err := gozenity.FileSelection("Choose a picture to open", nil)
+		if err != nil {
+			panic(err)
+		}
+		fileName = files[0]
+	}
+
 	var ctx *context
 	if ctx, err = initialize("Tabula Editor"); err != nil {
 		panic(err)
@@ -128,11 +140,7 @@ func main() {
 	}
 	comms := make(chan imageComm)
 
-	fileName := "monkaDetect.png"
-	if len(os.Args) == 2 {
-		fileName = os.Args[1]
-	}
-	iv, err := NewImageView(imageViewArea, fileName, comms, ctx)
+	iv, err := NewImageView(imageViewArea, fileName, comms, nil, ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -141,7 +149,7 @@ func main() {
 		panic(err)
 	}
 	b, err := NewButton(buttonArea, ctx, nil, nil, "Press Me!", func() {
-		fmt.Printf("Action!\n")
+
 	})
 	comps := []UIComponent{iv, bb, b}
 
