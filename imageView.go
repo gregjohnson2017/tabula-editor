@@ -46,7 +46,6 @@ type ImageView struct {
 	selTex    *sdl.Texture
 	backTex   *sdl.Texture
 	comms     chan<- imageComm
-	fileComm  <-chan func()
 	ctx       *context
 	fileName  string
 }
@@ -57,8 +56,8 @@ type imageComm struct {
 	mult     float64
 }
 
-func (iv *ImageView) loadFromFile(fileName string, area *sdl.Rect, ctx *context) error {
-	surf, tex, err := loadImage(ctx.Rend, fileName)
+func (iv *ImageView) loadFromFile(fileName string) error {
+	surf, tex, err := loadImage(iv.ctx.Rend, fileName)
 	if err != nil {
 		return err
 	}
@@ -70,14 +69,14 @@ func (iv *ImageView) loadFromFile(fileName string, area *sdl.Rect, ctx *context)
 		return err
 	}
 	var selTex *sdl.Texture
-	if selTex, err = ctx.Rend.CreateTexture(selSurf.Format.Format, sdl.TEXTUREACCESS_STREAMING, selSurf.W, selSurf.H); err != nil {
+	if selTex, err = iv.ctx.Rend.CreateTexture(selSurf.Format.Format, sdl.TEXTUREACCESS_STREAMING, selSurf.W, selSurf.H); err != nil {
 		return err
 	}
 	if err = selTex.SetBlendMode(sdl.BLENDMODE_BLEND); err != nil {
 		return err
 	}
 	var backSurf *sdl.Surface
-	if backSurf, err = sdl.CreateRGBSurfaceWithFormat(0, area.W, area.H, 32, uint32(sdl.PIXELFORMAT_RGBA32)); err != nil {
+	if backSurf, err = sdl.CreateRGBSurfaceWithFormat(0, iv.area.W, iv.area.H, 32, uint32(sdl.PIXELFORMAT_RGBA32)); err != nil {
 		return err
 	}
 	light := mapRGBA(backSurf.Format, 0xEE, 0xEE, 0xEE, 0xFF)
@@ -94,13 +93,13 @@ func (iv *ImageView) loadFromFile(fileName string, area *sdl.Rect, ctx *context)
 	dark := mapRGBA(backSurf.Format, 0x99, 0x99, 0x99, 0xFF)
 	backSurf.FillRects(rects, dark)
 	var backTex *sdl.Texture
-	if backTex, err = ctx.Rend.CreateTextureFromSurface(backSurf); err != nil {
+	if backTex, err = iv.ctx.Rend.CreateTextureFromSurface(backSurf); err != nil {
 		return err
 	}
 	backSurf.Free()
 	var canvas = &sdl.Rect{
-		X: int32(float64(area.W)/2.0 - float64(surf.W)/2.0),
-		Y: int32(float64(area.H)/2.0 - float64(surf.H)/2.0),
+		X: int32(float64(iv.area.W)/2.0 - float64(surf.W)/2.0),
+		Y: int32(float64(iv.area.H)/2.0 - float64(surf.H)/2.0),
 		W: surf.W,
 		H: surf.H,
 	}
@@ -112,22 +111,21 @@ func (iv *ImageView) loadFromFile(fileName string, area *sdl.Rect, ctx *context)
 	iv.canvas = canvas
 	fileParts := strings.Split(fileName, "/")
 	iv.fileName = fileParts[len(fileParts)-1]
+	iv.mult = 1.0
+	iv.sel = set.NewSet()
 	return nil
 }
 
 // NewImageView returns a pointer to a new ImageView struct that implements UIComponent
-func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, fileComm <-chan func(), ctx *context) (*ImageView, error) {
-	var iv = &ImageView{}
+func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, ctx *context) (*ImageView, error) {
 	var err error
-	if err = iv.loadFromFile(fileName, area, ctx); err != nil {
+	var iv = &ImageView{}
+	iv.area = area
+	iv.ctx = ctx
+	iv.comms = comms
+	if err = iv.loadFromFile(fileName); err != nil {
 		return nil, err
 	}
-	iv.area = area
-	iv.mult = 1.0
-	iv.sel = set.NewSet()
-	iv.comms = comms
-	iv.fileComm = fileComm
-	iv.ctx = ctx
 	return iv, nil
 }
 
@@ -242,7 +240,7 @@ func (iv *ImageView) OnScroll(evt *sdl.MouseWheelEvent) bool {
 			iv.zoomIn()
 		}
 	} else if evt.Y < 0 {
-		if int32(iv.mult*float64(iv.surf.W)/2.0) > 0 && int32(iv.mult*float64(iv.surf.H)/2.0) > 0 && iv.mult > 0.25 {
+		if int32(iv.mult*float64(iv.surf.W)/2.0) > 0 && int32(iv.mult*float64(iv.surf.H)/2.0) > 0 {
 			iv.zoomOut()
 		}
 	}

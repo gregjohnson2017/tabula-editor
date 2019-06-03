@@ -22,8 +22,8 @@ type config struct {
 
 func initConfig() *config {
 	c := config{
-		screenWidth:     640,
-		screenHeight:    480,
+		screenWidth:     960,
+		screenHeight:    720,
 		bottomBarHeight: 30,
 		fontName:        "NotoMono-Regular.ttf",
 		framerate:       144,
@@ -139,8 +139,9 @@ func main() {
 		H: 20,
 	}
 	comms := make(chan imageComm)
+	fileComm := make(chan func())
 
-	iv, err := NewImageView(imageViewArea, fileName, comms, nil, ctx)
+	iv, err := NewImageView(imageViewArea, fileName, comms, ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -148,8 +149,21 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	b, err := NewButton(buttonArea, ctx, nil, nil, "Press Me!", func() {
-
+	b, err := NewButton(buttonArea, ctx, nil, nil, "Load File", func() {
+		files, err := gozenity.FileSelection("Choose a picture to open", nil)
+		if err != nil {
+			fmt.Printf("No file chosen\n")
+			return
+		}
+		newFileName := files[0]
+		go func() {
+			fileComm <- func() {
+				iv.Destroy()
+				if err = iv.loadFromFile(newFileName); err != nil {
+					panic(err)
+				}
+			}
+		}()
 	})
 	comps := []UIComponent{iv, bb, b}
 
@@ -211,6 +225,18 @@ func main() {
 						moved = false
 					}
 				}
+			}
+		}
+
+		// TODO: handle all events in pipe
+		hasEvents := true
+		for hasEvents {
+			select {
+			case closure := <-fileComm:
+				closure()
+			default:
+				// no more in pipe
+				hasEvents = false
 			}
 		}
 
