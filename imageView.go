@@ -2,7 +2,7 @@ package main
 
 import (
 	"math"
-	"strings"
+	"path"
 
 	set "github.com/kroppt/IntSet"
 	"github.com/veandco/go-sdl2/sdl"
@@ -72,7 +72,28 @@ func (iv *ImageView) loadFromFile(fileName string) error {
 	if err = selTex.SetBlendMode(sdl.BLENDMODE_BLEND); err != nil {
 		return err
 	}
+	if err = iv.createBackTex(); err != nil {
+		return err
+	}
+	var canvas = &sdl.Rect{
+		X: int32(float64(iv.area.W)/2.0 - float64(surf.W)/2.0),
+		Y: int32(float64(iv.area.H)/2.0 - float64(surf.H)/2.0),
+		W: surf.W,
+		H: surf.H,
+	}
+	iv.surf = surf
+	iv.selSurf = selSurf
+	iv.tex = tex
+	iv.selTex = selTex
+	iv.canvas = canvas
+	iv.fileName = path.Base(fileName)
+	iv.fullPath = fileName
+	return nil
+}
+
+func (iv *ImageView) createBackTex() error {
 	var backSurf *sdl.Surface
+	var err error
 	if backSurf, err = sdl.CreateRGBSurfaceWithFormat(0, iv.area.W, iv.area.H, 32, uint32(sdl.PIXELFORMAT_RGBA32)); err != nil {
 		return err
 	}
@@ -94,21 +115,7 @@ func (iv *ImageView) loadFromFile(fileName string) error {
 		return err
 	}
 	backSurf.Free()
-	var canvas = &sdl.Rect{
-		X: int32(float64(iv.area.W)/2.0 - float64(surf.W)/2.0),
-		Y: int32(float64(iv.area.H)/2.0 - float64(surf.H)/2.0),
-		W: surf.W,
-		H: surf.H,
-	}
-	iv.surf = surf
-	iv.selSurf = selSurf
-	iv.tex = tex
-	iv.selTex = selTex
 	iv.backTex = backTex
-	iv.canvas = canvas
-	fileParts := strings.Split(fileName, "/")
-	iv.fileName = fileParts[len(fileParts)-1]
-	iv.fullPath = fileName
 	return nil
 }
 
@@ -276,12 +283,13 @@ func (iv *ImageView) OnClick(evt *sdl.MouseButtonEvent) bool {
 
 // OnResize is called when the user resizes the window
 func (iv *ImageView) OnResize(x, y int32) {
+	var err error
 	iv.area.W = x
 	iv.area.H += (y - iv.area.H)
-	oldCanvas := iv.canvas
-	iv.Destroy()
-	if err := iv.loadFromFile(iv.fullPath); err != nil {
+	if err = iv.backTex.Destroy(); err != nil {
 		panic(err)
 	}
-	iv.canvas = oldCanvas
+	if err = iv.createBackTex(); err != nil {
+		panic(err)
+	}
 }
