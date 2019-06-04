@@ -2,7 +2,8 @@ package main
 
 import (
 	"math"
-	"path"
+	"os"
+	"strings"
 
 	set "github.com/kroppt/IntSet"
 	"github.com/veandco/go-sdl2/sdl"
@@ -86,7 +87,8 @@ func (iv *ImageView) loadFromFile(fileName string) error {
 	iv.tex = tex
 	iv.selTex = selTex
 	iv.canvas = canvas
-	iv.fileName = path.Base(fileName)
+	parts := strings.Split(fileName, string(os.PathSeparator))
+	iv.fileName = parts[len(parts)-1]
 	iv.fullPath = fileName
 	return nil
 }
