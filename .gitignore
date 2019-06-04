@@ -1,6 +1,7 @@
 # Go
 
 # Binaries for programs and plugins
+tabula-editor
 *.exe
 *.exe~
 *.dll
