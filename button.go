@@ -2,26 +2,31 @@ package main
 
 import (
 	"github.com/veandco/go-sdl2/sdl"
+	"github.com/veandco/go-sdl2/ttf"
 )
 
 var _ UIComponent = UIComponent(&Button{})
 
 // Button defines an interactive button
 type Button struct {
-	area         *sdl.Rect
-	defaultTex   *sdl.Texture
-	highlightTex *sdl.Texture
-	text         string
-	ctx          *context
-	pressed      bool
-	hovering     bool
-	menu         *Menu
-	action       func()
+	area               *sdl.Rect
+	defaultTex         *sdl.Texture
+	highlightTex       *sdl.Texture
+	defaultTextColor   *sdl.Color
+	highlightTextColor *sdl.Color
+	font               *ttf.Font
+	fontSize           int32
+	text               string
+	ctx                *context
+	pressed            bool
+	hovering           bool
+	menu               *Menu
+	action             func()
 }
 
 // NewMenuButton returns a pointer to a Button struct with special menu functionality
 // defaultColor and highlightColor default to light grey (0xD6CFCFFF) and blue (0X0046AFFF) respectively, if nil
-func NewMenuButton(area *sdl.Rect, ctx *context, defaultColor *sdl.Color, highlightColor *sdl.Color, text string, action func(), menu *Menu) (*Button, error) {
+func NewMenuButton(area *sdl.Rect, ctx *context, defaultColor *sdl.Color, highlightColor *sdl.Color, text string, fontName string, fontSize int32, action func(), menu *Menu) (*Button, error) {
 	if defaultColor == nil {
 		defaultColor = &sdl.Color{R: 0xD6, G: 0xCF, B: 0xCF, A: 0xFF}
 	}
@@ -37,23 +42,69 @@ func NewMenuButton(area *sdl.Rect, ctx *context, defaultColor *sdl.Color, highli
 	if highlightTex, err = createSolidColorTexture(ctx.Rend, area.W, area.H, highlightColor.R, highlightColor.G, highlightColor.B, highlightColor.A); err != nil {
 		return nil, err
 	}
+	var font *ttf.Font
+	if font, err = ttf.OpenFont(fontName, int(fontSize)); err != nil {
+		return nil, err
+	}
 	return &Button{
-		area:         area,
-		defaultTex:   defaultTex,
-		highlightTex: highlightTex,
-		text:         text,
-		ctx:          ctx,
-		pressed:      false,
-		hovering:     false,
-		action:       action,
-		menu:         menu,
+		area:               area,
+		defaultTex:         defaultTex,
+		defaultTextColor:   &sdl.Color{R: 0x00, G: 0x00, B: 0x00, A: 0xFF},
+		highlightTex:       highlightTex,
+		highlightTextColor: &sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF},
+		text:               text,
+		ctx:                ctx,
+		pressed:            false,
+		hovering:           false,
+		action:             action,
+		menu:               menu,
+		font:               font,
+		fontSize:           fontSize,
 	}, nil
 }
 
 // NewButton returns a pointer to a new Button struct that implements UIComponent
 // defaultColor and highlightColor default to light grey (0xD6CFCFFF) and blue (0X0046AFFF) respectively, if nil
-func NewButton(area *sdl.Rect, ctx *context, defaultColor *sdl.Color, highlightColor *sdl.Color, text string, action func()) (*Button, error) {
-	return NewMenuButton(area, ctx, defaultColor, highlightColor, text, action, nil)
+func NewButton(area *sdl.Rect, ctx *context, text string, fontName string, fontSize int32, action func()) (*Button, error) {
+	return NewMenuButton(area, ctx, nil, nil, text, fontName, fontSize, action, nil)
+}
+
+// SetDefaultBackgroundColor recreates the button's defaultTex with the given background color
+func (b *Button) SetDefaultBackgroundColor(color *sdl.Color) error {
+	var err error
+	var tex *sdl.Texture
+	if tex, err = createSolidColorTexture(b.ctx.Rend, b.area.W, b.area.H, color.R, color.G, color.B, color.A); err != nil {
+		return err
+	}
+	if b.defaultTex != nil {
+		b.defaultTex.Destroy()
+	}
+	b.defaultTex = tex
+	return nil
+}
+
+// SetHighlightBackgroundColor recreates the button's highlightTex with the given background color
+func (b *Button) SetHighlightBackgroundColor(color *sdl.Color) error {
+	var err error
+	var tex *sdl.Texture
+	if tex, err = createSolidColorTexture(b.ctx.Rend, b.area.W, b.area.H, color.R, color.G, color.B, color.A); err != nil {
+		return err
+	}
+	if b.highlightTex != nil {
+		b.highlightTex.Destroy()
+	}
+	b.highlightTex = tex
+	return nil
+}
+
+// SetDefaultTextColor changes the default text color
+func (b *Button) SetDefaultTextColor(color *sdl.Color) {
+	b.defaultTextColor = color
+}
+
+// SetHighlightTextColor changes the highlight text color
+func (b *Button) SetHighlightTextColor(color *sdl.Color) {
+	b.highlightTextColor = color
 }
 
 // Destroy frees all surfaces and textures in the BottomBar
@@ -74,10 +125,10 @@ func (b *Button) Render() error {
 	var textColor *sdl.Color
 	if b.hovering {
 		backgroundTex = b.highlightTex
-		textColor = &sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}
+		textColor = b.highlightTextColor
 	} else {
 		backgroundTex = b.defaultTex
-		textColor = &sdl.Color{R: 0x00, G: 0x00, B: 0x00, A: 0xFF}
+		textColor = b.defaultTextColor
 	}
 
 	// background first
@@ -89,7 +140,7 @@ func (b *Button) Render() error {
 		return err
 	}
 	// text on top
-	if err = renderText(b.ctx.Rend, b.ctx.Conf.fontName, 14, b.text, coord{b.area.W / 2, b.area.H / 2}, Align{AlignMiddle, AlignCenter}, textColor); err != nil {
+	if err = renderText(b.ctx.Rend, b.font, b.fontSize, b.text, coord{b.area.W / 2, b.area.H / 2}, Align{AlignMiddle, AlignCenter}, textColor); err != nil {
 		return err
 	}
 	return nil

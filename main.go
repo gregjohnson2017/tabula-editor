@@ -153,11 +153,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	bottomBar, err := NewBottomBar(bottomBarArea, comms, ctx, nil)
+	bottomBar, err := NewBottomBar(bottomBarArea, comms, ctx, "NotoMono-Regular.ttf", 24)
 	if err != nil {
 		panic(err)
 	}
-	openButton, err := NewButton(buttonAreaOpen, ctx, nil, nil, "Open File", func() {
+	openButton, err := NewButton(buttonAreaOpen, ctx, "Open File", "NotoMono-Regular.ttf", 14, func() {
 		files, err := gozenity.FileSelection("Choose a picture to open", nil)
 		if err != nil {
 			fmt.Printf("No file chosen\n")
@@ -175,13 +175,14 @@ func main() {
 			}
 		}()
 	})
-	centerButton, err := NewButton(buttonAreaCenter, ctx, nil, nil, "Center Image", func() {
+	centerButton, err := NewButton(buttonAreaCenter, ctx, "Center Image", "NotoMono-Regular.ttf", 14, func() {
 		go func() {
 			fileComm <- func() {
 				iv.centerImage()
 			}
 		}()
 	})
+	centerButton.SetHighlightBackgroundColor(&sdl.Color{R: 0xFF, G: 0x00, B: 0x00, A: 0xFF})
 	comps := []UIComponent{iv, bottomBar, openButton, centerButton}
 
 	var lastHover UIComponent

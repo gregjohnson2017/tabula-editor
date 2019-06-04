@@ -78,31 +78,29 @@ func createSolidColorTexture(rend *sdl.Renderer, w int32, h int32, r uint8, g ui
 	return tex, nil
 }
 
-func renderText(rend *sdl.Renderer, fontName string, fontSize int32, text string, pos coord, align Align, col *sdl.Color) error {
+func renderText(rend *sdl.Renderer, font *ttf.Font, fontSize int32, text string, pos coord, align Align, col *sdl.Color) error {
 	var surf *sdl.Surface
 	var err error
-	var font *ttf.Font
-	if font, err = ttf.OpenFont(fontName, int(fontSize)); err != nil {
-		return err
-	}
 	if surf, err = font.RenderUTF8Blended(text, *col); err != nil {
-		font.Close()
 		return err
 	}
 	var tex *sdl.Texture
 	if tex, err = rend.CreateTexture(surf.Format.Format, sdl.TEXTUREACCESS_STREAMING, surf.W, int32(fontSize)); err != nil {
 		surf.Free()
-		font.Close()
 		return err
 	}
 	if err = tex.SetBlendMode(sdl.BLENDMODE_BLEND); err != nil {
 		surf.Free()
 		tex.Destroy()
-		font.Close()
 		return err
 	}
-	sliceOffset := surf.Pitch * (surf.H - fontSize)
-	copyToTexture(tex, surf.Pixels()[sliceOffset:], nil)
+
+	h, err := font.GlyphMetrics('h')
+	rowsFromTop := int32(font.Ascent() - h.MaxY)
+	sliceStart := surf.Pitch * (rowsFromTop)
+	rowsFromBottom := surf.H - fontSize - rowsFromTop
+	sliceStop := surf.Pitch * (surf.H - rowsFromBottom)
+	copyToTexture(tex, surf.Pixels()[sliceStart:sliceStop], nil)
 
 	w2 := int32(float64(surf.W) / 2.0)
 	h2 := int32(float64(fontSize) / 2.0)
@@ -114,10 +112,10 @@ func renderText(rend *sdl.Renderer, fontName string, fontSize int32, text string
 		W: int32(surf.W),
 		H: int32(fontSize),
 	}
+
 	err = rend.Copy(tex, nil, rect)
 	surf.Free()
 	tex.Destroy()
-	font.Close()
 	return err
 }
 
