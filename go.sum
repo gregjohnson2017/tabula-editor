@@ -4,3 +4,5 @@ github.com/kroppt/IntSet v0.0.0-20190419004518-ef69714198d7 h1:BHM5zypaVa/YfCmBr
 github.com/kroppt/IntSet v0.0.0-20190419004518-ef69714198d7/go.mod h1:wbkCTu5DddTQSJEn3UFFMN2bMCPhediq45yLGsIvfsA=
 github.com/veandco/go-sdl2 v0.3.1-0.20180618054924-09947465530a h1:TVZgFM2xSMA1EnUYwfGkYCG3klWRyGZvmZMA8FNqjtk=
 github.com/veandco/go-sdl2 v0.3.1-0.20180618054924-09947465530a/go.mod h1:FB+kTpX9YTE+urhYiClnRzpOXbiWgaU3+5F2AB78DPg=
+github.com/kroppt/winfileask v0.0.0-20190604203301-8c2224e10487 h1:04ujwK5vLrF5gT99dQIlM/jgGTYFXTO1jTTh8LQoNV4=
+github.com/kroppt/winfileask v0.0.0-20190604203301-8c2224e10487/go.mod h1:biYF1MwJ7dNUHE4F6GtL67wQu1sFJdMUxG+PbKQQyGU=

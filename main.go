@@ -5,7 +5,6 @@ import (
 	"math"
 	"os"
 
-	"github.com/jcmuller/gozenity"
 	set "github.com/kroppt/IntSet"
 	"github.com/veandco/go-sdl2/gfx"
 	"github.com/veandco/go-sdl2/img"
@@ -69,7 +68,7 @@ func initialize(title string) (*context, error) {
 		return nil, err
 	}
 	var win *sdl.Window
-	if win, err = sdl.CreateWindow(title, sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, conf.screenWidth, conf.screenHeight, 0); err != nil {
+	if win, err = sdl.CreateWindow(title, sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, conf.screenWidth, conf.screenHeight, sdl.WINDOW_HIDDEN); err != nil {
 		return nil, err
 	}
 	win.SetResizable(true)
@@ -99,22 +98,23 @@ func initialize(title string) (*context, error) {
 }
 
 func main() {
+	var ctx *context
 	var err error
+	if ctx, err = initialize("Tabula Editor"); err != nil {
+		panic(err)
+	}
+
 	var fileName string
 	if len(os.Args) == 2 {
 		fileName = os.Args[1]
 	} else {
-		files, err := gozenity.FileSelection("Choose a picture to open", nil)
-		if err != nil {
-			panic(err)
+		if fileName, err = openFileDialog(ctx.Win); err != nil {
+			fmt.Printf("%v\n", err)
+			os.Exit(1)
 		}
-		fileName = files[0]
 	}
 
-	var ctx *context
-	if ctx, err = initialize("Tabula Editor"); err != nil {
-		panic(err)
-	}
+	ctx.Win.Show()
 
 	var framerate = &gfx.FPSmanager{}
 	gfx.InitFramerate(framerate)
@@ -158,12 +158,11 @@ func main() {
 		panic(err)
 	}
 	openButton, err := NewButton(buttonAreaOpen, ctx, "Open File", "NotoMono-Regular.ttf", 14, func() {
-		files, err := gozenity.FileSelection("Choose a picture to open", nil)
+		newFileName, err := openFileDialog(ctx.Win)
 		if err != nil {
 			fmt.Printf("No file chosen\n")
 			return
 		}
-		newFileName := files[0]
 		go func() {
 			fileComm <- func() {
 				iv.Destroy()
