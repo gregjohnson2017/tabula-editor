@@ -73,3 +73,8 @@ func (m *Menu) OnClick(evt *sdl.MouseButtonEvent) bool {
 
 // OnResize is called when the user resizes the window
 func (m *Menu) OnResize(x, y int32) {}
+
+// String returns the name of the component type
+func (m *Menu) String() string {
+	return "Menu"
+}

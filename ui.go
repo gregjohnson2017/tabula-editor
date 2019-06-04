@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
@@ -17,6 +19,7 @@ type UIComponent interface {
 	OnScroll(*sdl.MouseWheelEvent) bool
 	OnClick(*sdl.MouseButtonEvent) bool
 	OnResize(x, y int32)
+	fmt.Stringer
 }
 
 type context struct {

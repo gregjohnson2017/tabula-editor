@@ -131,3 +131,8 @@ func (bb *BottomBar) OnResize(x, y int32) {
 	}
 	bb.tex = bottomBarTex
 }
+
+// String  returns the name of the component type
+func (bb *BottomBar) String() string {
+	return "BottomBar"
+}

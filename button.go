@@ -180,3 +180,8 @@ func (b *Button) OnClick(evt *sdl.MouseButtonEvent) bool {
 
 // OnResize is called when the user resizes the window
 func (b *Button) OnResize(x, y int32) {}
+
+// String  returns the name of the component type
+func (b *Button) String() string {
+	return "Button"
+}

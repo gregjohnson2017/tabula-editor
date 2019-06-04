@@ -295,3 +295,8 @@ func (iv *ImageView) OnResize(x, y int32) {
 		panic(err)
 	}
 }
+
+// String returns the name of the component type
+func (iv *ImageView) String() string {
+	return "ImageView"
+}
