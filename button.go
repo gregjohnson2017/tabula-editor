@@ -15,12 +15,13 @@ type Button struct {
 	ctx          *context
 	pressed      bool
 	hovering     bool
+	menu         *Menu
 	action       func()
 }
 
-// NewButton returns a pointer to a new BottomBar struct that implements UIComponent
+// NewMenuButton returns a pointer to a Button struct with special menu functionality
 // defaultColor and highlightColor default to light grey (0xD6CFCFFF) and blue (0X0046AFFF) respectively, if nil
-func NewButton(area *sdl.Rect, ctx *context, defaultColor *sdl.Color, highlightColor *sdl.Color, text string, action func()) (*Button, error) {
+func NewMenuButton(area *sdl.Rect, ctx *context, defaultColor *sdl.Color, highlightColor *sdl.Color, text string, action func(), menu *Menu) (*Button, error) {
 	if defaultColor == nil {
 		defaultColor = &sdl.Color{R: 0xD6, G: 0xCF, B: 0xCF, A: 0xFF}
 	}
@@ -43,8 +44,16 @@ func NewButton(area *sdl.Rect, ctx *context, defaultColor *sdl.Color, highlightC
 		text:         text,
 		ctx:          ctx,
 		pressed:      false,
+		hovering:     false,
 		action:       action,
+		menu:         menu,
 	}, nil
+}
+
+// NewButton returns a pointer to a new Button struct that implements UIComponent
+// defaultColor and highlightColor default to light grey (0xD6CFCFFF) and blue (0X0046AFFF) respectively, if nil
+func NewButton(area *sdl.Rect, ctx *context, defaultColor *sdl.Color, highlightColor *sdl.Color, text string, action func()) (*Button, error) {
+	return NewMenuButton(area, ctx, defaultColor, highlightColor, text, action, nil)
 }
 
 // Destroy frees all surfaces and textures in the BottomBar
@@ -117,3 +126,6 @@ func (b *Button) OnClick(evt *sdl.MouseButtonEvent) bool {
 	}
 	return true
 }
+
+// OnResize is called when the user resizes the window
+func (b *Button) OnResize(x, y int32) {}
