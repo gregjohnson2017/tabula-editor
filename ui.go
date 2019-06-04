@@ -16,6 +16,7 @@ type UIComponent interface {
 	OnMotion(*sdl.MouseMotionEvent) bool
 	OnScroll(*sdl.MouseWheelEvent) bool
 	OnClick(*sdl.MouseButtonEvent) bool
+	OnResize(x, y int32)
 }
 
 type context struct {

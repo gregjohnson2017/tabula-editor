@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/jcmuller/gozenity"
+	set "github.com/kroppt/IntSet"
 	"github.com/veandco/go-sdl2/gfx"
 	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
@@ -71,6 +72,7 @@ func initialize(title string) (*context, error) {
 	if win, err = sdl.CreateWindow(title, sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, conf.screenWidth, conf.screenHeight, 0); err != nil {
 		return nil, err
 	}
+	win.SetResizable(true)
 	var rend *sdl.Renderer
 	if rend, err = sdl.CreateRenderer(win, -1, sdl.RENDERER_ACCELERATED); err != nil {
 		return nil, err
@@ -162,6 +164,8 @@ func main() {
 				if err = iv.loadFromFile(newFileName); err != nil {
 					panic(err)
 				}
+				iv.mult = 1.0
+				iv.sel = set.NewSet()
 			}
 		}()
 	})
@@ -223,6 +227,10 @@ func main() {
 						lastHover = currHover
 						currHover = nil
 						moved = false
+					}
+				} else if evt.Event == sdl.WINDOWEVENT_RESIZED {
+					for _, comp := range comps {
+						comp.OnResize(evt.Data1, evt.Data2)
 					}
 				}
 			}

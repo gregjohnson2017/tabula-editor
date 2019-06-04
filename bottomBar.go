@@ -13,6 +13,7 @@ type BottomBar struct {
 	area     *sdl.Rect
 	tex      *sdl.Texture
 	comms    <-chan imageComm
+	color    *sdl.Color
 	mousePix coord
 	ctx      *context
 }
@@ -25,7 +26,7 @@ func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, ctx *context, color *s
 	}
 	var err error
 	var bottomBarTex *sdl.Texture
-	if bottomBarTex, err = createSolidColorTexture(ctx.Rend, ctx.Conf.screenWidth, ctx.Conf.bottomBarHeight, color.R, color.G, color.B, color.A); err != nil {
+	if bottomBarTex, err = createSolidColorTexture(ctx.Rend, area.W, area.H, color.R, color.G, color.B, color.A); err != nil {
 		return nil, err
 	}
 	return &BottomBar{
@@ -33,6 +34,7 @@ func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, ctx *context, color *s
 		tex:   bottomBarTex,
 		comms: comms,
 		ctx:   ctx,
+		color: color,
 	}, nil
 }
 
@@ -60,7 +62,7 @@ func (bb *BottomBar) Render() error {
 	}
 	// second render white text on top
 	coords := "(" + strconv.Itoa(int(msg.mousePix.x)) + ", " + strconv.Itoa(int(msg.mousePix.y)) + ")"
-	pos := coord{bb.ctx.Conf.screenWidth, int32(float64(bb.ctx.Conf.bottomBarHeight) / 2.0)}
+	pos := coord{bb.area.W, int32(float64(bb.ctx.Conf.bottomBarHeight) / 2.0)}
 	if err = renderText(bb.ctx.Rend, bb.ctx.Conf.fontName, 24, coords, pos, Align{AlignMiddle, AlignRight}, &sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}); err != nil {
 		return err
 	}
@@ -68,8 +70,8 @@ func (bb *BottomBar) Render() error {
 	if err = renderText(bb.ctx.Rend, bb.ctx.Conf.fontName, 24, msg.fileName, pos, Align{AlignMiddle, AlignLeft}, &sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}); err != nil {
 		return err
 	}
-	pos.x = bb.ctx.Conf.screenWidth / 2
-	if err = renderText(bb.ctx.Rend, bb.ctx.Conf.fontName, 24, strconv.FormatFloat(msg.mult, 'f', 2, 64)+"x", pos, Align{AlignMiddle, AlignCenter}, &sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}); err != nil {
+	pos.x = bb.area.W / 2
+	if err = renderText(bb.ctx.Rend, bb.ctx.Conf.fontName, 24, strconv.FormatFloat(msg.mult, 'f', 4, 64)+"x", pos, Align{AlignMiddle, AlignCenter}, &sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}); err != nil {
 		return err
 	}
 	return nil
@@ -94,4 +96,17 @@ func (bb *BottomBar) OnScroll(evt *sdl.MouseWheelEvent) bool {
 // OnClick is called when the user clicks within the UIComponent's region
 func (bb *BottomBar) OnClick(evt *sdl.MouseButtonEvent) bool {
 	return true
+}
+
+// OnResize is called when the user resizes the window
+func (bb *BottomBar) OnResize(x, y int32) {
+	bb.area.W = x
+	bb.area.Y = y - bb.area.H
+	bb.tex.Destroy()
+	var err error
+	var bottomBarTex *sdl.Texture
+	if bottomBarTex, err = createSolidColorTexture(bb.ctx.Rend, bb.area.W, bb.area.H, bb.color.R, bb.color.G, bb.color.B, bb.color.A); err != nil {
+		panic(err)
+	}
+	bb.tex = bottomBarTex
 }

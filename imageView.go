@@ -10,20 +10,16 @@ import (
 
 func (iv *ImageView) zoomIn() {
 	iv.mult *= 2.0
-	diffW := int32(float64(iv.surf.W)*iv.mult) - iv.canvas.W
-	diffH := int32(float64(iv.surf.H)*iv.mult) - iv.canvas.H
-	iv.canvas.W += diffW
-	iv.canvas.H += diffH
+	iv.canvas.W = int32(float64(iv.surf.W) * iv.mult)
+	iv.canvas.H = int32(float64(iv.surf.H) * iv.mult)
 	iv.canvas.X = 2*iv.canvas.X - int32(math.Round(float64(iv.area.W)/2.0)) //iv.mouseLoc.x
 	iv.canvas.Y = 2*iv.canvas.Y - int32(math.Round(float64(iv.area.H)/2.0)) //iv.mouseLoc.y
 }
 
 func (iv *ImageView) zoomOut() {
 	iv.mult /= 2.0
-	diffW := int32(float64(iv.surf.W)*iv.mult) - iv.canvas.W
-	diffH := int32(float64(iv.surf.H)*iv.mult) - iv.canvas.H
-	iv.canvas.W += diffW
-	iv.canvas.H += diffH
+	iv.canvas.W = int32(float64(iv.surf.W) * iv.mult)
+	iv.canvas.H = int32(float64(iv.surf.H) * iv.mult)
 	iv.canvas.X = int32(math.Round(float64(iv.canvas.X)/2.0 + float64(iv.area.W)/4.0)) //iv.mouseLoc.x/2
 	iv.canvas.Y = int32(math.Round(float64(iv.canvas.Y)/2.0 + float64(iv.area.H)/4.0)) //iv.mouseLoc.y/2
 }
@@ -48,6 +44,7 @@ type ImageView struct {
 	comms     chan<- imageComm
 	ctx       *context
 	fileName  string
+	fullPath  string
 }
 
 type imageComm struct {
@@ -111,8 +108,7 @@ func (iv *ImageView) loadFromFile(fileName string) error {
 	iv.canvas = canvas
 	fileParts := strings.Split(fileName, "/")
 	iv.fileName = fileParts[len(fileParts)-1]
-	iv.mult = 1.0
-	iv.sel = set.NewSet()
+	iv.fullPath = fileName
 	return nil
 }
 
@@ -123,6 +119,8 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, ctx *
 	iv.area = area
 	iv.ctx = ctx
 	iv.comms = comms
+	iv.mult = 1.0
+	iv.sel = set.NewSet()
 	if err = iv.loadFromFile(fileName); err != nil {
 		return nil, err
 	}
@@ -263,11 +261,22 @@ func (iv *ImageView) OnClick(evt *sdl.MouseButtonEvent) bool {
 		iv.dragPoint.y = evt.Y
 	}
 	if evt.Button == sdl.BUTTON_LEFT && evt.State == sdl.PRESSED {
-
 		i := int(iv.surf.W*iv.mousePix.y + iv.mousePix.x)
 		if !iv.sel.Contains(i) {
 			iv.sel.Add(i)
 		}
 	}
 	return true
+}
+
+// OnResize is called when the user resizes the window
+func (iv *ImageView) OnResize(x, y int32) {
+	iv.area.W = x
+	iv.area.H += (y - iv.area.H)
+	oldCanvas := iv.canvas
+	iv.Destroy()
+	if err := iv.loadFromFile(iv.fullPath); err != nil {
+		panic(err)
+	}
+	iv.canvas = oldCanvas
 }
