@@ -5,7 +5,6 @@ import (
 	"math"
 	"os"
 
-	"github.com/jcmuller/gozenity"
 	set "github.com/kroppt/IntSet"
 	"github.com/veandco/go-sdl2/gfx"
 	"github.com/veandco/go-sdl2/img"
@@ -159,12 +158,11 @@ func main() {
 		panic(err)
 	}
 	openButton, err := NewButton(buttonAreaOpen, ctx, nil, nil, "Open File", func() {
-		files, err := gozenity.FileSelection("Choose a picture to open", nil)
+		newFileName, err := openFileDialog(ctx.Win)
 		if err != nil {
 			fmt.Printf("No file chosen\n")
 			return
 		}
-		newFileName := files[0]
 		go func() {
 			fileComm <- func() {
 				iv.Destroy()
