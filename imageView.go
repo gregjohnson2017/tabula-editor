@@ -112,6 +112,11 @@ func (iv *ImageView) loadFromFile(fileName string) error {
 	return nil
 }
 
+func (iv *ImageView) centerImage() {
+	iv.canvas.X = int32(float64(iv.area.W)/2.0 - float64(iv.canvas.W)/2.0)
+	iv.canvas.Y = int32(float64(iv.area.H)/2.0 - float64(iv.canvas.H)/2.0)
+}
+
 // NewImageView returns a pointer to a new ImageView struct that implements UIComponent
 func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, ctx *context) (*ImageView, error) {
 	var err error

@@ -134,8 +134,14 @@ func main() {
 		W: ctx.Conf.screenWidth,
 		H: ctx.Conf.bottomBarHeight,
 	}
-	buttonArea := &sdl.Rect{
+	buttonAreaOpen := &sdl.Rect{
 		X: 0,
+		Y: 0,
+		W: 125,
+		H: 20,
+	}
+	buttonAreaCenter := &sdl.Rect{
+		X: 125,
 		Y: 0,
 		W: 125,
 		H: 20,
@@ -147,11 +153,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	bb, err := NewBottomBar(bottomBarArea, comms, ctx, nil)
+	bottomBar, err := NewBottomBar(bottomBarArea, comms, ctx, nil)
 	if err != nil {
 		panic(err)
 	}
-	b, err := NewButton(buttonArea, ctx, nil, nil, "Load File", func() {
+	openButton, err := NewButton(buttonAreaOpen, ctx, nil, nil, "Open File", func() {
 		files, err := gozenity.FileSelection("Choose a picture to open", nil)
 		if err != nil {
 			fmt.Printf("No file chosen\n")
@@ -169,7 +175,14 @@ func main() {
 			}
 		}()
 	})
-	comps := []UIComponent{iv, bb, b}
+	centerButton, err := NewButton(buttonAreaCenter, ctx, nil, nil, "Center Image", func() {
+		go func() {
+			fileComm <- func() {
+				iv.centerImage()
+			}
+		}()
+	})
+	comps := []UIComponent{iv, bottomBar, openButton, centerButton}
 
 	var lastHover UIComponent
 	var currHover UIComponent
