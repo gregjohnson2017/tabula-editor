@@ -141,7 +141,7 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm) (*Ima
 	}
 	screenSizeLoc := gl.GetUniformLocation(iv.programID, &[]byte("screenSize")[0])
 	gl.UseProgram(iv.programID)
-	gl.Uniform2f(screenSizeLoc, float32(iv.surf.W), float32(iv.surf.H))
+	gl.Uniform2f(screenSizeLoc, float32(iv.area.W), float32(iv.area.H))
 	gl.UseProgram(0)
 
 	iv.comms = comms
@@ -215,14 +215,14 @@ func (iv *ImageView) Render() error {
 	gl.GenerateMipmap(gl.TEXTURE_2D)
 
 	// render canvas rectangle
-	scw, sch := float32(iv.surf.W), float32(iv.surf.H)
+	sfw, sfh := float32(iv.surf.W), float32(iv.surf.H)
 	square := []float32{
 		0.0, 0.0, 0, 1, // top-left
-		0.0, sch, 0, 0, // bottom-left
-		scw, sch, 1, 0, // bottom-right
+		0.0, sfh, 0, 0, // bottom-left
+		sfw, sfh, 1, 0, // bottom-right
 		0.0, 0.0, 0, 1, // top-left
-		scw, sch, 1, 0, // bottom-right
-		scw, 0.0, 1, 1, // top-right
+		sfw, sfh, 1, 0, // bottom-right
+		sfw, 0.0, 1, 1, // top-right
 	}
 	// for i := 0; i < len(square); i += 4 {
 	// 	sx, sy := square[i], square[i+1]

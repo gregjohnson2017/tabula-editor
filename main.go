@@ -37,7 +37,7 @@ func initWindow(title string, width, height int32) (*sdl.Window, error) {
 	sdl.GLSetAttribute(sdl.GL_CONTEXT_PROFILE_MASK, sdl.GL_CONTEXT_PROFILE_CORE)
 
 	var window *sdl.Window
-	if window, err = sdl.CreateWindow(title, sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, 500, 500, sdl.WINDOW_HIDDEN|sdl.WINDOW_OPENGL); err != nil {
+	if window, err = sdl.CreateWindow(title, sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, width, height, sdl.WINDOW_HIDDEN|sdl.WINDOW_OPENGL); err != nil {
 		return nil, err
 	}
 	window.SetResizable(true)
@@ -67,9 +67,10 @@ func initWindow(title string, width, height int32) (*sdl.Window, error) {
 }
 
 func main() {
+	var screenWidth, screenHeight int32 = 900, 100
 	var err error
 	var win *sdl.Window
-	if win, err = initWindow("Tabula Editor", 720, 960); err != nil {
+	if win, err = initWindow("Tabula Editor", screenWidth, screenHeight); err != nil {
 		panic(err)
 	}
 
@@ -95,8 +96,8 @@ func main() {
 	imageViewArea := &sdl.Rect{
 		X: 0,
 		Y: 0,
-		W: 720,
-		H: 960, // - ctx.Conf.bottomBarHeight,
+		W: screenWidth,
+		H: screenHeight, // - ctx.Conf.bottomBarHeight,
 	}
 	// bottomBarArea := &sdl.Rect{
 	// 	X: 0,
