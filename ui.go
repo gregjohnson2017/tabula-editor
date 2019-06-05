@@ -189,11 +189,11 @@ const (
 	layout(location = 1) in vec2 tex_coords_in;
 	// TODO add colors
 	out vec2 tex_coords;
-    void main() {
+	void main() {
 		vec2 pos = 2.0 * (position_in / screenSize) - vec2(1.0);
 		gl_Position = vec4(pos, 0.0, 1.0);
-		tex_coords = tex_coords_in; 
-    }
+		tex_coords = tex_coords_in;
+	}
 ` + "\x00"
 
 	fragmentShaderSource = `
@@ -201,9 +201,9 @@ const (
 	uniform sampler2D frag_tex;
 	in vec2 tex_coords;
 	out vec4 frag_color;
-    void main() {
-        frag_color = texture(frag_tex, tex_coords);
-    }
+	void main() {
+		frag_color = texture(frag_tex, tex_coords);
+	}
 ` + "\x00"
 )
 

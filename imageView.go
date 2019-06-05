@@ -44,9 +44,10 @@ type ImageView struct {
 	// selSurf   *sdl.Surface
 	// selTex    *sdl.Texture
 	// backTex   *sdl.Texture
-	comms    chan<- imageComm
-	fileName string
-	fullPath string
+	comms         chan<- imageComm
+	fileName      string
+	fullPath      string
+	screenSizeLoc int32
 }
 
 type imageComm struct {
@@ -139,9 +140,9 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm) (*Ima
 	if iv.programID, err = CreateShaderProgram(vertexShaderSource, fragmentShaderSource); err != nil {
 		return nil, err
 	}
-	screenSizeLoc := gl.GetUniformLocation(iv.programID, &[]byte("screenSize")[0])
+	iv.screenSizeLoc = gl.GetUniformLocation(iv.programID, &[]byte("screenSize")[0])
 	gl.UseProgram(iv.programID)
-	gl.Uniform2f(screenSizeLoc, float32(iv.area.W), float32(iv.area.H))
+	gl.Uniform2f(iv.screenSizeLoc, float32(iv.area.W), float32(iv.area.H))
 	gl.UseProgram(0)
 
 	iv.comms = comms
@@ -316,7 +317,10 @@ func (iv *ImageView) OnClick(evt *sdl.MouseButtonEvent) bool {
 func (iv *ImageView) OnResize(x, y int32) {
 	// var err error
 	iv.area.W = x
-	iv.area.H += (y - iv.area.H)
+	iv.area.H = y
+	gl.UseProgram(iv.programID)
+	gl.Uniform2f(iv.screenSizeLoc, float32(iv.area.W), float32(iv.area.H))
+	gl.UseProgram(0)
 	// if err = iv.backTex.Destroy(); err != nil {
 	// 	panic(err)
 	// }

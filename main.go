@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/veandco/go-sdl2/img"
@@ -74,16 +75,15 @@ func main() {
 		panic(err)
 	}
 
-	// var fileName string
-	// if len(os.Args) == 2 {
-	// 	fileName = os.Args[1]
-	// } else {
-	// 	if fileName, err = openFileDialog(win); err != nil {
-	// 		fmt.Printf("%v\n", err)
-	// 		os.Exit(1)
-	// 	}
-	// }
-	fileName := "happyhug.png"
+	var fileName string
+	if len(os.Args) == 2 {
+		fileName = os.Args[1]
+	} else {
+		if fileName, err = openFileDialog(win); err != nil {
+			fmt.Printf("%v\n", err)
+			os.Exit(1)
+		}
+	}
 
 	win.Show()
 
@@ -213,6 +213,7 @@ func main() {
 						moved = false
 					}
 				} else if evt.Event == sdl.WINDOWEVENT_RESIZED {
+					gl.Viewport(0, 0, evt.Data1, evt.Data2)
 					for _, comp := range comps {
 						comp.OnResize(evt.Data1, evt.Data2)
 					}
