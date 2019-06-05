@@ -213,7 +213,6 @@ func main() {
 						moved = false
 					}
 				} else if evt.Event == sdl.WINDOWEVENT_RESIZED {
-					gl.Viewport(0, 0, evt.Data1, evt.Data2)
 					for _, comp := range comps {
 						comp.OnResize(evt.Data1, evt.Data2)
 					}

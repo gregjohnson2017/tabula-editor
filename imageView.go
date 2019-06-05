@@ -212,6 +212,7 @@ func (iv *ImageView) Render() error {
 		r.H = iv.area.H - r.Y
 	}
 
+	gl.Viewport(0, 0, iv.area.W, iv.area.H)
 	gl.UseProgram(iv.programID)
 
 	// render canvas rectangle
