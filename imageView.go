@@ -48,6 +48,7 @@ type ImageView struct {
 	fileName      string
 	fullPath      string
 	screenSizeLoc int32
+	textureID     uint32
 }
 
 type imageComm struct {
@@ -133,6 +134,9 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm) (*Ima
 	var err error
 	var iv = &ImageView{}
 	iv.area = area
+	iv.comms = comms
+	iv.mult = 1.0
+	// iv.sel = set.NewSet()
 	if err = iv.loadFromFile(fileName); err != nil {
 		return nil, err
 	}
@@ -145,9 +149,18 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm) (*Ima
 	gl.Uniform2f(iv.screenSizeLoc, float32(iv.area.W), float32(iv.area.H))
 	gl.UseProgram(0)
 
-	iv.comms = comms
-	iv.mult = 1.0
-	// iv.sel = set.NewSet()
+	// TODO find correct format
+	format := int32(gl.RGBA)
+	gl.GenTextures(1, &iv.textureID)
+	gl.BindTexture(gl.TEXTURE_2D, iv.textureID)
+	// copy pixels to texture
+	gl.TexImage2D(gl.TEXTURE_2D, 0, format, iv.surf.W, iv.surf.H, 0, uint32(format), gl.UNSIGNED_BYTE, unsafe.Pointer(&iv.surf.Pixels()[0]))
+	// https://www.khronos.org/registry/OpenGL-Refpages/es2.0/xhtml/glTexParameter.xml
+	// TODO pick right minify filter param
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+	gl.GenerateMipmap(gl.TEXTURE_2D)
+	gl.BindTexture(gl.TEXTURE_2D, 0)
 
 	return iv, nil
 }
@@ -155,10 +168,8 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm) (*Ima
 // Destroy frees all surfaces and textures in the ImageView
 func (iv *ImageView) Destroy() {
 	iv.surf.Free()
+	gl.DeleteTextures(1, &iv.textureID)
 	// iv.selSurf.Free()
-	// iv.tex.Destroy()
-	// iv.selTex.Destroy()
-	// iv.backTex.Destroy()
 }
 
 func (iv *ImageView) updateMousePos(x, y int32) {
@@ -203,18 +214,6 @@ func (iv *ImageView) Render() error {
 
 	gl.UseProgram(iv.programID)
 
-	// copy pixels to texture
-	// TODO find correct format
-	format := int32(gl.RGBA)
-	var textureID uint32
-	gl.GenTextures(1, &textureID)
-	gl.BindTexture(gl.TEXTURE_2D, textureID)
-	gl.TexImage2D(gl.TEXTURE_2D, 0, format, iv.surf.W, iv.surf.H, 0, uint32(format), gl.UNSIGNED_BYTE, unsafe.Pointer(&iv.surf.Pixels()[0]))
-	// this might fudge the pixels
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
-	gl.GenerateMipmap(gl.TEXTURE_2D)
-
 	// render canvas rectangle
 	sfw, sfh := float32(iv.surf.W), float32(iv.surf.H)
 	square := []float32{
@@ -230,16 +229,20 @@ func (iv *ImageView) Render() error {
 	// 	x, y := 2.0*sx/scw-1.0, 2.0*sy/sch-1.0
 	// 	fmt.Printf("%v: %v,%v\n", i, x, y)
 	// }
-	vao := makeVao(square)
+	vao, vbo := makeVao(square)
 	gl.BindVertexArray(vao)
 	gl.EnableVertexAttribArray(0)
 	gl.EnableVertexAttribArray(1)
+	gl.BindTexture(gl.TEXTURE_2D, iv.textureID)
 	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(square)/4))
+	gl.BindTexture(gl.TEXTURE_2D, 0)
 	gl.DisableVertexAttribArray(0)
 	gl.DisableVertexAttribArray(1)
-	// unbind texture
-	gl.BindTexture(gl.TEXTURE_2D, 0)
 
+	// clean up
+	gl.BindTexture(gl.TEXTURE_2D, 0)
+	gl.DeleteBuffers(1, &vbo)
+	gl.DeleteVertexArrays(1, &vao)
 	return nil
 }
 

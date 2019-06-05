@@ -159,7 +159,7 @@ func loadImage(fileName string) (*sdl.Surface, error) {
 	return surf, err
 }
 
-func makeVao(points []float32) uint32 {
+func makeVao(points []float32) (uint32, uint32) {
 	var vao uint32
 	gl.GenVertexArrays(1, &vao)
 	gl.BindVertexArray(vao)
@@ -178,7 +178,7 @@ func makeVao(points []float32) uint32 {
 	gl.DisableVertexAttribArray(0)
 	gl.DisableVertexAttribArray(1)
 	gl.BindVertexArray(0)
-	return vao
+	return vao, vbo
 }
 
 const (
