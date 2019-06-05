@@ -10,22 +10,6 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 )
 
-func (iv *ImageView) zoomIn() {
-	iv.mult *= 2.0
-	iv.canvas.W = int32(float64(iv.surf.W) * iv.mult)
-	iv.canvas.H = int32(float64(iv.surf.H) * iv.mult)
-	iv.canvas.X = 2*iv.canvas.X - int32(math.Round(float64(iv.area.W)/2.0)) //iv.mouseLoc.x
-	iv.canvas.Y = 2*iv.canvas.Y - int32(math.Round(float64(iv.area.H)/2.0)) //iv.mouseLoc.y
-}
-
-func (iv *ImageView) zoomOut() {
-	iv.mult /= 2.0
-	iv.canvas.W = int32(float64(iv.surf.W) * iv.mult)
-	iv.canvas.H = int32(float64(iv.surf.H) * iv.mult)
-	iv.canvas.X = int32(math.Round(float64(iv.canvas.X)/2.0 + float64(iv.area.W)/4.0)) //iv.mouseLoc.x/2
-	iv.canvas.Y = int32(math.Round(float64(iv.canvas.Y)/2.0 + float64(iv.area.H)/4.0)) //iv.mouseLoc.y/2
-}
-
 var _ UIComponent = UIComponent(&ImageView{})
 
 // ImageView defines an interactable image viewing pane
@@ -128,11 +112,6 @@ func (iv *ImageView) loadFromFile(fileName string) error {
 // 	return nil
 // }
 
-func (iv *ImageView) centerImage() {
-	iv.canvas.X = int32(float64(iv.area.W)/2.0 - float64(iv.canvas.W)/2.0)
-	iv.canvas.Y = int32(float64(iv.area.H)/2.0 - float64(iv.canvas.H)/2.0)
-}
-
 // NewImageView returns a pointer to a new ImageView struct that implements UIComponent
 func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm) (*ImageView, error) {
 	var err error
@@ -162,7 +141,7 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm) (*Ima
 	gl.TexImage2D(gl.TEXTURE_2D, 0, format, iv.surf.W, iv.surf.H, 0, uint32(format), gl.UNSIGNED_BYTE, unsafe.Pointer(&iv.surf.Pixels()[0]))
 	// https://www.khronos.org/registry/OpenGL-Refpages/es2.0/xhtml/glTexParameter.xml
 	// TODO pick right minify filter param
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
 	gl.GenerateMipmap(gl.TEXTURE_2D)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
@@ -186,13 +165,6 @@ func (iv *ImageView) Destroy() {
 	gl.DeleteTextures(1, &iv.textureID)
 	gl.DeleteBuffers(1, &iv.vboID)
 	gl.DeleteVertexArrays(1, &iv.vaoID)
-}
-
-func (iv *ImageView) updateMousePos(x, y int32) {
-	iv.mouseLoc.x = x
-	iv.mouseLoc.y = y
-	iv.mousePix.x = int32(float64(iv.mouseLoc.x-iv.canvas.X) / iv.mult)
-	iv.mousePix.y = int32(float64(iv.mouseLoc.y-iv.canvas.Y) / iv.mult)
 }
 
 // GetBoundary returns the clickable region of the UIComponent
@@ -244,6 +216,34 @@ func (iv *ImageView) Render() error {
 	return nil
 }
 
+func (iv *ImageView) zoomIn() {
+	iv.mult *= 2.0
+	iv.canvas.W = int32(float64(iv.surf.W) * iv.mult)
+	iv.canvas.H = int32(float64(iv.surf.H) * iv.mult)
+	iv.canvas.X = 2*iv.canvas.X - int32(math.Round(float64(iv.area.W)/2.0)) //iv.mouseLoc.x
+	iv.canvas.Y = 2*iv.canvas.Y - int32(math.Round(float64(iv.area.H)/2.0)) //iv.mouseLoc.y
+}
+
+func (iv *ImageView) zoomOut() {
+	iv.mult /= 2.0
+	iv.canvas.W = int32(float64(iv.surf.W) * iv.mult)
+	iv.canvas.H = int32(float64(iv.surf.H) * iv.mult)
+	iv.canvas.X = int32(math.Round(float64(iv.canvas.X)/2.0 + float64(iv.area.W)/4.0)) //iv.mouseLoc.x/2
+	iv.canvas.Y = int32(math.Round(float64(iv.canvas.Y)/2.0 + float64(iv.area.H)/4.0)) //iv.mouseLoc.y/2
+}
+
+func (iv *ImageView) centerImage() {
+	iv.canvas.X = int32(float64(iv.area.W)/2.0 - float64(iv.canvas.W)/2.0)
+	iv.canvas.Y = int32(float64(iv.area.H)/2.0 - float64(iv.canvas.H)/2.0)
+}
+
+func (iv *ImageView) updateMousePos(x, y int32) {
+	iv.mouseLoc.x = x
+	iv.mouseLoc.y = y
+	iv.mousePix.x = int32(float64(iv.mouseLoc.x-iv.canvas.X) / iv.mult)
+	iv.mousePix.y = int32(float64(iv.mouseLoc.y-iv.canvas.Y) / iv.mult)
+}
+
 // OnEnter is called when the cursor enters the UIComponent's region
 func (iv *ImageView) OnEnter() {}
 
@@ -276,18 +276,18 @@ func (iv *ImageView) OnMotion(evt *sdl.MouseMotionEvent) bool {
 
 // OnScroll is called when the user scrolls within the UIComponent's region
 func (iv *ImageView) OnScroll(evt *sdl.MouseWheelEvent) bool {
-	// if iv.dragging {
-	// 	return true
-	// }
-	// if evt.Y > 0 {
-	// 	if int32(iv.mult*float64(iv.surf.W)*2.0) < iv.ctx.RendInfo.MaxTextureWidth && int32(iv.mult*float64(iv.surf.H)*2.0) < iv.ctx.RendInfo.MaxTextureHeight {
-	// 		iv.zoomIn()
-	// 	}
-	// } else if evt.Y < 0 {
-	// 	if int32(iv.mult*float64(iv.surf.W)/2.0) > 0 && int32(iv.mult*float64(iv.surf.H)/2.0) > 0 {
-	// 		iv.zoomOut()
-	// 	}
-	// }
+	if iv.dragging {
+		return true
+	}
+	if evt.Y > 0 {
+		if int32(iv.mult*float64(iv.surf.W)*2.0) > iv.canvas.W && int32(iv.mult*float64(iv.surf.H)*2.0) > iv.canvas.H {
+			iv.zoomIn()
+		}
+	} else if evt.Y < 0 {
+		if int32(iv.mult*float64(iv.surf.W)/2.0) > 0 && int32(iv.mult*float64(iv.surf.H)/2.0) > 0 {
+			iv.zoomOut()
+		}
+	}
 	return true
 }
 
