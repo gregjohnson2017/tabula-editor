@@ -190,8 +190,7 @@ const (
 	// TODO add colors
 	out vec2 tex_coords;
 	void main() {
-		vec2 pos = 2.0 * (position_in / screenSize) - vec2(1.0);
-		gl_Position = vec4(pos, 0.0, 1.0);
+		gl_Position = vec4(position_in, 0.0, 1.0);
 		tex_coords = tex_coords_in;
 	}
 ` + "\x00"

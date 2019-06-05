@@ -124,10 +124,10 @@ func (iv *ImageView) loadFromFile(fileName string) error {
 // 	return nil
 // }
 
-// func (iv *ImageView) centerImage() {
-// 	iv.canvas.X = int32(float64(iv.area.W)/2.0 - float64(iv.canvas.W)/2.0)
-// 	iv.canvas.Y = int32(float64(iv.area.H)/2.0 - float64(iv.canvas.H)/2.0)
-// }
+func (iv *ImageView) centerImage() {
+	iv.canvas.X = int32(float64(iv.area.W)/2.0 - float64(iv.canvas.W)/2.0)
+	iv.canvas.Y = int32(float64(iv.area.H)/2.0 - float64(iv.canvas.H)/2.0)
+}
 
 // NewImageView returns a pointer to a new ImageView struct that implements UIComponent
 func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm) (*ImageView, error) {
@@ -212,18 +212,18 @@ func (iv *ImageView) Render() error {
 		r.H = iv.area.H - r.Y
 	}
 
-	gl.Viewport(0, 0, iv.area.W, iv.area.H)
+	gl.Viewport(iv.canvas.X, iv.canvas.Y, iv.canvas.W, iv.canvas.H)
 	gl.UseProgram(iv.programID)
 
 	// render canvas rectangle
-	sfw, sfh := float32(iv.surf.W), float32(iv.surf.H)
+	// fill viewport with texture
 	square := []float32{
-		0.0, 0.0, 0, 1, // top-left
-		0.0, sfh, 0, 0, // bottom-left
-		sfw, sfh, 1, 0, // bottom-right
-		0.0, 0.0, 0, 1, // top-left
-		sfw, sfh, 1, 0, // bottom-right
-		sfw, 0.0, 1, 1, // top-right
+		-1.0, -1.0, 0.0, 1.0, // top-left
+		-1.0, +1.0, 0.0, 0.0, // bottom-left
+		+1.0, +1.0, 1.0, 0.0, // bottom-right
+		-1.0, -1.0, 0.0, 1.0, // top-left
+		+1.0, +1.0, 1.0, 0.0, // bottom-right
+		+1.0, -1.0, 1.0, 1.0, // top-right
 	}
 	// for i := 0; i < len(square); i += 4 {
 	// 	sx, sy := square[i], square[i+1]
@@ -325,6 +325,7 @@ func (iv *ImageView) OnResize(x, y int32) {
 	gl.UseProgram(iv.programID)
 	gl.Uniform2f(iv.screenSizeLoc, float32(iv.area.W), float32(iv.area.H))
 	gl.UseProgram(0)
+	iv.centerImage()
 	// if err = iv.backTex.Destroy(); err != nil {
 	// 	panic(err)
 	// }
