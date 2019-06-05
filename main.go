@@ -53,16 +53,46 @@ func initWindow(title string, width, height int32) (*sdl.Window, uint32, error) 
 	if err = gl.Init(); err != nil {
 		return nil, 0, err
 	}
+	gl.ClearColor(0.0, 0.0, 0.0, 1.0)
+	gl.Enable(gl.MULTISAMPLE)
+	gl.Enable(gl.BLEND)
+	// enable anti-aliasing
+	// gl.Enable(gl.LINE_SMOOTH)
+	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+	gl.Hint(gl.LINE_SMOOTH_HINT, gl.NICEST)
+
+	vertexShaderSource := `
+    #version 410
+    in vec2 vp;
+    void main() {
+        gl_Position = vec4(vp, 0.0, 1.0);
+    }
+` + "\x00"
+
+	fragmentShaderSource := `
+    #version 410
+    out vec4 frag_colour;
+    void main() {
+        frag_colour = vec4(1, 1, 1, 1);
+    }
+` + "\x00"
+
+	vertexShader, err := compileShader(vertexShaderSource, gl.VERTEX_SHADER)
+	if err != nil {
+		panic(err)
+	}
+	fragmentShader, err := compileShader(fragmentShaderSource, gl.FRAGMENT_SHADER)
+	if err != nil {
+		panic(err)
+	}
 
 	// version := gl.GoStr(gl.GetString(gl.VERSION))
 	// log.Println("OpenGL version", version)
 
 	program := gl.CreateProgram()
+	gl.AttachShader(program, vertexShader)
+	gl.AttachShader(program, fragmentShader)
 	gl.LinkProgram(program)
-	gl.ClearColor(0.0, 0.0, 0.0, 1.0)
-	gl.Enable(gl.MULTISAMPLE)
-	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
-	gl.Enable(gl.BLEND)
 
 	return window, program, nil
 }
@@ -239,6 +269,18 @@ func main() {
 				panic(err)
 			}
 		}
+
+		square := []float32{
+			-0.5, 0.5, // top-left
+			-0.5, -0.5, // bottom-left
+			0.5, -0.5, // top-right
+			-0.5, 0.5, // top-left
+			0.5, -0.5, // bottom-right
+			0.5, 0.5, // top-right
+		}
+		vao := makeVao(square)
+		gl.BindVertexArray(vao)
+		gl.DrawArrays(gl.TRIANGLES, 0, int32(len(square)/2))
 
 		win.GLSwap()
 		// TODO wait remainder of frame-time
