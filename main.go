@@ -2,57 +2,12 @@ package main
 
 import (
 	"fmt"
-	"math"
-	"os"
 
-	set "github.com/kroppt/IntSet"
-	"github.com/veandco/go-sdl2/gfx"
+	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
 )
-
-type config struct {
-	screenWidth     int32
-	screenHeight    int32
-	bottomBarHeight int32
-	fontName        string
-	framerate       uint32
-}
-
-func initConfig() *config {
-	c := config{
-		screenWidth:     960,
-		screenHeight:    720,
-		bottomBarHeight: 30,
-		fontName:        "NotoMono-Regular.ttf",
-		framerate:       144,
-	}
-	return &c
-}
-
-func initLibraries(conf *config) error {
-	if sdl.SetHint(sdl.HINT_RENDER_DRIVER, "opengl") != true {
-		return fmt.Errorf("failed to set opengl render driver hint")
-	}
-	var err error
-	if err = sdl.Init(sdl.INIT_VIDEO); err != nil {
-		return err
-	}
-	if img.Init(img.INIT_PNG) != img.INIT_PNG {
-		return fmt.Errorf("could not initialize PNG")
-	}
-	if err = ttf.Init(); err != nil {
-		return err
-	}
-	return err
-}
-
-func quit(conf *config) {
-	sdl.Quit()
-	img.Quit()
-	ttf.Quit()
-}
 
 func inBounds(area *sdl.Rect, x int32, y int32) bool {
 	if x < area.X || x >= area.X+area.W || y < area.Y || y >= area.Y+area.H {
@@ -61,129 +16,145 @@ func inBounds(area *sdl.Rect, x int32, y int32) bool {
 	return true
 }
 
-func initialize(title string) (*context, error) {
-	conf := initConfig()
+func initWindow(title string, width, height int32) (*sdl.Window, uint32, error) {
+	if sdl.SetHint(sdl.HINT_RENDER_DRIVER, "opengl") != true {
+		return nil, 0, fmt.Errorf("failed to set opengl render driver hint")
+	}
 	var err error
-	if err = initLibraries(conf); err != nil {
-		return nil, err
+	if err = sdl.Init(sdl.INIT_VIDEO | sdl.INIT_EVENTS); err != nil {
+		return nil, 0, err
 	}
-	var win *sdl.Window
-	if win, err = sdl.CreateWindow(title, sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, conf.screenWidth, conf.screenHeight, sdl.WINDOW_HIDDEN); err != nil {
-		return nil, err
+	// other libraries
+	if img.Init(img.INIT_PNG) != img.INIT_PNG {
+		return nil, 0, fmt.Errorf("could not initialize PNG")
 	}
-	win.SetResizable(true)
-	var rend *sdl.Renderer
-	if rend, err = sdl.CreateRenderer(win, -1, sdl.RENDERER_ACCELERATED); err != nil {
-		return nil, err
+	if err = ttf.Init(); err != nil {
+		return nil, 0, err
 	}
-	if err = rend.SetDrawColor(0xFF, 0xFF, 0xFF, 0xFF); err != nil {
-		return nil, err
+	sdl.GLSetAttribute(sdl.GL_CONTEXT_MAJOR_VERSION, 4)
+	sdl.GLSetAttribute(sdl.GL_CONTEXT_MINOR_VERSION, 6)
+	sdl.GLSetAttribute(sdl.GL_DOUBLEBUFFER, 1)
+	sdl.GLSetAttribute(sdl.GL_CONTEXT_PROFILE_MASK, sdl.GL_CONTEXT_PROFILE_CORE)
+
+	var window *sdl.Window
+	if window, err = sdl.CreateWindow(title, sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, 500, 500, sdl.WINDOW_HIDDEN|sdl.WINDOW_OPENGL); err != nil {
+		return nil, 0, err
 	}
-	var info sdl.RendererInfo
-	if info, err = rend.GetInfo(); err != nil {
-		return nil, err
+	window.SetResizable(true)
+	// creates context AND makes current
+	if _, err = window.GLCreateContext(); err != nil {
+		return nil, 0, err
 	}
-	if info.MaxTextureWidth == 0 {
-		info.MaxTextureWidth = math.MaxInt32
+	if err = sdl.GLSetSwapInterval(1); err != nil {
+		return nil, 0, err
 	}
-	if info.MaxTextureHeight == 0 {
-		info.MaxTextureHeight = math.MaxInt32
+
+	// INIT OPENGL
+	if err = gl.Init(); err != nil {
+		return nil, 0, err
 	}
-	return &context{
-		Win:      win,
-		Rend:     rend,
-		RendInfo: &info,
-		Conf:     conf,
-	}, err
+
+	// version := gl.GoStr(gl.GetString(gl.VERSION))
+	// log.Println("OpenGL version", version)
+
+	program := gl.CreateProgram()
+	gl.LinkProgram(program)
+	gl.ClearColor(0.0, 0.0, 0.0, 1.0)
+	gl.Enable(gl.MULTISAMPLE)
+	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+	gl.Enable(gl.BLEND)
+
+	return window, program, nil
 }
 
 func main() {
-	var ctx *context
 	var err error
-	if ctx, err = initialize("Tabula Editor"); err != nil {
+	var win *sdl.Window
+	var prog uint32
+	if win, prog, err = initWindow("Tabula Editor", 720, 960); err != nil {
 		panic(err)
 	}
 
-	var fileName string
-	if len(os.Args) == 2 {
-		fileName = os.Args[1]
-	} else {
-		if fileName, err = openFileDialog(ctx.Win); err != nil {
-			fmt.Printf("%v\n", err)
-			os.Exit(1)
-		}
-	}
+	// var fileName string
+	// if len(os.Args) == 2 {
+	// 	fileName = os.Args[1]
+	// } else {
+	// 	if fileName, err = openFileDialog(win); err != nil {
+	// 		fmt.Printf("%v\n", err)
+	// 		os.Exit(1)
+	// 	}
+	// }
 
-	ctx.Win.Show()
+	win.Show()
 
-	var framerate = &gfx.FPSmanager{}
-	gfx.InitFramerate(framerate)
-	if gfx.SetFramerate(framerate, ctx.Conf.framerate) != true {
-		panic(fmt.Errorf("could not set framerate: %v", sdl.GetError()))
-	}
+	// var framerate = &gfx.FPSmanager{}
+	// gfx.InitFramerate(framerate)
+	// if gfx.SetFramerate(framerate, ctx.Conf.framerate) != true {
+	// 	panic(fmt.Errorf("could not set framerate: %v", sdl.GetError()))
+	// }
 
-	imageViewArea := &sdl.Rect{
-		X: 0,
-		Y: 0,
-		W: ctx.Conf.screenWidth,
-		H: ctx.Conf.screenHeight - ctx.Conf.bottomBarHeight,
-	}
-	bottomBarArea := &sdl.Rect{
-		X: 0,
-		Y: ctx.Conf.screenHeight - ctx.Conf.bottomBarHeight,
-		W: ctx.Conf.screenWidth,
-		H: ctx.Conf.bottomBarHeight,
-	}
-	buttonAreaOpen := &sdl.Rect{
-		X: 0,
-		Y: 0,
-		W: 125,
-		H: 20,
-	}
-	buttonAreaCenter := &sdl.Rect{
-		X: 125,
-		Y: 0,
-		W: 125,
-		H: 20,
-	}
-	comms := make(chan imageComm)
-	fileComm := make(chan func())
+	// imageViewArea := &sdl.Rect{
+	// 	X: 0,
+	// 	Y: 0,
+	// 	W: ctx.Conf.screenWidth,
+	// 	H: ctx.Conf.screenHeight - ctx.Conf.bottomBarHeight,
+	// }
+	// bottomBarArea := &sdl.Rect{
+	// 	X: 0,
+	// 	Y: ctx.Conf.screenHeight - ctx.Conf.bottomBarHeight,
+	// 	W: ctx.Conf.screenWidth,
+	// 	H: ctx.Conf.bottomBarHeight,
+	// }
+	// buttonAreaOpen := &sdl.Rect{
+	// 	X: 0,
+	// 	Y: 0,
+	// 	W: 125,
+	// 	H: 20,
+	// }
+	// buttonAreaCenter := &sdl.Rect{
+	// 	X: 125,
+	// 	Y: 0,
+	// 	W: 125,
+	// 	H: 20,
+	// }
+	// comms := make(chan imageComm)
+	// fileComm := make(chan func())
 
-	iv, err := NewImageView(imageViewArea, fileName, comms, ctx)
-	if err != nil {
-		panic(err)
-	}
-	bottomBar, err := NewBottomBar(bottomBarArea, comms, ctx, "NotoMono-Regular.ttf", 24)
-	if err != nil {
-		panic(err)
-	}
-	openButton, err := NewButton(buttonAreaOpen, ctx, "Open File", "NotoMono-Regular.ttf", 14, func() {
-		newFileName, err := openFileDialog(ctx.Win)
-		if err != nil {
-			fmt.Printf("No file chosen\n")
-			return
-		}
-		go func() {
-			fileComm <- func() {
-				iv.Destroy()
-				if err = iv.loadFromFile(newFileName); err != nil {
-					panic(err)
-				}
-				iv.mult = 1.0
-				iv.sel = set.NewSet()
-			}
-		}()
-	})
-	centerButton, err := NewButton(buttonAreaCenter, ctx, "Center Image", "NotoMono-Regular.ttf", 14, func() {
-		go func() {
-			fileComm <- func() {
-				iv.centerImage()
-			}
-		}()
-	})
-	centerButton.SetHighlightBackgroundColor(&sdl.Color{R: 0xFF, G: 0x00, B: 0x00, A: 0xFF})
-	comps := []UIComponent{iv, bottomBar, openButton, centerButton}
-
+	// iv, err := NewImageView(imageViewArea, fileName, comms, ctx)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// bottomBar, err := NewBottomBar(bottomBarArea, comms, ctx, "NotoMono-Regular.ttf", 24)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// openButton, err := NewButton(buttonAreaOpen, ctx, "Open File", "NotoMono-Regular.ttf", 14, func() {
+	// 	newFileName, err := openFileDialog(ctx.Win)
+	// 	if err != nil {
+	// 		fmt.Printf("No file chosen\n")
+	// 		return
+	// 	}
+	// 	go func() {
+	// 		fileComm <- func() {
+	// 			iv.Destroy()
+	// 			if err = iv.loadFromFile(newFileName); err != nil {
+	// 				panic(err)
+	// 			}
+	// 			iv.mult = 1.0
+	// 			iv.sel = set.NewSet()
+	// 		}
+	// 	}()
+	// })
+	// centerButton, err := NewButton(buttonAreaCenter, ctx, "Center Image", "NotoMono-Regular.ttf", 14, func() {
+	// 	go func() {
+	// 		fileComm <- func() {
+	// 			iv.centerImage()
+	// 		}
+	// 	}()
+	// })
+	// centerButton.SetHighlightBackgroundColor(&sdl.Color{R: 0xFF, G: 0x00, B: 0x00, A: 0xFF})
+	// comps := []UIComponent{iv, bottomBar, openButton, centerButton}
+	comps := []UIComponent{} // TODO: empty for OpenGL testing
 	var lastHover UIComponent
 	var currHover UIComponent
 	var moved bool
@@ -249,30 +220,29 @@ func main() {
 			}
 		}
 
-		// TODO: handle all events in pipe
-		hasEvents := true
-		for hasEvents {
-			select {
-			case closure := <-fileComm:
-				closure()
-			default:
-				// no more in pipe
-				hasEvents = false
-			}
-		}
+		// handle all events in pipe
+		// hasEvents := true
+		// for hasEvents {
+		// 	select {
+		// 	case closure := <-fileComm:
+		// 		closure()
+		// 	default:
+		// 		// no more in pipe
+		// 		hasEvents = false
+		// 	}
+		// }
+		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+		gl.UseProgram(prog)
 
-		if err = ctx.Rend.Clear(); err != nil {
-			panic(err)
-		}
 		for _, comp := range comps {
 			if err = comp.Render(); err != nil {
 				panic(err)
 			}
 		}
 
-		// wait remainder of frame-time before presenting
-		gfx.FramerateDelay(framerate)
-		ctx.Rend.Present()
+		win.GLSwap()
+		// TODO wait remainder of frame-time
+		// gfx.FramerateDelay(framerate)
 	}
 
 	// free UIComponent SDL assets
@@ -280,5 +250,9 @@ func main() {
 		comp.Destroy()
 	}
 
-	quit(ctx.Conf)
+	gl.UseProgram(0)
+	win.Destroy()
+	sdl.Quit()
+	img.Quit()
+	ttf.Quit()
 }

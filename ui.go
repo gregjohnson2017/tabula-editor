@@ -22,13 +22,6 @@ type UIComponent interface {
 	fmt.Stringer
 }
 
-type context struct {
-	Win      *sdl.Window
-	Rend     *sdl.Renderer
-	RendInfo *sdl.RendererInfo
-	Conf     *config
-}
-
 // AlignV is used for the positioning of elements vertically
 type AlignV int
 
