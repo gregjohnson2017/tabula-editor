@@ -16,20 +16,20 @@ func inBounds(area *sdl.Rect, x int32, y int32) bool {
 	return true
 }
 
-func initWindow(title string, width, height int32) (*sdl.Window, uint32, error) {
+func initWindow(title string, width, height int32) (*sdl.Window, error) {
 	if sdl.SetHint(sdl.HINT_RENDER_DRIVER, "opengl") != true {
-		return nil, 0, fmt.Errorf("failed to set opengl render driver hint")
+		return nil, fmt.Errorf("failed to set opengl render driver hint")
 	}
 	var err error
 	if err = sdl.Init(sdl.INIT_VIDEO | sdl.INIT_EVENTS); err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	// other libraries
 	if img.Init(img.INIT_PNG) != img.INIT_PNG {
-		return nil, 0, fmt.Errorf("could not initialize PNG")
+		return nil, fmt.Errorf("could not initialize PNG")
 	}
 	if err = ttf.Init(); err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	sdl.GLSetAttribute(sdl.GL_CONTEXT_MAJOR_VERSION, 4)
 	sdl.GLSetAttribute(sdl.GL_CONTEXT_MINOR_VERSION, 6)
@@ -38,20 +38,20 @@ func initWindow(title string, width, height int32) (*sdl.Window, uint32, error) 
 
 	var window *sdl.Window
 	if window, err = sdl.CreateWindow(title, sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, 500, 500, sdl.WINDOW_HIDDEN|sdl.WINDOW_OPENGL); err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	window.SetResizable(true)
 	// creates context AND makes current
 	if _, err = window.GLCreateContext(); err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	if err = sdl.GLSetSwapInterval(1); err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
 	// INIT OPENGL
 	if err = gl.Init(); err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	gl.ClearColor(0.0, 0.0, 0.0, 1.0)
 	gl.Enable(gl.MULTISAMPLE)
@@ -61,47 +61,15 @@ func initWindow(title string, width, height int32) (*sdl.Window, uint32, error) 
 	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 	gl.Hint(gl.LINE_SMOOTH_HINT, gl.NICEST)
 
-	vertexShaderSource := `
-    #version 410
-    in vec2 vp;
-    void main() {
-        gl_Position = vec4(vp, 0.0, 1.0);
-    }
-` + "\x00"
-
-	fragmentShaderSource := `
-    #version 410
-    out vec4 frag_colour;
-    void main() {
-        frag_colour = vec4(1, 1, 1, 1);
-    }
-` + "\x00"
-
-	vertexShader, err := compileShader(vertexShaderSource, gl.VERTEX_SHADER)
-	if err != nil {
-		panic(err)
-	}
-	fragmentShader, err := compileShader(fragmentShaderSource, gl.FRAGMENT_SHADER)
-	if err != nil {
-		panic(err)
-	}
-
 	// version := gl.GoStr(gl.GetString(gl.VERSION))
 	// log.Println("OpenGL version", version)
-
-	program := gl.CreateProgram()
-	gl.AttachShader(program, vertexShader)
-	gl.AttachShader(program, fragmentShader)
-	gl.LinkProgram(program)
-
-	return window, program, nil
+	return window, nil
 }
 
 func main() {
 	var err error
 	var win *sdl.Window
-	var prog uint32
-	if win, prog, err = initWindow("Tabula Editor", 720, 960); err != nil {
+	if win, err = initWindow("Tabula Editor", 720, 960); err != nil {
 		panic(err)
 	}
 
@@ -114,6 +82,7 @@ func main() {
 	// 		os.Exit(1)
 	// 	}
 	// }
+	fileName := "happyhug.png"
 
 	win.Show()
 
@@ -123,12 +92,12 @@ func main() {
 	// 	panic(fmt.Errorf("could not set framerate: %v", sdl.GetError()))
 	// }
 
-	// imageViewArea := &sdl.Rect{
-	// 	X: 0,
-	// 	Y: 0,
-	// 	W: ctx.Conf.screenWidth,
-	// 	H: ctx.Conf.screenHeight - ctx.Conf.bottomBarHeight,
-	// }
+	imageViewArea := &sdl.Rect{
+		X: 0,
+		Y: 0,
+		W: 720,
+		H: 960, // - ctx.Conf.bottomBarHeight,
+	}
 	// bottomBarArea := &sdl.Rect{
 	// 	X: 0,
 	// 	Y: ctx.Conf.screenHeight - ctx.Conf.bottomBarHeight,
@@ -147,13 +116,13 @@ func main() {
 	// 	W: 125,
 	// 	H: 20,
 	// }
-	// comms := make(chan imageComm)
+	comms := make(chan imageComm)
 	// fileComm := make(chan func())
 
-	// iv, err := NewImageView(imageViewArea, fileName, comms, ctx)
-	// if err != nil {
-	// 	panic(err)
-	// }
+	iv, err := NewImageView(imageViewArea, fileName, comms)
+	if err != nil {
+		panic(err)
+	}
 	// bottomBar, err := NewBottomBar(bottomBarArea, comms, ctx, "NotoMono-Regular.ttf", 24)
 	// if err != nil {
 	// 	panic(err)
@@ -184,7 +153,7 @@ func main() {
 	// })
 	// centerButton.SetHighlightBackgroundColor(&sdl.Color{R: 0xFF, G: 0x00, B: 0x00, A: 0xFF})
 	// comps := []UIComponent{iv, bottomBar, openButton, centerButton}
-	comps := []UIComponent{} // TODO: empty for OpenGL testing
+	comps := []UIComponent{iv} // TODO: empty for OpenGL testing
 	var lastHover UIComponent
 	var currHover UIComponent
 	var moved bool
@@ -262,25 +231,12 @@ func main() {
 		// 	}
 		// }
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
-		gl.UseProgram(prog)
 
 		for _, comp := range comps {
 			if err = comp.Render(); err != nil {
 				panic(err)
 			}
 		}
-
-		square := []float32{
-			-0.5, 0.5, // top-left
-			-0.5, -0.5, // bottom-left
-			0.5, -0.5, // top-right
-			-0.5, 0.5, // top-left
-			0.5, -0.5, // bottom-right
-			0.5, 0.5, // top-right
-		}
-		vao := makeVao(square)
-		gl.BindVertexArray(vao)
-		gl.DrawArrays(gl.TRIANGLES, 0, int32(len(square)/2))
 
 		win.GLSwap()
 		// TODO wait remainder of frame-time

@@ -4,7 +4,9 @@ import (
 	"math"
 	"os"
 	"strings"
+	"unsafe"
 
+	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -30,6 +32,7 @@ var _ UIComponent = UIComponent(&ImageView{})
 type ImageView struct {
 	area      *sdl.Rect
 	canvas    *sdl.Rect
+	programID uint32
 	mouseLoc  coord
 	mousePix  coord
 	dragging  bool
@@ -129,13 +132,22 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm) (*Ima
 	var err error
 	var iv = &ImageView{}
 	iv.area = area
-	// iv.ctx = ctx
-	iv.comms = comms
-	iv.mult = 1.0
-	// iv.sel = set.NewSet()
 	if err = iv.loadFromFile(fileName); err != nil {
 		return nil, err
 	}
+
+	if iv.programID, err = CreateShaderProgram(vertexShaderSource, fragmentShaderSource); err != nil {
+		return nil, err
+	}
+	screenSizeLoc := gl.GetUniformLocation(iv.programID, &[]byte("screenSize")[0])
+	gl.UseProgram(iv.programID)
+	gl.Uniform2f(screenSizeLoc, float32(iv.surf.W), float32(iv.surf.H))
+	gl.UseProgram(0)
+
+	iv.comms = comms
+	iv.mult = 1.0
+	// iv.sel = set.NewSet()
+
 	return iv, nil
 }
 
@@ -162,9 +174,9 @@ func (iv *ImageView) GetBoundary() *sdl.Rect {
 
 // Render draws the UIComponent
 func (iv *ImageView) Render() error {
-	go func() {
-		iv.comms <- imageComm{fileName: iv.fileName, mousePix: iv.mousePix, mult: iv.mult}
-	}()
+	// go func() {
+	// 	iv.comms <- imageComm{fileName: iv.fileName, mousePix: iv.mousePix, mult: iv.mult}
+	// }()
 	// iv.sel.Range(func(n int) bool {
 	// 	y := int32(n) % iv.selSurf.W
 	// 	x := int32(n) - y*iv.selSurf.W
@@ -187,6 +199,45 @@ func (iv *ImageView) Render() error {
 	if r.Y+r.H > iv.area.H {
 		r.H = iv.area.H - r.Y
 	}
+
+	gl.UseProgram(iv.programID)
+
+	// copy pixels to texture
+	// TODO find correct format
+	format := int32(gl.RGBA)
+	var textureID uint32
+	gl.GenTextures(1, &textureID)
+	gl.BindTexture(gl.TEXTURE_2D, textureID)
+	gl.TexImage2D(gl.TEXTURE_2D, 0, format, iv.surf.W, iv.surf.H, 0, uint32(format), gl.UNSIGNED_BYTE, unsafe.Pointer(&iv.surf.Pixels()[0]))
+	// this might fudge the pixels
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+	gl.GenerateMipmap(gl.TEXTURE_2D)
+
+	// render canvas rectangle
+	scw, sch := float32(iv.surf.W), float32(iv.surf.H)
+	square := []float32{
+		0.0, 0.0, 0, 1, // top-left
+		0.0, sch, 0, 0, // bottom-left
+		scw, sch, 1, 0, // bottom-right
+		0.0, 0.0, 0, 1, // top-left
+		scw, sch, 1, 0, // bottom-right
+		scw, 0.0, 1, 1, // top-right
+	}
+	// for i := 0; i < len(square); i += 4 {
+	// 	sx, sy := square[i], square[i+1]
+	// 	x, y := 2.0*sx/scw-1.0, 2.0*sy/sch-1.0
+	// 	fmt.Printf("%v: %v,%v\n", i, x, y)
+	// }
+	vao := makeVao(square)
+	gl.BindVertexArray(vao)
+	gl.EnableVertexAttribArray(0)
+	gl.EnableVertexAttribArray(1)
+	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(square)/4))
+	gl.DisableVertexAttribArray(0)
+	gl.DisableVertexAttribArray(1)
+	// unbind texture
+	gl.BindTexture(gl.TEXTURE_2D, 0)
 
 	return nil
 }

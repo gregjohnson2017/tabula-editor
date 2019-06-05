@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"unsafe"
 
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/veandco/go-sdl2/img"
@@ -154,24 +155,57 @@ func loadImage(fileName string) (*sdl.Surface, error) {
 	if surf, err = img.Load(fileName); err != nil {
 		return nil, err
 	}
+	// TODO check bytes per pixel == 4 and convert if necessary
 	return surf, err
 }
 
 func makeVao(points []float32) uint32 {
-	var vbo uint32
-	gl.GenBuffers(1, &vbo)
-	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
-	gl.BufferData(gl.ARRAY_BUFFER, 4*len(points), gl.Ptr(points), gl.STATIC_DRAW)
-
 	var vao uint32
 	gl.GenVertexArrays(1, &vao)
 	gl.BindVertexArray(vao)
 	gl.EnableVertexAttribArray(0)
-	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
-	gl.VertexAttribPointer(0, 2, gl.FLOAT, false, 0, nil)
+	gl.EnableVertexAttribArray(1)
 
+	var vbo uint32
+	var vertexStride int32 = 4 * 4
+	gl.GenBuffers(1, &vbo)
+	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
+	gl.BufferData(gl.ARRAY_BUFFER, 4*len(points), gl.Ptr(points), gl.STATIC_DRAW)
+	gl.VertexAttribPointer(0, 2, gl.FLOAT, false, vertexStride, nil)
+	gl.VertexAttribPointer(1, 2, gl.FLOAT, false, vertexStride, unsafe.Pointer(uintptr(2*4)))
+
+	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
+	gl.DisableVertexAttribArray(0)
+	gl.DisableVertexAttribArray(1)
+	gl.BindVertexArray(0)
 	return vao
 }
+
+const (
+	vertexShaderSource = `
+	#version 460
+	uniform vec2 screenSize;
+	layout(location = 0) in vec2 position_in;
+	layout(location = 1) in vec2 tex_coords_in;
+	// TODO add colors
+	out vec2 tex_coords;
+    void main() {
+		vec2 pos = 2.0 * (position_in / screenSize) - vec2(1.0);
+		gl_Position = vec4(pos, 0.0, 1.0);
+		tex_coords = tex_coords_in; 
+    }
+` + "\x00"
+
+	fragmentShaderSource = `
+	#version 460
+	uniform sampler2D frag_tex;
+	in vec2 tex_coords;
+	out vec4 frag_color;
+    void main() {
+        frag_color = texture(frag_tex, tex_coords);
+    }
+` + "\x00"
+)
 
 func compileShader(source string, shaderType uint32) (uint32, error) {
 	shader := gl.CreateShader(shaderType)
@@ -194,4 +228,35 @@ func compileShader(source string, shaderType uint32) (uint32, error) {
 	}
 
 	return shader, nil
+}
+
+// CreateShaderProgram compiles a vertex and fragment shader,
+// attaches them to a new shader program and returns its ID.
+func CreateShaderProgram(vshStr, fshStr string) (uint32, error) {
+	prog := gl.CreateProgram()
+	vsh, err := compileShader(vshStr, gl.VERTEX_SHADER)
+	if err != nil {
+		return 0, err
+	}
+	fsh, err := compileShader(fshStr, gl.FRAGMENT_SHADER)
+	if err != nil {
+		return 0, err
+	}
+	gl.AttachShader(prog, vsh)
+	gl.AttachShader(prog, fsh)
+	gl.LinkProgram(prog)
+
+	var status int32
+	gl.GetProgramiv(prog, gl.LINK_STATUS, &status)
+	if status == gl.FALSE {
+		var logLength int32
+		gl.GetProgramiv(prog, gl.INFO_LOG_LENGTH, &logLength)
+
+		log := strings.Repeat("\x00", int(logLength+1))
+		gl.GetProgramInfoLog(prog, logLength, nil, gl.Str(log))
+
+		return 0, fmt.Errorf("failed to compile program: %v", log)
+	}
+
+	return prog, nil
 }
