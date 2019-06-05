@@ -38,17 +38,21 @@ type ImageView struct {
 	dragging  bool
 	dragPoint coord
 	mult      float64
+	glSquare  []float32
+	vaoID     uint32
+	vboID     uint32
+	textureID uint32
+	// screenSizeID int32
+
 	// sel       set.Set
 	surf *sdl.Surface
 	// tex       *sdl.Texture
 	// selSurf   *sdl.Surface
 	// selTex    *sdl.Texture
 	// backTex   *sdl.Texture
-	comms         chan<- imageComm
-	fileName      string
-	fullPath      string
-	screenSizeLoc int32
-	textureID     uint32
+	comms    chan<- imageComm
+	fileName string
+	fullPath string
 }
 
 type imageComm struct {
@@ -144,10 +148,11 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm) (*Ima
 	if iv.programID, err = CreateShaderProgram(vertexShaderSource, fragmentShaderSource); err != nil {
 		return nil, err
 	}
-	iv.screenSizeLoc = gl.GetUniformLocation(iv.programID, &[]byte("screenSize")[0])
-	gl.UseProgram(iv.programID)
-	gl.Uniform2f(iv.screenSizeLoc, float32(iv.area.W), float32(iv.area.H))
-	gl.UseProgram(0)
+
+	// iv.screenSizeID = gl.GetUniformLocation(iv.programID, &[]byte("screenSize")[0])
+	// gl.UseProgram(iv.programID)
+	// gl.Uniform2f(iv.screenSizeID, float32(iv.area.W), float32(iv.area.H))
+	// gl.UseProgram(0)
 
 	// TODO find correct format
 	format := int32(gl.RGBA)
@@ -162,14 +167,25 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm) (*Ima
 	gl.GenerateMipmap(gl.TEXTURE_2D)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 
+	iv.glSquare = []float32{
+		-1.0, -1.0, 0.0, 1.0, // top-left
+		-1.0, +1.0, 0.0, 0.0, // bottom-left
+		+1.0, +1.0, 1.0, 0.0, // bottom-right
+		-1.0, -1.0, 0.0, 1.0, // top-left
+		+1.0, +1.0, 1.0, 0.0, // bottom-right
+		+1.0, -1.0, 1.0, 1.0, // top-right
+	}
+	iv.vaoID, iv.vboID = makeVAO(iv.glSquare)
+
 	return iv, nil
 }
 
-// Destroy frees all surfaces and textures in the ImageView
+// Destroy frees all assets acquired by the UIComponent
 func (iv *ImageView) Destroy() {
 	iv.surf.Free()
 	gl.DeleteTextures(1, &iv.textureID)
-	// iv.selSurf.Free()
+	gl.DeleteBuffers(1, &iv.vboID)
+	gl.DeleteVertexArrays(1, &iv.vaoID)
 }
 
 func (iv *ImageView) updateMousePos(x, y int32) {
@@ -215,35 +231,16 @@ func (iv *ImageView) Render() error {
 	gl.Viewport(iv.canvas.X, iv.canvas.Y, iv.canvas.W, iv.canvas.H)
 	gl.UseProgram(iv.programID)
 
-	// render canvas rectangle
-	// fill viewport with texture
-	square := []float32{
-		-1.0, -1.0, 0.0, 1.0, // top-left
-		-1.0, +1.0, 0.0, 0.0, // bottom-left
-		+1.0, +1.0, 1.0, 0.0, // bottom-right
-		-1.0, -1.0, 0.0, 1.0, // top-left
-		+1.0, +1.0, 1.0, 0.0, // bottom-right
-		+1.0, -1.0, 1.0, 1.0, // top-right
-	}
-	// for i := 0; i < len(square); i += 4 {
-	// 	sx, sy := square[i], square[i+1]
-	// 	x, y := 2.0*sx/scw-1.0, 2.0*sy/sch-1.0
-	// 	fmt.Printf("%v: %v,%v\n", i, x, y)
-	// }
-	vao, vbo := makeVao(square)
-	gl.BindVertexArray(vao)
+	gl.BindVertexArray(iv.vaoID)
 	gl.EnableVertexAttribArray(0)
 	gl.EnableVertexAttribArray(1)
 	gl.BindTexture(gl.TEXTURE_2D, iv.textureID)
-	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(square)/4))
+	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(iv.glSquare)/4))
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 	gl.DisableVertexAttribArray(0)
 	gl.DisableVertexAttribArray(1)
+	gl.BindVertexArray(0)
 
-	// clean up
-	gl.BindTexture(gl.TEXTURE_2D, 0)
-	gl.DeleteBuffers(1, &vbo)
-	gl.DeleteVertexArrays(1, &vao)
 	return nil
 }
 
@@ -257,16 +254,17 @@ func (iv *ImageView) OnLeave() {
 
 // OnMotion is called when the cursor moves within the UIComponent's region
 func (iv *ImageView) OnMotion(evt *sdl.MouseMotionEvent) bool {
-	// iv.updateMousePos(evt.X, evt.Y)
-	// if !inBounds(iv.canvas, evt.X, evt.Y) {
-	// 	return false
-	// }
-	// if evt.State == sdl.ButtonRMask() && iv.dragging {
-	// 	iv.canvas.X += evt.X - iv.dragPoint.x
-	// 	iv.canvas.Y += evt.Y - iv.dragPoint.y
-	// 	iv.dragPoint.x = evt.X
-	// 	iv.dragPoint.y = evt.Y
-	// }
+	evt.Y = iv.area.H - evt.Y
+	iv.updateMousePos(evt.X, evt.Y)
+	if !inBounds(iv.canvas, evt.X, evt.Y) {
+		return false
+	}
+	if evt.State == sdl.ButtonRMask() && iv.dragging {
+		iv.canvas.X += evt.X - iv.dragPoint.x
+		iv.canvas.Y += evt.Y - iv.dragPoint.y
+		iv.dragPoint.x = evt.X
+		iv.dragPoint.y = evt.Y
+	}
 	// if evt.State == sdl.ButtonLMask() && inBounds(iv.canvas, evt.X, evt.Y) {
 	// 	i := int(iv.surf.W*iv.mousePix.y + iv.mousePix.x)
 	// 	if !iv.sel.Contains(i) {
@@ -295,6 +293,7 @@ func (iv *ImageView) OnScroll(evt *sdl.MouseWheelEvent) bool {
 
 // OnClick is called when the user clicks within the UIComponent's region
 func (iv *ImageView) OnClick(evt *sdl.MouseButtonEvent) bool {
+	evt.Y = iv.area.H - evt.Y
 	iv.updateMousePos(evt.X, evt.Y)
 	if !inBounds(iv.canvas, evt.X, evt.Y) {
 		return true
@@ -322,9 +321,10 @@ func (iv *ImageView) OnResize(x, y int32) {
 	// var err error
 	iv.area.W = x
 	iv.area.H = y
-	gl.UseProgram(iv.programID)
-	gl.Uniform2f(iv.screenSizeLoc, float32(iv.area.W), float32(iv.area.H))
-	gl.UseProgram(0)
+	// might need to upload screen size for alpha background calculation
+	// gl.UseProgram(iv.programID)
+	// gl.Uniform2f(iv.screenSizeID, float32(iv.area.W), float32(iv.area.H))
+	// gl.UseProgram(0)
 	iv.centerImage()
 	// if err = iv.backTex.Destroy(); err != nil {
 	// 	panic(err)

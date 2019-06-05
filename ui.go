@@ -159,7 +159,7 @@ func loadImage(fileName string) (*sdl.Surface, error) {
 	return surf, err
 }
 
-func makeVao(points []float32) (uint32, uint32) {
+func makeVAO(points []float32) (uint32, uint32) {
 	var vao uint32
 	gl.GenVertexArrays(1, &vao)
 	gl.BindVertexArray(vao)
@@ -184,7 +184,7 @@ func makeVao(points []float32) (uint32, uint32) {
 const (
 	vertexShaderSource = `
 	#version 460
-	uniform vec2 screenSize;
+	// uniform vec2 screenSize;
 	layout(location = 0) in vec2 position_in;
 	layout(location = 1) in vec2 tex_coords_in;
 	// TODO add colors

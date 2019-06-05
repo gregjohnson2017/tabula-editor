@@ -68,7 +68,7 @@ func initWindow(title string, width, height int32) (*sdl.Window, error) {
 }
 
 func main() {
-	var screenWidth, screenHeight int32 = 900, 100
+	var screenWidth, screenHeight int32 = 960, 720
 	var err error
 	var win *sdl.Window
 	if win, err = initWindow("Tabula Editor", screenWidth, screenHeight); err != nil {
@@ -168,7 +168,7 @@ func main() {
 			case *sdl.MouseButtonEvent:
 				for i := range comps {
 					comp := comps[len(comps)-i-1]
-					if inBounds(comp.GetBoundary(), evt.X, evt.Y) {
+					if inBounds(comp.GetBoundary(), evt.X, screenHeight-evt.Y) {
 						comp.OnClick(evt)
 						break
 					}
@@ -177,7 +177,7 @@ func main() {
 				// search top down through components until exhausted or one absorbs the event
 				for i := range comps {
 					comp := comps[len(comps)-i-1]
-					if inBounds(comp.GetBoundary(), evt.X, evt.Y) {
+					if inBounds(comp.GetBoundary(), evt.X, screenHeight-evt.Y) {
 						if currHover != comp {
 							// entered a new component
 							comp.OnEnter()
@@ -198,7 +198,7 @@ func main() {
 				for i := range comps {
 					comp := comps[len(comps)-i-1]
 					x, y, _ := sdl.GetMouseState()
-					if inBounds(comp.GetBoundary(), x, y) {
+					if inBounds(comp.GetBoundary(), x, screenHeight-y) {
 						if comp.OnScroll(evt) {
 							break
 						}
