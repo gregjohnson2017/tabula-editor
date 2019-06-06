@@ -77,7 +77,7 @@ func createSolidColorTexture(rend *sdl.Renderer, w int32, h int32, r uint8, g ui
 	return tex, nil
 }
 
-func renderText(font *ttf.Font, fontSize int32, text string, pos coord, align Align, col *sdl.Color) ([]byte, *sdl.Rect, error) {
+func renderText(font *ttf.Font, fontSize int32, text string, pos coord, align Align, col *sdl.Color, maxH int32) ([]byte, *sdl.Rect, error) {
 	var surf *sdl.Surface
 	var err error
 	if surf, err = font.RenderUTF8Blended(text, *col); err != nil {
@@ -89,7 +89,9 @@ func renderText(font *ttf.Font, fontSize int32, text string, pos coord, align Al
 	sliceStart := surf.Pitch * (rowsFromTop)
 	rowsFromBottom := surf.H - fontSize - rowsFromTop
 	sliceStop := surf.Pitch * (surf.H - rowsFromBottom)
-	slice := surf.Pixels()[sliceStart:sliceStop]
+	// copy the pixels so we can free surf before returning
+	slice := make([]byte, len(surf.Pixels()))
+	copy(slice, surf.Pixels()[sliceStart:sliceStop])
 
 	w2 := int32(float64(surf.W) / 2.0)
 	h2 := int32(float64(fontSize) / 2.0)
@@ -97,12 +99,13 @@ func renderText(font *ttf.Font, fontSize int32, text string, pos coord, align Al
 	offy := -h2 - int32(align.v)*int32(h2)
 	var rect = &sdl.Rect{
 		X: pos.x + offx,
-		Y: pos.y + offy,
+		// apply coordinate conversion from SDL to OpenGL
+		Y: maxH - fontSize - pos.y - offy,
 		W: int32(surf.W),
-		H: int32(fontSize),
+		H: fontSize,
 	}
 
-	// TODO figure out if you can free the surface without destroying pixels
+	surf.Free()
 	return slice, rect, nil
 }
 
@@ -208,7 +211,6 @@ const (
 	uniform vec2 screenSize;
 	layout(location = 0) in vec2 position_in;
 	layout(location = 1) in vec2 tex_coords_in;
-	// TODO add colors
 	out vec2 tex_coords;
 	void main() {
 		vec2 glSpace = vec2(2.0, -2.0) * (position_in / screenSize) + vec2(-1.0, 1.0);
@@ -226,6 +228,17 @@ const (
 		frag_color = texture(frag_tex, tex_coords);
 	}
 ` + "\x00"
+
+	vshTexturePassthrough = `
+	#version 460
+	layout(location = 0) in vec2 position_in;
+	layout(location = 1) in vec2 tex_coords_in;
+	out vec2 tex_coords;
+	void main() {
+		gl_Position = vec4(position_in, 0.0, 1.0);
+		tex_coords = tex_coords_in;
+	}
+	` + "\x00"
 )
 
 func compileShader(source string, shaderType uint32) (uint32, error) {

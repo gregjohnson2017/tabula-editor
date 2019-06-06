@@ -1,6 +1,9 @@
 package main
 
 import (
+	"strconv"
+	"unsafe"
+
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
@@ -17,11 +20,15 @@ type BottomBar struct {
 	font          *ttf.Font
 	fontSize      int32
 	backProgramID uint32
+	textProgramID uint32
 	glSquare      []float32
 	glTexSquare   []float32
 	backVaoID     uint32
 	backVboID     uint32
+	textVaoID     uint32
+	textVboID     uint32
 	uniColorID    int32
+	textureID     uint32
 	cfg           *config
 }
 
@@ -37,6 +44,10 @@ func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, fontName string, fontS
 	}
 	var backProgramID uint32
 	if backProgramID, err = CreateShaderProgram(solidColorVertex, solidColorFragment); err != nil {
+		return nil, err
+	}
+	var textProgramID uint32
+	if textProgramID, err = CreateShaderProgram(vshTexturePassthrough, fragmentShaderSource); err != nil {
 		return nil, err
 	}
 	uniColorID := gl.GetUniformLocation(backProgramID, &[]byte("uni_color")[0])
@@ -62,6 +73,7 @@ func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, fontName string, fontS
 	}
 
 	backVaoID, backVboID := bufferData(glSquare, []int32{2})
+	textVaoID, textVboID := bufferData(glTexSquare, []int32{2, 2})
 
 	return &BottomBar{
 		area:          area,
@@ -70,8 +82,11 @@ func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, fontName string, fontS
 		font:          font,
 		fontSize:      fontSize,
 		backProgramID: backProgramID,
+		textProgramID: textProgramID,
 		backVaoID:     backVaoID,
 		backVboID:     backVboID,
+		textVaoID:     textVaoID,
+		textVboID:     textVboID,
 		glSquare:      glSquare,
 		glTexSquare:   glTexSquare,
 		uniColorID:    uniColorID,
@@ -87,10 +102,13 @@ func (bb *BottomBar) SetBackgroundColor(color *sdl.Color) error {
 	return nil
 }
 
-// Destroy frees all surfaces and textures in the BottomBar
+// Destroy frees all assets obtained by the UIComponent
 func (bb *BottomBar) Destroy() {
 	gl.DeleteBuffers(1, &bb.backVaoID)
 	gl.DeleteVertexArrays(1, &bb.backVboID)
+	gl.DeleteBuffers(1, &bb.textVaoID)
+	gl.DeleteVertexArrays(1, &bb.textVboID)
+	bb.font.Close()
 }
 
 // GetBoundary returns the clickable region of the UIComponent
@@ -100,8 +118,9 @@ func (bb *BottomBar) GetBoundary() *sdl.Rect {
 
 // Render draws the UIComponent
 func (bb *BottomBar) Render() error {
-	// msg := <-bb.comms
+	msg := <-bb.comms
 
+	// first render solid color background
 	gl.Viewport(bb.area.X, 0, bb.area.W, bb.area.H)
 	gl.UseProgram(bb.backProgramID)
 
@@ -112,24 +131,57 @@ func (bb *BottomBar) Render() error {
 	gl.BindVertexArray(0)
 
 	// second render white text on top
-	// coords := "(" + strconv.Itoa(int(msg.mousePix.x)) + ", " + strconv.Itoa(int(msg.mousePix.y)) + ")"
-	// pos := coord{bb.area.W, int32(float64(bb.area.H) / 2.0)}
-	// pos := coord{bb.area.W, int32(float64(bb.area.H) / 2.0)}
+	// TODO find correct format
+	format := int32(gl.RGBA)
+	gl.UseProgram(bb.textProgramID)
+	gl.GenTextures(1, &bb.textureID)
+	gl.BindTexture(gl.TEXTURE_2D, bb.textureID)
+	gl.BindVertexArray(bb.textVaoID)
+	gl.EnableVertexAttribArray(0)
+	gl.EnableVertexAttribArray(1)
 
-	// slice, rect, err := renderText(bb.font, bb.fontSize, "Tttestghh!!", pos, Align{AlignMiddle, AlignRight}, &sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF})
-	// if err != nil {
-	// 	return err
-	// }
+	// draw x,y image pixel coordinates on right
+	coords := "(" + strconv.Itoa(int(msg.mousePix.x)) + ", " + strconv.Itoa(int(msg.mousePix.y)) + ")"
+	pos := coord{bb.area.W, int32(float64(bb.area.H) / 2.0)}
+	slice, rect, err := renderText(bb.font, bb.fontSize, coords, pos, Align{AlignMiddle, AlignRight}, &sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}, bb.area.H)
+	if err != nil {
+		return err
+	}
+	gl.Viewport(rect.X, rect.Y, rect.W, rect.H)
+	gl.TexImage2D(gl.TEXTURE_2D, 0, format, rect.W, rect.H, 0, uint32(format), gl.UNSIGNED_BYTE, unsafe.Pointer(&slice[0]))
+	gl.GenerateMipmap(gl.TEXTURE_2D)
+	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(bb.glTexSquare)/4))
+	gl.DeleteTextures(1, &bb.textureID)
 
-	// pos.x = 0
-	// if err = renderText(bb.ctx.Rend, bb.font, bb.fontSize, msg.fileName, pos, Align{AlignMiddle, AlignLeft}, &sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}); err != nil {
-	// 	return err
-	// }
-	// pos.x = bb.area.W / 2
-	// if err = renderText(bb.ctx.Rend, bb.font, bb.fontSize, strconv.FormatFloat(msg.mult, 'f', 4, 64)+"x", pos, Align{AlignMiddle, AlignCenter}, &sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}); err != nil {
-	// 	return err
-	// }
+	// draw image filename on left
+	pos.x = 0
+	slice, rect, err = renderText(bb.font, bb.fontSize, msg.fileName, pos, Align{AlignMiddle, AlignLeft}, &sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}, bb.area.H)
+	if err != nil {
+		return err
+	}
+	gl.Viewport(rect.X, rect.Y, rect.W, rect.H)
+	gl.TexImage2D(gl.TEXTURE_2D, 0, format, rect.W, rect.H, 0, uint32(format), gl.UNSIGNED_BYTE, unsafe.Pointer(&slice[0]))
+	gl.GenerateMipmap(gl.TEXTURE_2D)
+	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(bb.glTexSquare)/4))
+	gl.DeleteTextures(1, &bb.textureID)
 
+	// draw zoom multiplier in middle
+	pos.x = bb.area.W / 2
+	slice, rect, err = renderText(bb.font, bb.fontSize, strconv.FormatFloat(msg.mult, 'f', 4, 64)+"x", pos, Align{AlignMiddle, AlignCenter}, &sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}, bb.area.H)
+	if err != nil {
+		return err
+	}
+	gl.Viewport(rect.X, rect.Y, rect.W, rect.H)
+	gl.TexImage2D(gl.TEXTURE_2D, 0, format, rect.W, rect.H, 0, uint32(format), gl.UNSIGNED_BYTE, unsafe.Pointer(&slice[0]))
+	gl.GenerateMipmap(gl.TEXTURE_2D)
+	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(bb.glTexSquare)/4))
+	gl.DeleteTextures(1, &bb.textureID)
+
+	gl.BindTexture(gl.TEXTURE_2D, 0)
+	gl.DisableVertexAttribArray(0)
+	gl.DisableVertexAttribArray(1)
+	gl.BindVertexArray(0)
+	gl.UseProgram(0)
 	return nil
 }
 
