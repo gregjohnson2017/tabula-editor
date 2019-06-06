@@ -166,18 +166,20 @@ func main() {
 			case *sdl.QuitEvent:
 				running = false
 			case *sdl.MouseButtonEvent:
+				evt.Y = screenHeight - evt.Y
 				for i := range comps {
 					comp := comps[len(comps)-i-1]
-					if inBounds(comp.GetBoundary(), evt.X, screenHeight-evt.Y) {
+					if inBounds(comp.GetBoundary(), evt.X, evt.Y) {
 						comp.OnClick(evt)
 						break
 					}
 				}
 			case *sdl.MouseMotionEvent:
 				// search top down through components until exhausted or one absorbs the event
+				evt.Y = screenHeight - evt.Y
 				for i := range comps {
 					comp := comps[len(comps)-i-1]
-					if inBounds(comp.GetBoundary(), evt.X, screenHeight-evt.Y) {
+					if inBounds(comp.GetBoundary(), evt.X, evt.Y) {
 						if currHover != comp {
 							// entered a new component
 							comp.OnEnter()
@@ -213,8 +215,12 @@ func main() {
 						moved = false
 					}
 				} else if evt.Event == sdl.WINDOWEVENT_RESIZED {
+					diffx := evt.Data1 - screenWidth
+					diffy := evt.Data2 - screenHeight
+					screenWidth = evt.Data1
+					screenHeight = evt.Data2
 					for _, comp := range comps {
-						comp.OnResize(evt.Data1, evt.Data2)
+						comp.OnResize(diffx, diffy)
 					}
 				}
 			}

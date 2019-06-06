@@ -254,7 +254,6 @@ func (iv *ImageView) OnLeave() {
 
 // OnMotion is called when the cursor moves within the UIComponent's region
 func (iv *ImageView) OnMotion(evt *sdl.MouseMotionEvent) bool {
-	evt.Y = iv.area.H - evt.Y
 	iv.updateMousePos(evt.X, evt.Y)
 	if !iv.dragging && !inBounds(iv.canvas, evt.X, evt.Y) {
 		return false
@@ -293,7 +292,6 @@ func (iv *ImageView) OnScroll(evt *sdl.MouseWheelEvent) bool {
 
 // OnClick is called when the user clicks within the UIComponent's region
 func (iv *ImageView) OnClick(evt *sdl.MouseButtonEvent) bool {
-	evt.Y = iv.area.H - evt.Y
 	iv.updateMousePos(evt.X, evt.Y)
 	if !inBounds(iv.canvas, evt.X, evt.Y) {
 		return true
@@ -319,8 +317,8 @@ func (iv *ImageView) OnClick(evt *sdl.MouseButtonEvent) bool {
 // OnResize is called when the user resizes the window
 func (iv *ImageView) OnResize(x, y int32) {
 	// var err error
-	iv.area.W = x
-	iv.area.H = y
+	iv.area.W += x
+	iv.area.H += y
 	// might need to upload screen size for alpha background calculation
 	// gl.UseProgram(iv.programID)
 	// gl.Uniform2f(iv.screenSizeID, float32(iv.area.W), float32(iv.area.H))

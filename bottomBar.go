@@ -153,7 +153,7 @@ func (bb *BottomBar) OnClick(evt *sdl.MouseButtonEvent) bool {
 
 // OnResize is called when the user resizes the window
 func (bb *BottomBar) OnResize(x, y int32) {
-	bb.area.W = x
+	bb.area.W += x
 }
 
 // String  returns the name of the component type
