@@ -148,7 +148,8 @@ func (bb *BottomBar) Render() error {
 	}
 	gl.Viewport(rect.X, rect.Y, rect.W, rect.H)
 	gl.TexImage2D(gl.TEXTURE_2D, 0, format, rect.W, rect.H, 0, uint32(format), gl.UNSIGNED_BYTE, unsafe.Pointer(&slice[0]))
-	gl.GenerateMipmap(gl.TEXTURE_2D)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
 	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(bb.glTexSquare)/4))
 	gl.DeleteTextures(1, &bb.textureID)
 
@@ -160,7 +161,8 @@ func (bb *BottomBar) Render() error {
 	}
 	gl.Viewport(rect.X, rect.Y, rect.W, rect.H)
 	gl.TexImage2D(gl.TEXTURE_2D, 0, format, rect.W, rect.H, 0, uint32(format), gl.UNSIGNED_BYTE, unsafe.Pointer(&slice[0]))
-	gl.GenerateMipmap(gl.TEXTURE_2D)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
 	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(bb.glTexSquare)/4))
 	gl.DeleteTextures(1, &bb.textureID)
 
@@ -172,7 +174,8 @@ func (bb *BottomBar) Render() error {
 	}
 	gl.Viewport(rect.X, rect.Y, rect.W, rect.H)
 	gl.TexImage2D(gl.TEXTURE_2D, 0, format, rect.W, rect.H, 0, uint32(format), gl.UNSIGNED_BYTE, unsafe.Pointer(&slice[0]))
-	gl.GenerateMipmap(gl.TEXTURE_2D)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
 	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(bb.glTexSquare)/4))
 	gl.DeleteTextures(1, &bb.textureID)
 
