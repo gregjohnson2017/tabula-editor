@@ -92,19 +92,19 @@ func main() {
 	// if gfx.SetFramerate(framerate, ctx.Conf.framerate) != true {
 	// 	panic(fmt.Errorf("could not set framerate: %v", sdl.GetError()))
 	// }
-
+	var bottomBarHeight int32 = 30
 	imageViewArea := &sdl.Rect{
+		X: 0,
+		Y: bottomBarHeight,
+		W: screenWidth,
+		H: screenHeight - bottomBarHeight,
+	}
+	bottomBarArea := &sdl.Rect{
 		X: 0,
 		Y: 0,
 		W: screenWidth,
-		H: screenHeight, // - ctx.Conf.bottomBarHeight,
+		H: bottomBarHeight,
 	}
-	// bottomBarArea := &sdl.Rect{
-	// 	X: 0,
-	// 	Y: ctx.Conf.screenHeight - ctx.Conf.bottomBarHeight,
-	// 	W: ctx.Conf.screenWidth,
-	// 	H: ctx.Conf.bottomBarHeight,
-	// }
 	// buttonAreaOpen := &sdl.Rect{
 	// 	X: 0,
 	// 	Y: 0,
@@ -124,10 +124,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	// bottomBar, err := NewBottomBar(bottomBarArea, comms, ctx, "NotoMono-Regular.ttf", 24)
-	// if err != nil {
-	// 	panic(err)
-	// }
+	bottomBar, err := NewBottomBar(bottomBarArea, comms, "NotoMono-Regular.ttf", 24)
+	if err != nil {
+		panic(err)
+	}
 	// openButton, err := NewButton(buttonAreaOpen, ctx, "Open File", "NotoMono-Regular.ttf", 14, func() {
 	// 	newFileName, err := openFileDialog(ctx.Win)
 	// 	if err != nil {
@@ -154,7 +154,7 @@ func main() {
 	// })
 	// centerButton.SetHighlightBackgroundColor(&sdl.Color{R: 0xFF, G: 0x00, B: 0x00, A: 0xFF})
 	// comps := []UIComponent{iv, bottomBar, openButton, centerButton}
-	comps := []UIComponent{iv} // TODO: empty for OpenGL testing
+	comps := []UIComponent{iv, bottomBar} // TODO: empty for OpenGL testing
 	var lastHover UIComponent
 	var currHover UIComponent
 	var moved bool

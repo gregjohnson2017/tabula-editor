@@ -182,6 +182,26 @@ func makeVAO(points []float32) (uint32, uint32) {
 }
 
 const (
+	solidColorVertex = `
+	#version 460
+	uniform vec4 uni_color;
+	in vec2 position_in;
+	out vec4 color;
+	void main() {
+		gl_Position = vec4(position_in, 0.0, 1.0);
+		color = uni_color;
+	}
+
+` + "\x00"
+	solidColorFragment = `
+	#version 460
+	in vec4 color;
+	out vec4 frag_color;
+	void main() {
+		frag_color = color;
+	}
+` + "\x00"
+
 	vertexShaderSource = `
 	#version 460
 	// uniform vec2 screenSize;
