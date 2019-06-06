@@ -14,19 +14,19 @@ var _ UIComponent = UIComponent(&ImageView{})
 
 // ImageView defines an interactable image viewing pane
 type ImageView struct {
-	area      *sdl.Rect
-	canvas    *sdl.Rect
-	programID uint32
-	mouseLoc  coord
-	mousePix  coord
-	dragging  bool
-	dragPoint coord
-	mult      float64
-	glSquare  []float32
-	vaoID     uint32
-	vboID     uint32
-	textureID uint32
-	// screenSizeID int32
+	area         *sdl.Rect
+	canvas       *sdl.Rect
+	programID    uint32
+	mouseLoc     coord
+	mousePix     coord
+	dragging     bool
+	dragPoint    coord
+	mult         float64
+	glSquare     []float32
+	vaoID        uint32
+	vboID        uint32
+	textureID    uint32
+	screenSizeID int32
 
 	// sel       set.Set
 	surf *sdl.Surface
@@ -67,17 +67,18 @@ func (iv *ImageView) loadFromFile(fileName string) error {
 	// if err = iv.createBackTex(); err != nil {
 	// 	return err
 	// }
-	var canvas = &sdl.Rect{
-		X: int32(float64(iv.area.W)/2.0 - float64(surf.W)/2.0),
-		Y: int32(float64(iv.area.H)/2.0 - float64(surf.H)/2.0),
-		W: surf.W,
-		H: surf.H,
-	}
-	iv.surf = surf
 	// iv.selSurf = selSurf
 	// iv.tex = tex
 	// iv.selTex = selTex
-	iv.canvas = canvas
+	iv.surf = surf
+	iv.canvas = &sdl.Rect{
+		X: 0,
+		Y: 0,
+		W: surf.W,
+		H: surf.H,
+	}
+	iv.centerImage()
+
 	parts := strings.Split(fileName, string(os.PathSeparator))
 	iv.fileName = parts[len(parts)-1]
 	iv.fullPath = fileName
@@ -128,10 +129,10 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm) (*Ima
 		return nil, err
 	}
 
-	// iv.screenSizeID = gl.GetUniformLocation(iv.programID, &[]byte("screenSize")[0])
-	// gl.UseProgram(iv.programID)
-	// gl.Uniform2f(iv.screenSizeID, float32(iv.area.W), float32(iv.area.H))
-	// gl.UseProgram(0)
+	iv.screenSizeID = gl.GetUniformLocation(iv.programID, &[]byte("screenSize")[0])
+	gl.UseProgram(iv.programID)
+	gl.Uniform2f(iv.screenSizeID, float32(iv.area.W), float32(iv.area.H))
+	gl.UseProgram(0)
 
 	// TODO find correct format
 	format := int32(gl.RGBA)
@@ -146,14 +147,32 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm) (*Ima
 	gl.GenerateMipmap(gl.TEXTURE_2D)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 
+	// convert := func(sdlX, sdlY int32) (float32, float32) {
+	// 	return 2.0*float32(sdlX)/float32(iv.area.W) - 1.0, -2.0*float32(sdlY)/float32(iv.area.H) + 1.0
+	// }
+
+	// iv.glSquare = []float32{
+	// 	blx, bly, 0.0, 1.0, // bottom-left
+	// 	tlx, tly, 0.0, 0.0, // top-left
+	// 	trx, try, 1.0, 0.0, // top-right
+	// 	blx, bly, 0.0, 1.0, // bottom-left
+	// 	trx, try, 1.0, 0.0, // top-right
+	// 	brx, bry, 1.0, 1.0, // bottom-right
+	// }
+
+	tlx, tly := float32(iv.canvas.X), float32(iv.canvas.Y)
+	trx, try := float32(iv.canvas.X+iv.canvas.W), float32(iv.canvas.Y)
+	blx, bly := float32(iv.canvas.X), float32(iv.canvas.H+iv.canvas.Y)
+	brx, bry := float32(iv.canvas.X+iv.canvas.W), float32(iv.canvas.H+iv.canvas.Y)
 	iv.glSquare = []float32{
-		-1.0, -1.0, 0.0, 1.0, // top-left
-		-1.0, +1.0, 0.0, 0.0, // bottom-left
-		+1.0, +1.0, 1.0, 0.0, // bottom-right
-		-1.0, -1.0, 0.0, 1.0, // top-left
-		+1.0, +1.0, 1.0, 0.0, // bottom-right
-		+1.0, -1.0, 1.0, 1.0, // top-right
+		blx, bly, 0.0, 1.0, // bottom-left
+		tlx, tly, 0.0, 0.0, // top-left
+		trx, try, 1.0, 0.0, // top-right
+		blx, bly, 0.0, 1.0, // bottom-left
+		trx, try, 1.0, 0.0, // top-right
+		brx, bry, 1.0, 1.0, // bottom-right
 	}
+
 	iv.vaoID, iv.vboID = makeVAO(iv.glSquare)
 
 	return iv, nil
@@ -200,7 +219,26 @@ func (iv *ImageView) Render() error {
 		r.H = iv.area.H - r.Y
 	}
 
-	gl.Viewport(iv.canvas.X, iv.canvas.Y, iv.canvas.W, iv.canvas.H)
+	// update buffered data
+	tlx, tly := float32(iv.canvas.X), float32(iv.canvas.Y)
+	trx, try := float32(iv.canvas.X+iv.canvas.W), float32(iv.canvas.Y)
+	blx, bly := float32(iv.canvas.X), float32(iv.canvas.H+iv.canvas.Y)
+	brx, bry := float32(iv.canvas.X+iv.canvas.W), float32(iv.canvas.H+iv.canvas.Y)
+	newSquare := []float32{
+		blx, bly, 0.0, 1.0, // bottom-left
+		tlx, tly, 0.0, 0.0, // top-left
+		trx, try, 1.0, 0.0, // top-right
+		blx, bly, 0.0, 1.0, // bottom-left
+		trx, try, 1.0, 0.0, // top-right
+		brx, bry, 1.0, 1.0, // bottom-right
+	}
+	copy(iv.glSquare, newSquare)
+
+	gl.BindBuffer(gl.ARRAY_BUFFER, iv.vboID)
+	gl.BufferData(gl.ARRAY_BUFFER, 4*len(iv.glSquare), gl.Ptr(iv.glSquare), gl.STATIC_DRAW)
+	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
+
+	gl.Viewport(iv.area.X, iv.area.Y, iv.area.W, iv.area.H)
 	gl.UseProgram(iv.programID)
 
 	gl.BindVertexArray(iv.vaoID)
@@ -320,9 +358,9 @@ func (iv *ImageView) OnResize(x, y int32) {
 	iv.area.W += x
 	iv.area.H += y
 	// might need to upload screen size for alpha background calculation
-	// gl.UseProgram(iv.programID)
-	// gl.Uniform2f(iv.screenSizeID, float32(iv.area.W), float32(iv.area.H))
-	// gl.UseProgram(0)
+	gl.UseProgram(iv.programID)
+	gl.Uniform2f(iv.screenSizeID, float32(iv.area.W), float32(iv.area.H))
+	gl.UseProgram(0)
 	iv.centerImage()
 	// if err = iv.backTex.Destroy(); err != nil {
 	// 	panic(err)

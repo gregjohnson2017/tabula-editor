@@ -95,13 +95,13 @@ func main() {
 	var bottomBarHeight int32 = 30
 	imageViewArea := &sdl.Rect{
 		X: 0,
-		Y: bottomBarHeight,
+		Y: 0,
 		W: screenWidth,
 		H: screenHeight - bottomBarHeight,
 	}
 	bottomBarArea := &sdl.Rect{
 		X: 0,
-		Y: 0,
+		Y: screenHeight - bottomBarHeight,
 		W: screenWidth,
 		H: bottomBarHeight,
 	}
@@ -166,7 +166,6 @@ func main() {
 			case *sdl.QuitEvent:
 				running = false
 			case *sdl.MouseButtonEvent:
-				evt.Y = screenHeight - evt.Y
 				for i := range comps {
 					comp := comps[len(comps)-i-1]
 					if inBounds(comp.GetBoundary(), evt.X, evt.Y) {
@@ -176,7 +175,6 @@ func main() {
 				}
 			case *sdl.MouseMotionEvent:
 				// search top down through components until exhausted or one absorbs the event
-				evt.Y = screenHeight - evt.Y
 				for i := range comps {
 					comp := comps[len(comps)-i-1]
 					if inBounds(comp.GetBoundary(), evt.X, evt.Y) {
@@ -200,7 +198,7 @@ func main() {
 				for i := range comps {
 					comp := comps[len(comps)-i-1]
 					x, y, _ := sdl.GetMouseState()
-					if inBounds(comp.GetBoundary(), x, screenHeight-y) {
+					if inBounds(comp.GetBoundary(), x, y) {
 						if comp.OnScroll(evt) {
 							break
 						}
