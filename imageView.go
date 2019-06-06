@@ -317,7 +317,7 @@ func (iv *ImageView) OnScroll(evt *sdl.MouseWheelEvent) bool {
 		return true
 	}
 	if evt.Y > 0 {
-		if int32(iv.mult*float64(iv.surf.W)*2.0) > iv.canvas.W && int32(iv.mult*float64(iv.surf.H)*2.0) > iv.canvas.H {
+		if int32(iv.mult*float64(iv.surf.W)*2.0) > iv.canvas.W && int32(iv.mult*float64(iv.surf.H)*2.0) > iv.canvas.H && iv.mult < 256 {
 			iv.zoomIn()
 		}
 	} else if evt.Y < 0 {
@@ -354,20 +354,13 @@ func (iv *ImageView) OnClick(evt *sdl.MouseButtonEvent) bool {
 
 // OnResize is called when the user resizes the window
 func (iv *ImageView) OnResize(x, y int32) {
-	// var err error
 	iv.area.W += x
 	iv.area.H += y
-	// might need to upload screen size for alpha background calculation
+
 	gl.UseProgram(iv.programID)
 	gl.Uniform2f(iv.screenSizeID, float32(iv.area.W), float32(iv.area.H))
 	gl.UseProgram(0)
 	iv.centerImage()
-	// if err = iv.backTex.Destroy(); err != nil {
-	// 	panic(err)
-	// }
-	// if err = iv.createBackTex(); err != nil {
-	// 	panic(err)
-	// }
 }
 
 // String returns the name of the component type
