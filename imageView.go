@@ -292,7 +292,9 @@ func (iv *ImageView) OnLeave() {
 
 // OnMotion is called when the cursor moves within the UIComponent's region
 func (iv *ImageView) OnMotion(evt *sdl.MouseMotionEvent) bool {
-	iv.updateMousePos(evt.X, evt.Y)
+	if !iv.dragging {
+		iv.updateMousePos(evt.X, evt.Y)
+	}
 	if !iv.dragging && !inBounds(iv.canvas, evt.X, evt.Y) {
 		return false
 	}
