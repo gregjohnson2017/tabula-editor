@@ -256,7 +256,7 @@ func (iv *ImageView) OnLeave() {
 func (iv *ImageView) OnMotion(evt *sdl.MouseMotionEvent) bool {
 	evt.Y = iv.area.H - evt.Y
 	iv.updateMousePos(evt.X, evt.Y)
-	if !inBounds(iv.canvas, evt.X, evt.Y) {
+	if !iv.dragging && !inBounds(iv.canvas, evt.X, evt.Y) {
 		return false
 	}
 	if evt.State == sdl.ButtonRMask() && iv.dragging {
