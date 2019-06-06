@@ -37,6 +37,7 @@ type ImageView struct {
 	comms    chan<- imageComm
 	fileName string
 	fullPath string
+	cfg      *config
 }
 
 type imageComm struct {
@@ -114,9 +115,10 @@ func (iv *ImageView) loadFromFile(fileName string) error {
 // }
 
 // NewImageView returns a pointer to a new ImageView struct that implements UIComponent
-func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm) (*ImageView, error) {
+func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, cfg *config) (*ImageView, error) {
 	var err error
 	var iv = &ImageView{}
+	iv.cfg = cfg
 	iv.area = area
 	iv.comms = comms
 	iv.mult = 1.0
@@ -140,8 +142,6 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm) (*Ima
 	gl.BindTexture(gl.TEXTURE_2D, iv.textureID)
 	// copy pixels to texture
 	gl.TexImage2D(gl.TEXTURE_2D, 0, format, iv.surf.W, iv.surf.H, 0, uint32(format), gl.UNSIGNED_BYTE, unsafe.Pointer(&iv.surf.Pixels()[0]))
-	// https://www.khronos.org/registry/OpenGL-Refpages/es2.0/xhtml/glTexParameter.xml
-	// TODO pick right minify filter param
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
 	gl.GenerateMipmap(gl.TEXTURE_2D)
@@ -173,7 +173,7 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm) (*Ima
 		brx, bry, 1.0, 1.0, // bottom-right
 	}
 
-	iv.vaoID, iv.vboID = makeVAO(iv.glSquare)
+	iv.vaoID, iv.vboID = bufferData(iv.glSquare, []int32{2, 2})
 
 	return iv, nil
 }
@@ -238,7 +238,7 @@ func (iv *ImageView) Render() error {
 	gl.BufferData(gl.ARRAY_BUFFER, 4*len(iv.glSquare), gl.Ptr(iv.glSquare), gl.STATIC_DRAW)
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 
-	gl.Viewport(iv.area.X, iv.area.Y, iv.area.W, iv.area.H)
+	gl.Viewport(iv.area.X, iv.area.Y+iv.cfg.bottomBarHeight, iv.area.W, iv.area.H)
 	gl.UseProgram(iv.programID)
 
 	gl.BindVertexArray(iv.vaoID)

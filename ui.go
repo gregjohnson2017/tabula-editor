@@ -77,21 +77,11 @@ func createSolidColorTexture(rend *sdl.Renderer, w int32, h int32, r uint8, g ui
 	return tex, nil
 }
 
-func renderText(rend *sdl.Renderer, font *ttf.Font, fontSize int32, text string, pos coord, align Align, col *sdl.Color) error {
+func renderText(font *ttf.Font, fontSize int32, text string, pos coord, align Align, col *sdl.Color) ([]byte, *sdl.Rect, error) {
 	var surf *sdl.Surface
 	var err error
 	if surf, err = font.RenderUTF8Blended(text, *col); err != nil {
-		return err
-	}
-	var tex *sdl.Texture
-	if tex, err = rend.CreateTexture(surf.Format.Format, sdl.TEXTUREACCESS_STREAMING, surf.W, int32(fontSize)); err != nil {
-		surf.Free()
-		return err
-	}
-	if err = tex.SetBlendMode(sdl.BLENDMODE_BLEND); err != nil {
-		surf.Free()
-		tex.Destroy()
-		return err
+		return nil, nil, err
 	}
 
 	h, err := font.GlyphMetrics('h')
@@ -99,7 +89,7 @@ func renderText(rend *sdl.Renderer, font *ttf.Font, fontSize int32, text string,
 	sliceStart := surf.Pitch * (rowsFromTop)
 	rowsFromBottom := surf.H - fontSize - rowsFromTop
 	sliceStop := surf.Pitch * (surf.H - rowsFromBottom)
-	copyToTexture(tex, surf.Pixels()[sliceStart:sliceStop], nil)
+	slice := surf.Pixels()[sliceStart:sliceStop]
 
 	w2 := int32(float64(surf.W) / 2.0)
 	h2 := int32(float64(fontSize) / 2.0)
@@ -112,10 +102,8 @@ func renderText(rend *sdl.Renderer, font *ttf.Font, fontSize int32, text string,
 		H: int32(fontSize),
 	}
 
-	err = rend.Copy(tex, nil, rect)
-	surf.Free()
-	tex.Destroy()
-	return err
+	// TODO figure out if you can free the surface without destroying pixels
+	return slice, rect, nil
 }
 
 func mapRGBA(form *sdl.PixelFormat, r, g, b, a uint8) uint32 {
@@ -159,24 +147,37 @@ func loadImage(fileName string) (*sdl.Surface, error) {
 	return surf, err
 }
 
-func makeVAO(points []float32) (uint32, uint32) {
+// makeVAO buffers vertex data and returns a VAO and VBO
+// the vertex data must be accompanied by a description of its layout
+// ex: vertex layout: (x,y,z, s,t) -> layout: (3, 2)
+// returns the VAO and VBO id
+func bufferData(data []float32, layout []int32) (uint32, uint32) {
+	var vbo uint32
+	gl.GenBuffers(1, &vbo)
+	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
+	gl.BufferData(gl.ARRAY_BUFFER, 4*len(data), gl.Ptr(&data[0]), gl.STATIC_DRAW)
+
 	var vao uint32
 	gl.GenVertexArrays(1, &vao)
 	gl.BindVertexArray(vao)
-	gl.EnableVertexAttribArray(0)
-	gl.EnableVertexAttribArray(1)
-
-	var vbo uint32
-	var vertexStride int32 = 4 * 4
-	gl.GenBuffers(1, &vbo)
-	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
-	gl.BufferData(gl.ARRAY_BUFFER, 4*len(points), gl.Ptr(points), gl.STATIC_DRAW)
-	gl.VertexAttribPointer(0, 2, gl.FLOAT, false, vertexStride, nil)
-	gl.VertexAttribPointer(1, 2, gl.FLOAT, false, vertexStride, unsafe.Pointer(uintptr(2*4)))
+	var vertexSize int32
+	for i := 0; i < len(layout); i++ {
+		gl.EnableVertexAttribArray(uint32(i))
+		vertexSize += layout[i]
+	}
+	// calculate vertex size in bytes
+	// ex: (x,y,z,s,t) -> 5*4 = 20 bytes
+	vertexStride := vertexSize * 4
+	var offset int32
+	for i := 0; i < len(layout); i++ {
+		gl.VertexAttribPointer(uint32(i), layout[i], gl.FLOAT, false, vertexStride, unsafe.Pointer(uintptr(offset*4)))
+		offset += layout[i]
+	}
+	for i := 0; i < len(layout); i++ {
+		gl.DisableVertexAttribArray(uint32(i))
+	}
 
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
-	gl.DisableVertexAttribArray(0)
-	gl.DisableVertexAttribArray(1)
 	gl.BindVertexArray(0)
 	return vao, vbo
 }

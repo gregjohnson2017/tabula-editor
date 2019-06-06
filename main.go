@@ -10,6 +10,12 @@ import (
 	"github.com/veandco/go-sdl2/ttf"
 )
 
+type config struct {
+	screenWidth     int32
+	screenHeight    int32
+	bottomBarHeight int32
+}
+
 func inBounds(area *sdl.Rect, x int32, y int32) bool {
 	if x < area.X || x >= area.X+area.W || y < area.Y || y >= area.Y+area.H {
 		return false
@@ -68,10 +74,10 @@ func initWindow(title string, width, height int32) (*sdl.Window, error) {
 }
 
 func main() {
-	var screenWidth, screenHeight int32 = 960, 720
+	cfg := &config{screenWidth: 960, screenHeight: 720, bottomBarHeight: 30}
 	var err error
 	var win *sdl.Window
-	if win, err = initWindow("Tabula Editor", screenWidth, screenHeight); err != nil {
+	if win, err = initWindow("Tabula Editor", cfg.screenWidth, cfg.screenHeight); err != nil {
 		panic(err)
 	}
 
@@ -92,18 +98,17 @@ func main() {
 	// if gfx.SetFramerate(framerate, ctx.Conf.framerate) != true {
 	// 	panic(fmt.Errorf("could not set framerate: %v", sdl.GetError()))
 	// }
-	var bottomBarHeight int32 = 30
 	imageViewArea := &sdl.Rect{
 		X: 0,
 		Y: 0,
-		W: screenWidth,
-		H: screenHeight - bottomBarHeight,
+		W: cfg.screenWidth,
+		H: cfg.screenHeight - cfg.bottomBarHeight,
 	}
 	bottomBarArea := &sdl.Rect{
 		X: 0,
-		Y: screenHeight - bottomBarHeight,
-		W: screenWidth,
-		H: bottomBarHeight,
+		Y: cfg.screenHeight - cfg.bottomBarHeight,
+		W: cfg.screenWidth,
+		H: cfg.bottomBarHeight,
 	}
 	// buttonAreaOpen := &sdl.Rect{
 	// 	X: 0,
@@ -120,11 +125,11 @@ func main() {
 	comms := make(chan imageComm)
 	// fileComm := make(chan func())
 
-	iv, err := NewImageView(imageViewArea, fileName, comms)
+	iv, err := NewImageView(imageViewArea, fileName, comms, cfg)
 	if err != nil {
 		panic(err)
 	}
-	bottomBar, err := NewBottomBar(bottomBarArea, comms, "NotoMono-Regular.ttf", 24)
+	bottomBar, err := NewBottomBar(bottomBarArea, comms, "NotoMono-Regular.ttf", 24, cfg)
 	if err != nil {
 		panic(err)
 	}
@@ -213,10 +218,10 @@ func main() {
 						moved = false
 					}
 				} else if evt.Event == sdl.WINDOWEVENT_RESIZED {
-					diffx := evt.Data1 - screenWidth
-					diffy := evt.Data2 - screenHeight
-					screenWidth = evt.Data1
-					screenHeight = evt.Data2
+					diffx := evt.Data1 - cfg.screenWidth
+					diffy := evt.Data2 - cfg.screenHeight
+					cfg.screenWidth = evt.Data1
+					cfg.screenHeight = evt.Data2
 					for _, comp := range comps {
 						comp.OnResize(diffx, diffy)
 					}

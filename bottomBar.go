@@ -18,14 +18,16 @@ type BottomBar struct {
 	fontSize      int32
 	backProgramID uint32
 	glSquare      []float32
+	glTexSquare   []float32
 	backVaoID     uint32
 	backVboID     uint32
 	uniColorID    int32
+	cfg           *config
 }
 
 // NewBottomBar returns a pointer to a new BottomBar struct that implements UIComponent
 // the background color defaults to grey (0x808080FF)
-func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, fontName string, fontSize int32) (*BottomBar, error) {
+func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, fontName string, fontSize int32, cfg *config) (*BottomBar, error) {
 	var m float32 = 255.0
 	color := [4]float32{128.0 / m, 128.0 / m, 128.0 / m, 1.0}
 	var err error
@@ -43,28 +45,23 @@ func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, fontName string, fontS
 	gl.UseProgram(0)
 
 	glSquare := []float32{
-		-1.0, -1.0, // top-left
-		-1.0, +1.0, // bottom-left
-		+1.0, +1.0, // bottom-right
-		-1.0, -1.0, // top-left
-		+1.0, +1.0, // bottom-right
-		+1.0, -1.0, // top-right
+		-1.0, -1.0, // bottom-left
+		-1.0, +1.0, // top-left
+		+1.0, +1.0, // top-right
+		-1.0, -1.0, // bottom-left
+		+1.0, +1.0, // top-right
+		+1.0, -1.0, // bottom-right
 	}
-	var backVaoID uint32
-	gl.GenVertexArrays(1, &backVaoID)
-	gl.BindVertexArray(backVaoID)
-	gl.EnableVertexAttribArray(0)
+	glTexSquare := []float32{
+		-1.0, -1.0, 0.0, 1.0, // bottom-left
+		-1.0, +1.0, 0.0, 0.0, // top-left
+		+1.0, +1.0, 1.0, 0.0, // top-right
+		-1.0, -1.0, 0.0, 1.0, // bottom-left
+		+1.0, +1.0, 1.0, 0.0, // top-right
+		+1.0, -1.0, 1.0, 1.0, // bottom-right
+	}
 
-	var backVboID uint32
-	gl.GenBuffers(1, &backVboID)
-	gl.BindBuffer(gl.ARRAY_BUFFER, backVboID)
-	gl.BufferData(gl.ARRAY_BUFFER, 4*len(glSquare), gl.Ptr(&glSquare[0]), gl.STATIC_DRAW)
-	gl.VertexAttribPointer(0, 2, gl.FLOAT, false, 0, nil)
-
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
-	gl.DisableVertexAttribArray(0)
-	gl.BindVertexArray(0)
-	gl.UseProgram(0)
+	backVaoID, backVboID := bufferData(glSquare, []int32{2})
 
 	return &BottomBar{
 		area:          area,
@@ -76,7 +73,9 @@ func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, fontName string, fontS
 		backVaoID:     backVaoID,
 		backVboID:     backVboID,
 		glSquare:      glSquare,
+		glTexSquare:   glTexSquare,
 		uniColorID:    uniColorID,
+		cfg:           cfg,
 	}, nil
 }
 
@@ -101,9 +100,9 @@ func (bb *BottomBar) GetBoundary() *sdl.Rect {
 
 // Render draws the UIComponent
 func (bb *BottomBar) Render() error {
-	//msg := <-bb.comms
+	// msg := <-bb.comms
 
-	gl.Viewport(bb.area.X, bb.area.Y, bb.area.W, bb.area.H)
+	gl.Viewport(bb.area.X, 0, bb.area.W, bb.area.H)
 	gl.UseProgram(bb.backProgramID)
 
 	gl.BindVertexArray(bb.backVaoID)
@@ -112,20 +111,24 @@ func (bb *BottomBar) Render() error {
 	gl.DisableVertexAttribArray(0)
 	gl.BindVertexArray(0)
 
-	//// second render white text on top
-	//coords := "(" + strconv.Itoa(int(msg.mousePix.x)) + ", " + strconv.Itoa(int(msg.mousePix.y)) + ")"
-	//pos := coord{bb.area.W, int32(float64(bb.area.H) / 2.0)}
-	//if err = renderText(bb.ctx.Rend, bb.font, bb.fontSize, coords, pos, Align{AlignMiddle, AlignRight}, &sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}); err != nil {
-	//	return err
-	//}
-	//pos.x = 0
-	//if err = renderText(bb.ctx.Rend, bb.font, bb.fontSize, msg.fileName, pos, Align{AlignMiddle, AlignLeft}, &sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}); err != nil {
-	//	return err
-	//}
-	//pos.x = bb.area.W / 2
-	//if err = renderText(bb.ctx.Rend, bb.font, bb.fontSize, strconv.FormatFloat(msg.mult, 'f', 4, 64)+"x", pos, Align{AlignMiddle, AlignCenter}, &sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}); err != nil {
-	//	return err
-	//}
+	// second render white text on top
+	// coords := "(" + strconv.Itoa(int(msg.mousePix.x)) + ", " + strconv.Itoa(int(msg.mousePix.y)) + ")"
+	// pos := coord{bb.area.W, int32(float64(bb.area.H) / 2.0)}
+	// pos := coord{bb.area.W, int32(float64(bb.area.H) / 2.0)}
+
+	// slice, rect, err := renderText(bb.font, bb.fontSize, "Tttestghh!!", pos, Align{AlignMiddle, AlignRight}, &sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF})
+	// if err != nil {
+	// 	return err
+	// }
+
+	// pos.x = 0
+	// if err = renderText(bb.ctx.Rend, bb.font, bb.fontSize, msg.fileName, pos, Align{AlignMiddle, AlignLeft}, &sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}); err != nil {
+	// 	return err
+	// }
+	// pos.x = bb.area.W / 2
+	// if err = renderText(bb.ctx.Rend, bb.font, bb.fontSize, strconv.FormatFloat(msg.mult, 'f', 4, 64)+"x", pos, Align{AlignMiddle, AlignCenter}, &sdl.Color{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}); err != nil {
+	// 	return err
+	// }
 
 	return nil
 }
