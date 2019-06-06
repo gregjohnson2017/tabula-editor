@@ -136,7 +136,6 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, cfg *
 	gl.Uniform2f(iv.screenSizeID, float32(iv.area.W), float32(iv.area.H))
 	gl.UseProgram(0)
 
-	// TODO find correct format
 	format := int32(gl.RGBA)
 	gl.GenTextures(1, &iv.textureID)
 	gl.BindTexture(gl.TEXTURE_2D, iv.textureID)

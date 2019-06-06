@@ -146,7 +146,17 @@ func loadImage(fileName string) (*sdl.Surface, error) {
 	if surf, err = img.Load(fileName); err != nil {
 		return nil, err
 	}
-	// TODO check bytes per pixel == 4 and convert if necessary
+
+	// convert pixel format to RGBA32 if necessary
+	if surf.Format.Format != uint32(sdl.PIXELFORMAT_RGBA32) {
+		convertedSurf, err := surf.ConvertFormat(uint32(sdl.PIXELFORMAT_RGBA32), 0)
+		surf.Free()
+		if err != nil {
+			return nil, err
+		}
+		return convertedSurf, nil
+	}
+
 	return surf, err
 }
 

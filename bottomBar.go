@@ -131,7 +131,6 @@ func (bb *BottomBar) Render() error {
 	gl.BindVertexArray(0)
 
 	// second render white text on top
-	// TODO find correct format
 	format := int32(gl.RGBA)
 	gl.UseProgram(bb.textProgramID)
 	gl.GenTextures(1, &bb.textureID)
