@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/go-gl/gl/v2.1/gl"
+	"github.com/veandco/go-sdl2/gfx"
 	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
@@ -91,13 +92,19 @@ func main() {
 		}
 	}
 
+	// loadFontTexture("NotoMono-Regular.ttf", 12)
+	// loadFontTexture("NotoMono-Regular.ttf", 24)
+	// loadFontTexture("NotoMono-Regular.ttf", 48)
+	// loadFontTexture("NotoMono-Regular.ttf", 96)
+
 	win.Show()
 
-	// var framerate = &gfx.FPSmanager{}
-	// gfx.InitFramerate(framerate)
-	// if gfx.SetFramerate(framerate, ctx.Conf.framerate) != true {
-	// 	panic(fmt.Errorf("could not set framerate: %v", sdl.GetError()))
-	// }
+	var framerate = &gfx.FPSmanager{}
+	gfx.InitFramerate(framerate)
+	if gfx.SetFramerate(framerate, 144) != true {
+		panic(fmt.Errorf("could not set framerate: %v", sdl.GetError()))
+	}
+
 	imageViewArea := &sdl.Rect{
 		X: 0,
 		Y: 0,
@@ -164,6 +171,9 @@ func main() {
 	var currHover UIComponent
 	var moved bool
 	running := true
+	var iterations int64
+	var imageTotalNs int64
+	var bbTotalNs int64
 	for running {
 		var e sdl.Event
 		for e = sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
@@ -243,16 +253,26 @@ func main() {
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
 		for _, comp := range comps {
+			sw := start()
 			if err = comp.Render(); err != nil {
 				panic(err)
 			}
+			ns := sw.stopGetNano()
+			switch comp.(type) {
+			case *ImageView:
+				imageTotalNs += ns
+			case *BottomBar:
+				bbTotalNs += ns
+			}
 		}
+		iterations++
 
 		win.GLSwap()
-		// TODO wait remainder of frame-time
-		// gfx.FramerateDelay(framerate)
+		gfx.FramerateDelay(framerate)
 	}
 
+	fmt.Printf("ImageView avg: %v ns\n", float64(imageTotalNs)/float64(iterations))
+	fmt.Printf("BottomBar avg: %v ns\n", float64(bbTotalNs)/float64(iterations))
 	// free UIComponent SDL assets
 	for _, comp := range comps {
 		comp.Destroy()

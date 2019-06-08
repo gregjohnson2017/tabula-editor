@@ -2,13 +2,21 @@ package main
 
 import (
 	"fmt"
+	"image"
+	"image/png"
+	"io/ioutil"
+	"os"
 	"strings"
+	"unicode"
 	"unsafe"
 
 	"github.com/go-gl/gl/v2.1/gl"
+	"github.com/golang/freetype/truetype"
 	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
+
+	"golang.org/x/image/math/fixed"
 )
 
 // UIComponent says what functions a UIComponent must implement
@@ -75,6 +83,155 @@ func createSolidColorTexture(rend *sdl.Renderer, w int32, h int32, r uint8, g ui
 	}
 	surf.Free()
 	return tex, nil
+}
+
+func writeRuneToFile(fileName string, mask image.Image, maskp image.Point, rec image.Rectangle) error {
+	if alpha, ok := mask.(*image.Alpha); ok {
+		tofile := alpha.SubImage(image.Rectangle{maskp, maskp.Add(image.Point{rec.Dx(), rec.Dy()})})
+		if f, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0755); err != nil {
+			png.Encode(f, tofile)
+			return err
+		}
+	}
+	return nil
+}
+
+func printRune(mask image.Image, maskp image.Point, rec image.Rectangle) {
+	if alpha, ok := mask.(*image.Alpha); ok {
+		for y := maskp.Y; y < maskp.Y+rec.Dy(); y++ {
+			for x := maskp.X; x < maskp.X+rec.Dx(); x++ {
+				if _, _, _, a := alpha.At(x, y).RGBA(); a > 0 {
+					fmt.Printf("%02x ", byte(a))
+				} else {
+					fmt.Printf(".  ")
+				}
+			}
+			fmt.Printf("\n")
+		}
+	}
+}
+
+func int26_6ToFloat32(x fixed.Int26_6) float32 {
+	top := float32(x >> 6)
+	bottom := float32(x&0x3F) / 64.0
+	return top + bottom
+}
+
+type runeInfo struct {
+	index   int32
+	width   int32
+	height  int32
+	bearing float32
+	advance float32
+}
+
+// mapString turns each character in the string into a pair of
+// (x,y,s,t)-vertex triangles using glyph information from a
+// pre-loaded font. This information is stored in a float32
+// array and returned with the total width and height for OpenGL.
+func mapString(str string, runeMap []runeInfo) ([]float32, int32, int32) {
+	// topLeft := (int32(origin.X + bearingX), origin.Y - rect.MinY)
+	// topRight := (topLeft.X + rectDx(), topLeft.Y)
+	// bottomLeft := (topLeft.X, origin.Y - rect.MaxY)
+	// bottomRight := (topRight.X, bottomLeft.Y)
+
+	// greg's calcs
+	// topLeft := (rect.MinX, origin.Y - rect.MinY)
+	// topRight := (rect.MaxX, topLeft.Y)
+	// bottomLeft := (topLeft.X, origin.Y - rect.MaxY)
+	// bottomRight := (topRight.X, bottomLeft.Y)
+	return nil, 0, 0
+}
+
+// loadFontTexture caches all of the glyph pixel data in an OpenGL texture for
+// a given font at a given size. It returns the OpenGL ID for this texture,
+// along with a runeInfo array for indexing into the texture per rune at runtime
+func loadFontTexture(fontName string, fontSize int32) (uint32, []runeInfo, error) {
+	// sw := start()
+
+	var err error
+	var fontBytes []byte
+	var font *truetype.Font
+	if fontBytes, err = ioutil.ReadFile(fontName); err != nil {
+		panic(err)
+	}
+	if font, err = truetype.Parse(fontBytes); err != nil {
+		panic(err)
+	}
+	face := truetype.NewFace(font, &truetype.Options{Size: float64(fontSize)})
+
+	var runeMap [unicode.MaxASCII - minASCII]runeInfo
+	var glyphBytes []byte
+	var currentIndex int32
+	for i := minASCII; i < unicode.MaxASCII; i++ {
+		c := rune(i)
+
+		roundedRect, mask, maskp, advance, glyphOK := face.Glyph(fixed.Point26_6{X: 0, Y: 0}, c)
+		accurateRect, _, glyphBoundsOK := face.GlyphBounds(c)
+		glyph, castOK := mask.(*image.Alpha)
+		if !glyphOK || !glyphBoundsOK || !castOK {
+			return 0, nil, fmt.Errorf("%v does not contain glyph for '%c'", fontName, c)
+		}
+
+		runeMap[i-minASCII] = runeInfo{
+			index:   currentIndex,
+			width:   int32(roundedRect.Dx()),
+			height:  int32(roundedRect.Dy()),
+			bearing: int26_6ToFloat32(accurateRect.Min.X),
+			advance: int26_6ToFloat32(advance),
+		}
+
+		// alternatively, upload entire glyph cache into OpenGL texture
+		// ... but this doesnt take that long and cuts texture size by 95%
+		for row := 0; row < roundedRect.Dy(); row++ {
+			glyphBytes = append(glyphBytes, glyph.Pix[(maskp.Y+row)*glyph.Stride:(maskp.Y+row+1)*glyph.Stride]...)
+			currentIndex += int32(glyph.Stride)
+		}
+
+		// fmt.Printf("\n")
+		// printRune(mask, maskp, roundedRect)
+		// fmt.Printf("['%c'] maskp = %v, size=%vx%v\n", c, maskp, roundedRect.Dx(), roundedRect.Dy())
+		// fmt.Printf("['%c'] maskp: %v\n", c, maskp)
+		// fmt.Printf("['%c'] roundedRect: %v\n", c, roundedRect)
+		// fmt.Printf("['%c'] accurateRect: %v\n", c, accurateRect)
+	}
+
+	// aRect, mask, maskp, _, _ := face.Glyph(fixed.Point26_6{X: 0, Y: 0}, 'c')
+	// fmt.Printf("glyphBytes = %v bytes\n", len(glyphBytes))
+	// fmt.Printf("entire cache = %v bytes\n", mask.Bounds().Dx()*mask.Bounds().Dy())
+
+	// runeInfo demo
+	// info := runeMap['A'-minASCII]
+	// if glyph, ok := mask.(*image.Alpha); ok {
+	// 	fmt.Printf("A's maskp = %v, stride = %v\n", maskp, glyph.Stride)
+	// 	for row := 0; row < aRect.Dy(); row++ {
+	// 		fmt.Printf("%03v\n", glyph.Pix[(maskp.Y+row)*glyph.Stride:(maskp.Y+row+1)*glyph.Stride])
+	// 	}
+	// }
+
+	// runemap demonstration
+	// for i := 0; i < unicode.MaxASCII-minASCII; i++ {
+	// 	fmt.Printf("RUNEMAP ['%c'] index = %v, (%vx%v)=%v bytes\n", rune(i+minASCII), runeMap[i].index, runeMap[i].width, runeMap[i].height, runeMap[i].width*runeMap[i].height)
+	// }
+	// fmt.Printf("glyphBytes = %v bytes\n", len(glyphBytes))
+
+	_, mask, _, _, _ := face.Glyph(fixed.Point26_6{X: 0, Y: 0}, 'A')
+	glyph, _ := mask.(*image.Alpha)
+	textureWidth := int32(glyph.Stride)
+	textureHeight := int32(len(glyphBytes) / glyph.Stride)
+	// pass glyphBytes to OpenGL texture
+	var fontTextureID uint32
+	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 1) // Disable byte-alignment restriction
+	gl.GenTextures(1, &fontTextureID)
+	gl.BindTexture(gl.TEXTURE_2D, fontTextureID)
+	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RED, textureWidth, textureHeight, 0, uint32(gl.RED), gl.UNSIGNED_BYTE, unsafe.Pointer(&glyphBytes[0]))
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+	gl.BindTexture(gl.TEXTURE_2D, 0)
+	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 4) // TODO Enable byte-alignment restriction ?
+	face.Close()
+	// fmt.Printf("loaded %v at size %v in %v ns\n", fontName, fontSize, sw.stopGetNano())
+	return fontTextureID, runeMap[:], nil
 }
 
 func renderText(font *ttf.Font, fontSize int32, text string, pos coord, align Align, col *sdl.Color, maxH int32) ([]byte, *sdl.Rect, error) {
@@ -160,7 +317,7 @@ func loadImage(fileName string) (*sdl.Surface, error) {
 	return surf, err
 }
 
-// makeVAO buffers vertex data and returns a VAO and VBO
+// bufferData buffers vertex data and returns a VAO and VBO
 // the vertex data must be accompanied by a description of its layout
 // ex: vertex layout: (x,y,z, s,t) -> layout: (3, 2)
 // returns the VAO and VBO id
@@ -196,6 +353,8 @@ func bufferData(data []float32, layout []int32) (uint32, uint32) {
 }
 
 const (
+	minASCII = 32
+
 	solidColorVertex = `
 	#version 460
 	uniform vec4 uni_color;
