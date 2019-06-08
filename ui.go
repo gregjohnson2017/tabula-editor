@@ -87,7 +87,8 @@ func createSolidColorTexture(rend *sdl.Renderer, w int32, h int32, r uint8, g ui
 
 func writeRuneToFile(fileName string, mask image.Image, maskp image.Point, rec image.Rectangle) error {
 	if alpha, ok := mask.(*image.Alpha); ok {
-		tofile := alpha.SubImage(image.Rectangle{maskp, maskp.Add(image.Point{rec.Dx(), rec.Dy()})})
+		diff := image.Point{rec.Dx(), rec.Dy()}
+		tofile := alpha.SubImage(image.Rectangle{maskp, maskp.Add(diff)})
 		if f, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0755); err != nil {
 			png.Encode(f, tofile)
 			return err
@@ -97,17 +98,21 @@ func writeRuneToFile(fileName string, mask image.Image, maskp image.Point, rec i
 }
 
 func printRune(mask image.Image, maskp image.Point, rec image.Rectangle) {
-	if alpha, ok := mask.(*image.Alpha); ok {
-		for y := maskp.Y; y < maskp.Y+rec.Dy(); y++ {
-			for x := maskp.X; x < maskp.X+rec.Dx(); x++ {
-				if _, _, _, a := alpha.At(x, y).RGBA(); a > 0 {
-					fmt.Printf("%02x ", byte(a))
-				} else {
-					fmt.Printf(".  ")
-				}
+	var alpha *image.Alpha
+	var ok bool
+	if alpha, ok = mask.(*image.Alpha); !ok {
+		fmt.Println("printRune image not Alpha")
+		return
+	}
+	for y := maskp.Y; y < maskp.Y+rec.Dy(); y++ {
+		for x := maskp.X; x < maskp.X+rec.Dx(); x++ {
+			if _, _, _, a := alpha.At(x, y).RGBA(); a > 0 {
+				fmt.Printf("%02x ", byte(a))
+			} else {
+				fmt.Printf(".  ")
 			}
-			fmt.Printf("\n")
 		}
+		fmt.Printf("\n")
 	}
 }
 
@@ -166,10 +171,13 @@ func loadFontTexture(fontName string, fontSize int32) (uint32, []runeInfo, error
 	for i := minASCII; i < unicode.MaxASCII; i++ {
 		c := rune(i)
 
-		roundedRect, mask, maskp, advance, glyphOK := face.Glyph(fixed.Point26_6{X: 0, Y: 0}, c)
-		accurateRect, _, glyphBoundsOK := face.GlyphBounds(c)
-		glyph, castOK := mask.(*image.Alpha)
-		if !glyphOK || !glyphBoundsOK || !castOK {
+		roundedRect, mask, maskp, advance, okGlyph := face.Glyph(fixed.Point26_6{X: 0, Y: 0}, c)
+		if !okGlyph {
+			return 0, nil, fmt.Errorf("%v does not contain glyph for '%c'", fontName, c)
+		}
+		accurateRect, _, okBounds := face.GlyphBounds(c)
+		glyph, okCast := mask.(*image.Alpha)
+		if !okBounds || !okCast {
 			return 0, nil, fmt.Errorf("%v does not contain glyph for '%c'", fontName, c)
 		}
 
@@ -184,7 +192,9 @@ func loadFontTexture(fontName string, fontSize int32) (uint32, []runeInfo, error
 		// alternatively, upload entire glyph cache into OpenGL texture
 		// ... but this doesnt take that long and cuts texture size by 95%
 		for row := 0; row < roundedRect.Dy(); row++ {
-			glyphBytes = append(glyphBytes, glyph.Pix[(maskp.Y+row)*glyph.Stride:(maskp.Y+row+1)*glyph.Stride]...)
+			beg := (maskp.Y + row) * glyph.Stride
+			end := (maskp.Y + row + 1) * glyph.Stride
+			glyphBytes = append(glyphBytes, glyph.Pix[beg:end]...)
 			currentIndex += int32(glyph.Stride)
 		}
 
@@ -217,14 +227,14 @@ func loadFontTexture(fontName string, fontSize int32) (uint32, []runeInfo, error
 
 	_, mask, _, _, _ := face.Glyph(fixed.Point26_6{X: 0, Y: 0}, 'A')
 	glyph, _ := mask.(*image.Alpha)
-	textureWidth := int32(glyph.Stride)
-	textureHeight := int32(len(glyphBytes) / glyph.Stride)
+	texWidth := int32(glyph.Stride)
+	texHeight := int32(len(glyphBytes) / glyph.Stride)
 	// pass glyphBytes to OpenGL texture
 	var fontTextureID uint32
 	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 1) // Disable byte-alignment restriction
 	gl.GenTextures(1, &fontTextureID)
 	gl.BindTexture(gl.TEXTURE_2D, fontTextureID)
-	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RED, textureWidth, textureHeight, 0, uint32(gl.RED), gl.UNSIGNED_BYTE, unsafe.Pointer(&glyphBytes[0]))
+	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RED, texWidth, texHeight, 0, uint32(gl.RED), gl.UNSIGNED_BYTE, unsafe.Pointer(&glyphBytes[0]))
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
