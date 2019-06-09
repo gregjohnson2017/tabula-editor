@@ -149,6 +149,10 @@ func (bb *BottomBar) Render() error {
 	fileNameTriangles := mapString(msg.fileName, bb.runeMap, coord{0, bb.cfg.bottomBarHeight / 2}, Align{AlignMiddle, AlignLeft})
 	zoomTriangles := mapString(fmt.Sprintf("%vx", msg.mult), bb.runeMap, coord{bb.cfg.screenWidth / 2, bb.cfg.bottomBarHeight / 2}, Align{AlignMiddle, AlignCenter})
 	mousePixTriangles := mapString(fmt.Sprintf("(%v, %v)", msg.mousePix.x, msg.mousePix.y), bb.runeMap, coord{bb.cfg.screenWidth, bb.cfg.bottomBarHeight / 2}, Align{AlignMiddle, AlignRight})
+	triangles := make([]float32, len(fileNameTriangles)+len(zoomTriangles)+len(mousePixTriangles))
+	triangles = append(triangles, fileNameTriangles...)
+	triangles = append(triangles, zoomTriangles...)
+	triangles = append(triangles, mousePixTriangles...)
 
 	gl.Viewport(0, 0, bb.cfg.screenWidth, bb.cfg.screenHeight)
 	gl.UseProgram(bb.textProgramID)
@@ -159,12 +163,8 @@ func (bb *BottomBar) Render() error {
 	gl.EnableVertexAttribArray(1)
 	gl.BindTexture(gl.TEXTURE_2D, bb.fontTexID)
 
-	gl.BufferData(gl.ARRAY_BUFFER, 4*len(fileNameTriangles), gl.Ptr(&fileNameTriangles[0]), gl.STATIC_DRAW)
-	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(fileNameTriangles)/4))
-	gl.BufferData(gl.ARRAY_BUFFER, 4*len(zoomTriangles), gl.Ptr(&zoomTriangles[0]), gl.STATIC_DRAW)
-	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(zoomTriangles)/4))
-	gl.BufferData(gl.ARRAY_BUFFER, 4*len(mousePixTriangles), gl.Ptr(&mousePixTriangles[0]), gl.STATIC_DRAW)
-	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(mousePixTriangles)/4))
+	gl.BufferData(gl.ARRAY_BUFFER, 4*len(triangles), gl.Ptr(&triangles[0]), gl.STATIC_DRAW)
+	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(triangles)/4))
 
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 	gl.DisableVertexAttribArray(0)
