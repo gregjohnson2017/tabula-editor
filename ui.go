@@ -38,12 +38,12 @@ type UIComponent interface {
 type AlignV int
 
 const (
-	// AlignBelow puts the top side at the y coordinate
-	AlignBelow AlignV = iota - 1
+	// AlignAbove puts the top side at the y coordinate
+	AlignAbove AlignV = iota - 1
 	// AlignMiddle puts the top and bottom sides equidistant from the middle
 	AlignMiddle
-	// AlignAbove puts the bottom side on the y coordinate
-	AlignAbove
+	// AlignBelow puts the bottom side on the y coordinate
+	AlignBelow
 )
 
 // AlignH is used for the positioning of elements horizontally
@@ -129,6 +129,8 @@ type runeInfo struct {
 	height   int32
 	bearingX float32
 	bearingY float32
+	ascent   int32
+	descent  int32
 	advance  float32
 }
 
@@ -139,21 +141,36 @@ type pointF32 struct {
 
 // mapString turns each character in the string into a pair of
 // (x,y,s,t)-vertex triangles using glyph information from a
-// pre-loaded font. This information is stored in a float32
-// array and returned with the total width and height for OpenGL.
-func mapString(str string, runeMap []runeInfo) ([]float32, int32, int32) {
+// pre-loaded font. The vertex info is returned as []float32
+func mapString(str string, runeMap []runeInfo, pos coord, align Align) []float32 {
 	// 2 triangles per rune, 3 vertices per triangle, 4 float32's per vertex (x,y,s,t)
 	buffer := make([]float32, 0, len(str)*24)
-
-	// TODO remove this 15 y origin offset
-	origin := pointF32{0, 15}
-	// fmt.Printf("Mapping '%v'...\n", str)
-	var maxHeight int32
+	// get glyph information for alignment
+	var strHeight, maxAscent, maxDescent int32
+	var strWidth, largestBearingY float32
 	for _, r := range str {
 		info := runeMap[r-minASCII]
-		if info.height > maxHeight {
-			maxHeight = info.height
+		if info.ascent > maxAscent {
+			maxAscent = info.ascent
 		}
+		if info.descent > maxDescent {
+			maxDescent = info.descent
+		}
+		if info.bearingY > largestBearingY {
+			largestBearingY = info.bearingY
+		}
+		strWidth += info.advance
+	}
+	strHeight = maxAscent + maxDescent
+	w2 := float64(strWidth) / 2.0
+	h2 := float64(strHeight) / 2.0
+	offx := int32(-w2 - float64(align.h)*w2)
+	offy := int32(-h2 - float64(align.v)*h2)
+	// offset origin to account for alignment
+	origin := pointF32{float32(pos.x + offx), float32(pos.y+offy) + largestBearingY}
+	for _, r := range str {
+		info := runeMap[r-minASCII]
+
 		// calculate x,y position coordinates - use bottom left as (0,0); shader converts for you
 		posTL := pointF32{origin.x + info.bearingX, origin.y + (float32(info.height) - info.bearingY)}
 		posTR := pointF32{posTL.x + float32(info.width), posTL.y}
@@ -179,8 +196,8 @@ func mapString(str string, runeMap []runeInfo) ([]float32, int32, int32) {
 
 		origin.x += info.advance
 	}
-	// TODO how to round origin.x for width?
-	return buffer, int32(origin.x), maxHeight
+
+	return buffer
 }
 
 // loadFontTexture caches all of the glyph pixel data in an OpenGL texture for
@@ -222,9 +239,10 @@ func loadFontTexture(fontName string, fontSize int32) (uint32, []runeInfo, error
 			height:   int32(roundedRect.Dy()),
 			bearingX: float32(accurateRect.Min.X.Ceil()),
 			bearingY: float32(accurateRect.Max.Y.Ceil()),
+			ascent:   int32(math.Abs(float64(roundedRect.Max.Y))),
+			descent:  int32(math.Abs(float64(roundedRect.Min.Y))),
 			advance:  int26_6ToFloat32(advance),
 		}
-
 		// alternatively, upload entire glyph cache into OpenGL texture
 		// ... but this doesnt take that long and cuts texture size by 95%
 		for row := 0; row < roundedRect.Dy(); row++ {

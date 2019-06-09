@@ -75,7 +75,7 @@ func initWindow(title string, width, height int32) (*sdl.Window, error) {
 }
 
 func main() {
-	cfg := &config{screenWidth: 960, screenHeight: 720, bottomBarHeight: 100}
+	cfg := &config{screenWidth: 960, screenHeight: 720, bottomBarHeight: 30}
 	var err error
 	var win *sdl.Window
 	if win, err = initWindow("Tabula Editor", cfg.screenWidth, cfg.screenHeight); err != nil {

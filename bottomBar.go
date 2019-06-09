@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
@@ -130,7 +132,7 @@ func (bb *BottomBar) GetBoundary() *sdl.Rect {
 
 // Render draws the UIComponent
 func (bb *BottomBar) Render() error {
-	// msg := <-bb.comms
+	msg := <-bb.comms
 
 	// first render solid color background
 	gl.Viewport(bb.area.X, 0, bb.area.W, bb.area.H)
@@ -143,26 +145,32 @@ func (bb *BottomBar) Render() error {
 	gl.BindVertexArray(0)
 
 	// second render text on top
-	testStr := "The quick brown fox jumped over the lazy dog"
-	// TODO implement alignment, requiring the unused width and height returns
 	// TODO optimize rendering by no-oping if string hasn't changed (or window size)
-	glyphData, _, _ := mapString(testStr, bb.runeMap)
-	gl.BindBuffer(gl.ARRAY_BUFFER, bb.textVboID)
-	gl.BufferData(gl.ARRAY_BUFFER, 4*len(glyphData), gl.Ptr(&glyphData[0]), gl.STATIC_DRAW)
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
+	fileNameTriangles := mapString(msg.fileName, bb.runeMap, coord{0, bb.cfg.bottomBarHeight / 2}, Align{AlignMiddle, AlignLeft})
+	zoomTriangles := mapString(fmt.Sprintf("%vx", msg.mult), bb.runeMap, coord{bb.cfg.screenWidth / 2, bb.cfg.bottomBarHeight / 2}, Align{AlignMiddle, AlignCenter})
+	mousePixTriangles := mapString(fmt.Sprintf("(%v, %v)", msg.mousePix.x, msg.mousePix.y), bb.runeMap, coord{bb.cfg.screenWidth, bb.cfg.bottomBarHeight / 2}, Align{AlignMiddle, AlignRight})
 
 	gl.Viewport(0, 0, bb.cfg.screenWidth, bb.cfg.screenHeight)
 	gl.UseProgram(bb.textProgramID)
 
+	gl.BindBuffer(gl.ARRAY_BUFFER, bb.textVboID)
 	gl.BindVertexArray(bb.textVaoID)
 	gl.EnableVertexAttribArray(0)
 	gl.EnableVertexAttribArray(1)
 	gl.BindTexture(gl.TEXTURE_2D, bb.fontTexID)
-	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(glyphData)/4))
+
+	gl.BufferData(gl.ARRAY_BUFFER, 4*len(fileNameTriangles), gl.Ptr(&fileNameTriangles[0]), gl.STATIC_DRAW)
+	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(fileNameTriangles)/4))
+	gl.BufferData(gl.ARRAY_BUFFER, 4*len(zoomTriangles), gl.Ptr(&zoomTriangles[0]), gl.STATIC_DRAW)
+	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(zoomTriangles)/4))
+	gl.BufferData(gl.ARRAY_BUFFER, 4*len(mousePixTriangles), gl.Ptr(&mousePixTriangles[0]), gl.STATIC_DRAW)
+	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(mousePixTriangles)/4))
+
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 	gl.DisableVertexAttribArray(0)
 	gl.DisableVertexAttribArray(1)
 	gl.BindVertexArray(0)
+	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 
 	gl.UseProgram(0)
 	return nil

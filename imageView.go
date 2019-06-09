@@ -168,9 +168,9 @@ func (iv *ImageView) GetBoundary() *sdl.Rect {
 
 // Render draws the UIComponent
 func (iv *ImageView) Render() error {
-	// go func() {
-	// 	iv.comms <- imageComm{fileName: iv.fileName, mousePix: iv.mousePix, mult: iv.mult}
-	// }()
+	go func() {
+		iv.comms <- imageComm{fileName: iv.fileName, mousePix: iv.mousePix, mult: iv.mult}
+	}()
 	// iv.sel.Range(func(n int) bool {
 	// 	y := int32(n) % iv.selSurf.W
 	// 	x := int32(n) - y*iv.selSurf.W
