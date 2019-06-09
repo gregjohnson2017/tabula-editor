@@ -75,7 +75,7 @@ func initWindow(title string, width, height int32) (*sdl.Window, error) {
 }
 
 func main() {
-	cfg := &config{screenWidth: 960, screenHeight: 720, bottomBarHeight: 30}
+	cfg := &config{screenWidth: 960, screenHeight: 720, bottomBarHeight: 100}
 	var err error
 	var win *sdl.Window
 	if win, err = initWindow("Tabula Editor", cfg.screenWidth, cfg.screenHeight); err != nil {
@@ -91,11 +91,6 @@ func main() {
 			os.Exit(1)
 		}
 	}
-
-	// loadFontTexture("NotoMono-Regular.ttf", 12)
-	// loadFontTexture("NotoMono-Regular.ttf", 24)
-	// loadFontTexture("NotoMono-Regular.ttf", 48)
-	// loadFontTexture("NotoMono-Regular.ttf", 96)
 
 	win.Show()
 
@@ -136,7 +131,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	bottomBar, err := NewBottomBar(bottomBarArea, comms, "NotoMono-Regular.ttf", 24, cfg)
+	bottomBar, err := NewBottomBar(bottomBarArea, comms, cfg)
 	if err != nil {
 		panic(err)
 	}

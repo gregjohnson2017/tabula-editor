@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/png"
 	"io/ioutil"
+	"math"
 	"os"
 	"strings"
 	"unicode"
@@ -123,11 +124,17 @@ func int26_6ToFloat32(x fixed.Int26_6) float32 {
 }
 
 type runeInfo struct {
-	index   int32
-	width   int32
-	height  int32
-	bearing float32
-	advance float32
+	row      int32
+	width    int32
+	height   int32
+	bearingX float32
+	bearingY float32
+	advance  float32
+}
+
+type pointF32 struct {
+	x float32
+	y float32
 }
 
 // mapString turns each character in the string into a pair of
@@ -135,33 +142,61 @@ type runeInfo struct {
 // pre-loaded font. This information is stored in a float32
 // array and returned with the total width and height for OpenGL.
 func mapString(str string, runeMap []runeInfo) ([]float32, int32, int32) {
-	// topLeft := (int32(origin.X + bearingX), origin.Y - rect.MinY)
-	// topRight := (topLeft.X + rectDx(), topLeft.Y)
-	// bottomLeft := (topLeft.X, origin.Y - rect.MaxY)
-	// bottomRight := (topRight.X, bottomLeft.Y)
+	// 2 triangles per rune, 3 vertices per triangle, 4 float32's per vertex (x,y,s,t)
+	buffer := make([]float32, 0, len(str)*24)
 
-	// greg's calcs
-	// topLeft := (rect.MinX, origin.Y - rect.MinY)
-	// topRight := (rect.MaxX, topLeft.Y)
-	// bottomLeft := (topLeft.X, origin.Y - rect.MaxY)
-	// bottomRight := (topRight.X, bottomLeft.Y)
-	return nil, 0, 0
+	// TODO remove this 15 y origin offset
+	origin := pointF32{0, 15}
+	// fmt.Printf("Mapping '%v'...\n", str)
+	var maxHeight int32
+	for _, r := range str {
+		info := runeMap[r-minASCII]
+		if info.height > maxHeight {
+			maxHeight = info.height
+		}
+		// calculate x,y position coordinates - use bottom left as (0,0); shader converts for you
+		posTL := pointF32{origin.x + info.bearingX, origin.y + (float32(info.height) - info.bearingY)}
+		posTR := pointF32{posTL.x + float32(info.width), posTL.y}
+		posBL := pointF32{posTL.x, origin.y - info.bearingY}
+		posBR := pointF32{posTR.x, posBL.y}
+		// calculate s,t texture coordinates - use top left as (0,0); shader converts for you
+		texTL := pointF32{0, float32(info.row)}
+		texTR := pointF32{float32(info.width), texTL.y}
+		texBL := pointF32{texTL.x, texTL.y + float32(info.height)}
+		texBR := pointF32{texTR.x, texBL.y}
+		// create 2 triangles
+		triangles := []float32{
+			// TODO do something better... please
+			float32(math.Ceil(float64(posBL.x))), float32(math.Ceil(float64(posBL.y))), texBL.x, texBL.y, // bottom-left
+			float32(math.Ceil(float64(posTL.x))), float32(math.Ceil(float64(posTL.y))), texTL.x, texTL.y, // top-left
+			float32(math.Ceil(float64(posTR.x))), float32(math.Ceil(float64(posTR.y))), texTR.x, texTR.y, // top-right
+
+			float32(math.Ceil(float64(posBL.x))), float32(math.Ceil(float64(posBL.y))), texBL.x, texBL.y, // bottom-left
+			float32(math.Ceil(float64(posTR.x))), float32(math.Ceil(float64(posTR.y))), texTR.x, texTR.y, // top-right
+			float32(math.Ceil(float64(posBR.x))), float32(math.Ceil(float64(posBR.y))), texBR.x, texBR.y, // bottom-right
+		}
+		buffer = append(buffer, triangles...)
+
+		origin.x += info.advance
+	}
+	// TODO how to round origin.x for width?
+	return buffer, int32(origin.x), maxHeight
 }
 
 // loadFontTexture caches all of the glyph pixel data in an OpenGL texture for
 // a given font at a given size. It returns the OpenGL ID for this texture,
 // along with a runeInfo array for indexing into the texture per rune at runtime
 func loadFontTexture(fontName string, fontSize int32) (uint32, []runeInfo, error) {
-	// sw := start()
+	sw := start()
 
 	var err error
 	var fontBytes []byte
 	var font *truetype.Font
 	if fontBytes, err = ioutil.ReadFile(fontName); err != nil {
-		panic(err)
+		return 0, nil, err
 	}
 	if font, err = truetype.Parse(fontBytes); err != nil {
-		panic(err)
+		return 0, nil, err
 	}
 	face := truetype.NewFace(font, &truetype.Options{Size: float64(fontSize)})
 
@@ -182,11 +217,12 @@ func loadFontTexture(fontName string, fontSize int32) (uint32, []runeInfo, error
 		}
 
 		runeMap[i-minASCII] = runeInfo{
-			index:   currentIndex,
-			width:   int32(roundedRect.Dx()),
-			height:  int32(roundedRect.Dy()),
-			bearing: int26_6ToFloat32(accurateRect.Min.X),
-			advance: int26_6ToFloat32(advance),
+			row:      currentIndex,
+			width:    int32(roundedRect.Dx()),
+			height:   int32(roundedRect.Dy()),
+			bearingX: float32(accurateRect.Min.X.Ceil()),
+			bearingY: float32(accurateRect.Max.Y.Ceil()),
+			advance:  int26_6ToFloat32(advance),
 		}
 
 		// alternatively, upload entire glyph cache into OpenGL texture
@@ -195,40 +231,25 @@ func loadFontTexture(fontName string, fontSize int32) (uint32, []runeInfo, error
 			beg := (maskp.Y + row) * glyph.Stride
 			end := (maskp.Y + row + 1) * glyph.Stride
 			glyphBytes = append(glyphBytes, glyph.Pix[beg:end]...)
-			currentIndex += int32(glyph.Stride)
+			currentIndex++
 		}
-
-		// fmt.Printf("\n")
-		// printRune(mask, maskp, roundedRect)
-		// fmt.Printf("['%c'] maskp = %v, size=%vx%v\n", c, maskp, roundedRect.Dx(), roundedRect.Dy())
-		// fmt.Printf("['%c'] maskp: %v\n", c, maskp)
-		// fmt.Printf("['%c'] roundedRect: %v\n", c, roundedRect)
-		// fmt.Printf("['%c'] accurateRect: %v\n", c, accurateRect)
 	}
 
-	// aRect, mask, maskp, _, _ := face.Glyph(fixed.Point26_6{X: 0, Y: 0}, 'c')
-	// fmt.Printf("glyphBytes = %v bytes\n", len(glyphBytes))
-	// fmt.Printf("entire cache = %v bytes\n", mask.Bounds().Dx()*mask.Bounds().Dy())
+	_, mask, _, _, aOK := face.Glyph(fixed.Point26_6{X: 0, Y: 0}, 'A')
+	if !aOK {
+		return 0, nil, fmt.Errorf("Failed to get glyph for 'A'")
+	}
 
-	// runeInfo demo
-	// info := runeMap['A'-minASCII]
-	// if glyph, ok := mask.(*image.Alpha); ok {
-	// 	fmt.Printf("A's maskp = %v, stride = %v\n", maskp, glyph.Stride)
-	// 	for row := 0; row < aRect.Dy(); row++ {
-	// 		fmt.Printf("%03v\n", glyph.Pix[(maskp.Y+row)*glyph.Stride:(maskp.Y+row+1)*glyph.Stride])
-	// 	}
-	// }
+	// writeme, _ := mask.(*image.Alpha)
+	// writeme.Pix = glyphBytes
+	// writeme.Rect = image.Rectangle{Min: image.Point{0, 0}, Max: image.Point{int(writeme.Stride), int(len(glyphBytes) / writeme.Stride)}}
+	// file, _ := os.OpenFile("glyphBytes.png", os.O_CREATE|os.O_RDWR, 0755)
+	// png.Encode(file, writeme)
 
-	// runemap demonstration
-	// for i := 0; i < unicode.MaxASCII-minASCII; i++ {
-	// 	fmt.Printf("RUNEMAP ['%c'] index = %v, (%vx%v)=%v bytes\n", rune(i+minASCII), runeMap[i].index, runeMap[i].width, runeMap[i].height, runeMap[i].width*runeMap[i].height)
-	// }
-	// fmt.Printf("glyphBytes = %v bytes\n", len(glyphBytes))
-
-	_, mask, _, _, _ := face.Glyph(fixed.Point26_6{X: 0, Y: 0}, 'A')
 	glyph, _ := mask.(*image.Alpha)
 	texWidth := int32(glyph.Stride)
 	texHeight := int32(len(glyphBytes) / glyph.Stride)
+
 	// pass glyphBytes to OpenGL texture
 	var fontTextureID uint32
 	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 1) // Disable byte-alignment restriction
@@ -239,8 +260,8 @@ func loadFontTexture(fontName string, fontSize int32) (uint32, []runeInfo, error
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 4) // TODO Enable byte-alignment restriction ?
-	face.Close()
-	// fmt.Printf("loaded %v at size %v in %v ns\n", fontName, fontSize, sw.stopGetNano())
+
+	fmt.Printf("Loaded %v at size %v in %v ns\n", fontName, fontSize, sw.stopGetNano())
 	return fontTextureID, runeMap[:], nil
 }
 
@@ -327,22 +348,13 @@ func loadImage(fileName string) (*sdl.Surface, error) {
 	return surf, err
 }
 
-// bufferData buffers vertex data and returns a VAO and VBO
-// the vertex data must be accompanied by a description of its layout
-// ex: vertex layout: (x,y,z, s,t) -> layout: (3, 2)
-// returns the VAO and VBO id
-func bufferData(data []float32, layout []int32) (uint32, uint32) {
-	var vbo uint32
-	gl.GenBuffers(1, &vbo)
-	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
-	gl.BufferData(gl.ARRAY_BUFFER, 4*len(data), gl.Ptr(&data[0]), gl.STATIC_DRAW)
-
-	var vao uint32
-	gl.GenVertexArrays(1, &vao)
-	gl.BindVertexArray(vao)
+// configureVAO configures a VAO & VBO pair with a specified vertex layout
+// example vertex layout: (x,y,z, s,t) -> layout = (3, 2)
+func configureVAO(vaoID uint32, vboID uint32, layout []int32) {
+	gl.BindBuffer(gl.ARRAY_BUFFER, vboID)
+	gl.BindVertexArray(vaoID)
 	var vertexSize int32
 	for i := 0; i < len(layout); i++ {
-		gl.EnableVertexAttribArray(uint32(i))
 		vertexSize += layout[i]
 	}
 	// calculate vertex size in bytes
@@ -353,13 +365,9 @@ func bufferData(data []float32, layout []int32) (uint32, uint32) {
 		gl.VertexAttribPointer(uint32(i), layout[i], gl.FLOAT, false, vertexStride, unsafe.Pointer(uintptr(offset*4)))
 		offset += layout[i]
 	}
-	for i := 0; i < len(layout); i++ {
-		gl.DisableVertexAttribArray(uint32(i))
-	}
 
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 	gl.BindVertexArray(0)
-	return vao, vbo
 }
 
 const (
@@ -374,8 +382,8 @@ const (
 		gl_Position = vec4(position_in, 0.0, 1.0);
 		color = uni_color;
 	}
-
 ` + "\x00"
+
 	solidColorFragment = `
 	#version 460
 	in vec4 color;
@@ -387,12 +395,12 @@ const (
 
 	vertexShaderSource = `
 	#version 460
-	uniform vec2 screenSize;
+	uniform vec2 area;
 	layout(location = 0) in vec2 position_in;
 	layout(location = 1) in vec2 tex_coords_in;
 	out vec2 tex_coords;
 	void main() {
-		vec2 glSpace = vec2(2.0, -2.0) * (position_in / screenSize) + vec2(-1.0, 1.0);
+		vec2 glSpace = vec2(2.0, -2.0) * (position_in / area) + vec2(-1.0, 1.0);
 		gl_Position = vec4(glSpace, 0.0, 1.0);
 		tex_coords = tex_coords_in;
 	}
@@ -417,7 +425,7 @@ const (
 		gl_Position = vec4(position_in, 0.0, 1.0);
 		tex_coords = tex_coords_in;
 	}
-	` + "\x00"
+` + "\x00"
 
 	// Uniform `tex_size` is the (width, height) of the texture.
 	// Input `position_in` is typical openGL position coordinates.
@@ -427,17 +435,26 @@ const (
 	glyphShaderVertex = `
 	#version 460
 	uniform vec2 tex_size;
+	uniform vec2 screen_size;
 	layout(location = 0) in vec2 position_in;
 	layout(location = 1) in vec2 tex_pixels;
 	out vec2 tex_coords;
 	void main() {
-		gl_Position = vec4(position_in, 0.0, 1.0);
-		tex_coords = vec2(
-			tex_pixels.x / tex_size.x,
-			(tex_size.y - tex_pixels.y) / tex_size.y
-		);
+		vec2 glSpace = vec2(2.0, 2.0) * (position_in / screen_size) + vec2(-1.0, -1.0);
+		gl_Position = vec4(glSpace, 0.0, 1.0);
+		tex_coords = vec2(tex_pixels.x / tex_size.x, tex_pixels.y / tex_size.y);
 	}
-	` + "\x00"
+` + "\x00"
+
+	glyphShaderFragment = `
+	#version 460
+	uniform sampler2D frag_tex;
+	in vec2 tex_coords;
+	out vec4 frag_color;
+	void main() {
+		frag_color = vec4(1.0, 1.0, 1.0, texture(frag_tex, tex_coords).r);
+	}
+` + "\x00"
 )
 
 func compileShader(source string, shaderType uint32) (uint32, error) {

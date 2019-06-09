@@ -14,19 +14,19 @@ var _ UIComponent = UIComponent(&ImageView{})
 
 // ImageView defines an interactable image viewing pane
 type ImageView struct {
-	area         *sdl.Rect
-	canvas       *sdl.Rect
-	programID    uint32
-	mouseLoc     coord
-	mousePix     coord
-	dragging     bool
-	dragPoint    coord
-	mult         float64
-	glSquare     []float32
-	vaoID        uint32
-	vboID        uint32
-	textureID    uint32
-	screenSizeID int32
+	area      *sdl.Rect
+	canvas    *sdl.Rect
+	programID uint32
+	mouseLoc  coord
+	mousePix  coord
+	dragging  bool
+	dragPoint coord
+	mult      float64
+	glSquare  []float32
+	vaoID     uint32
+	vboID     uint32
+	textureID uint32
+	uniAreaID int32
 
 	// sel       set.Set
 	surf *sdl.Surface
@@ -131,9 +131,9 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, cfg *
 		return nil, err
 	}
 
-	iv.screenSizeID = gl.GetUniformLocation(iv.programID, &[]byte("screenSize")[0])
+	iv.uniAreaID = gl.GetUniformLocation(iv.programID, &[]byte("area\x00")[0])
 	gl.UseProgram(iv.programID)
-	gl.Uniform2f(iv.screenSizeID, float32(iv.area.W), float32(iv.area.H))
+	gl.Uniform2f(iv.uniAreaID, float32(iv.area.W), float32(iv.area.H))
 	gl.UseProgram(0)
 
 	format := int32(gl.RGBA)
@@ -146,33 +146,9 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, cfg *
 	gl.GenerateMipmap(gl.TEXTURE_2D)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 
-	// convert := func(sdlX, sdlY int32) (float32, float32) {
-	// 	return 2.0*float32(sdlX)/float32(iv.area.W) - 1.0, -2.0*float32(sdlY)/float32(iv.area.H) + 1.0
-	// }
-
-	// iv.glSquare = []float32{
-	// 	blx, bly, 0.0, 1.0, // bottom-left
-	// 	tlx, tly, 0.0, 0.0, // top-left
-	// 	trx, try, 1.0, 0.0, // top-right
-	// 	blx, bly, 0.0, 1.0, // bottom-left
-	// 	trx, try, 1.0, 0.0, // top-right
-	// 	brx, bry, 1.0, 1.0, // bottom-right
-	// }
-
-	tlx, tly := float32(iv.canvas.X), float32(iv.canvas.Y)
-	trx, try := float32(iv.canvas.X+iv.canvas.W), float32(iv.canvas.Y)
-	blx, bly := float32(iv.canvas.X), float32(iv.canvas.H+iv.canvas.Y)
-	brx, bry := float32(iv.canvas.X+iv.canvas.W), float32(iv.canvas.H+iv.canvas.Y)
-	iv.glSquare = []float32{
-		blx, bly, 0.0, 1.0, // bottom-left
-		tlx, tly, 0.0, 0.0, // top-left
-		trx, try, 1.0, 0.0, // top-right
-		blx, bly, 0.0, 1.0, // bottom-left
-		trx, try, 1.0, 0.0, // top-right
-		brx, bry, 1.0, 1.0, // bottom-right
-	}
-
-	iv.vaoID, iv.vboID = bufferData(iv.glSquare, []int32{2, 2})
+	gl.GenBuffers(1, &iv.vboID)
+	gl.GenVertexArrays(1, &iv.vaoID)
+	configureVAO(iv.vaoID, iv.vboID, []int32{2, 2})
 
 	return iv, nil
 }
@@ -192,9 +168,9 @@ func (iv *ImageView) GetBoundary() *sdl.Rect {
 
 // Render draws the UIComponent
 func (iv *ImageView) Render() error {
-	go func() {
-		iv.comms <- imageComm{fileName: iv.fileName, mousePix: iv.mousePix, mult: iv.mult}
-	}()
+	// go func() {
+	// 	iv.comms <- imageComm{fileName: iv.fileName, mousePix: iv.mousePix, mult: iv.mult}
+	// }()
 	// iv.sel.Range(func(n int) bool {
 	// 	y := int32(n) % iv.selSurf.W
 	// 	x := int32(n) - y*iv.selSurf.W
@@ -223,18 +199,18 @@ func (iv *ImageView) Render() error {
 	trx, try := float32(iv.canvas.X+iv.canvas.W), float32(iv.canvas.Y)
 	blx, bly := float32(iv.canvas.X), float32(iv.canvas.H+iv.canvas.Y)
 	brx, bry := float32(iv.canvas.X+iv.canvas.W), float32(iv.canvas.H+iv.canvas.Y)
-	newSquare := []float32{
+	triangles := []float32{
 		blx, bly, 0.0, 1.0, // bottom-left
 		tlx, tly, 0.0, 0.0, // top-left
 		trx, try, 1.0, 0.0, // top-right
+
 		blx, bly, 0.0, 1.0, // bottom-left
 		trx, try, 1.0, 0.0, // top-right
 		brx, bry, 1.0, 1.0, // bottom-right
 	}
-	copy(iv.glSquare, newSquare)
 
 	gl.BindBuffer(gl.ARRAY_BUFFER, iv.vboID)
-	gl.BufferData(gl.ARRAY_BUFFER, 4*len(iv.glSquare), gl.Ptr(iv.glSquare), gl.STATIC_DRAW)
+	gl.BufferData(gl.ARRAY_BUFFER, 4*len(triangles), gl.Ptr(&triangles[0]), gl.STATIC_DRAW)
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 
 	gl.Viewport(iv.area.X, iv.area.Y+iv.cfg.bottomBarHeight, iv.area.W, iv.area.H)
@@ -244,12 +220,13 @@ func (iv *ImageView) Render() error {
 	gl.EnableVertexAttribArray(0)
 	gl.EnableVertexAttribArray(1)
 	gl.BindTexture(gl.TEXTURE_2D, iv.textureID)
-	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(iv.glSquare)/4))
+	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(triangles)/4))
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 	gl.DisableVertexAttribArray(0)
 	gl.DisableVertexAttribArray(1)
 	gl.BindVertexArray(0)
 
+	gl.UseProgram(0)
 	return nil
 }
 
@@ -359,7 +336,7 @@ func (iv *ImageView) OnResize(x, y int32) {
 	iv.area.H += y
 
 	gl.UseProgram(iv.programID)
-	gl.Uniform2f(iv.screenSizeID, float32(iv.area.W), float32(iv.area.H))
+	gl.Uniform2f(iv.uniAreaID, float32(iv.area.W), float32(iv.area.H))
 	gl.UseProgram(0)
 	iv.centerImage()
 }
