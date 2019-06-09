@@ -418,6 +418,26 @@ const (
 		tex_coords = tex_coords_in;
 	}
 	` + "\x00"
+
+	// Uniform `tex_size` is the (width, height) of the texture.
+	// Input `position_in` is typical openGL position coordinates.
+	// Input `tex_pixels` is the (x, y) of the vertex in the texture starting
+	// at (left, top).
+	// Output `tex_coords` is typical texture coordinates for fragment shader.
+	glyphShaderVertex = `
+	#version 460
+	uniform vec2 tex_size;
+	layout(location = 0) in vec2 position_in;
+	layout(location = 1) in vec2 tex_pixels;
+	out vec2 tex_coords;
+	void main() {
+		gl_Position = vec4(position_in, 0.0, 1.0);
+		tex_coords = vec2(
+			tex_pixels.x / tex_size.x,
+			(tex_size.y - tex_pixels.y) / tex_size.y
+		);
+	}
+	` + "\x00"
 )
 
 func compileShader(source string, shaderType uint32) (uint32, error) {
