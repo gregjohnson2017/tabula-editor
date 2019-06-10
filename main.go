@@ -61,7 +61,7 @@ func initWindow(title string, width, height int32) (*sdl.Window, error) {
 	if err = gl.Init(); err != nil {
 		return nil, err
 	}
-	gl.ClearColor(0.0, 0.0, 0.0, 1.0)
+	gl.ClearColor(1.0, 1.0, 1.0, 1.0)
 	gl.Enable(gl.MULTISAMPLE)
 	gl.Enable(gl.BLEND)
 	// enable anti-aliasing

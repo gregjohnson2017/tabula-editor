@@ -15,7 +15,6 @@ import (
 	"github.com/golang/freetype/truetype"
 	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
-	"github.com/veandco/go-sdl2/ttf"
 
 	"golang.org/x/image/math/fixed"
 )
@@ -161,6 +160,12 @@ func mapString(str string, runeMap []runeInfo, pos coord, align Align) []float32
 		}
 		strWidth += info.advance
 	}
+	// adjust strWidth if last rune's width + bearingX > advance
+	lastInfo := runeMap[str[len(str)-1]-minASCII]
+	if float32(lastInfo.width)+lastInfo.bearingX > lastInfo.advance {
+		strWidth += (float32(lastInfo.width) + lastInfo.bearingX - lastInfo.advance)
+	}
+
 	strHeight = maxAscent + maxDescent
 	w2 := float64(strWidth) / 2.0
 	h2 := float64(strHeight) / 2.0
@@ -237,11 +242,11 @@ func loadFontTexture(fontName string, fontSize int32) (uint32, []runeInfo, error
 			row:      currentIndex,
 			width:    int32(roundedRect.Dx()),
 			height:   int32(roundedRect.Dy()),
-			bearingX: float32(accurateRect.Min.X.Ceil()),
+			bearingX: float32(math.Round(float64(accurateRect.Min.X.Ceil()))),
 			bearingY: float32(accurateRect.Max.Y.Ceil()),
 			ascent:   int32(math.Abs(float64(roundedRect.Max.Y))),
 			descent:  int32(math.Abs(float64(roundedRect.Min.Y))),
-			advance:  int26_6ToFloat32(advance),
+			advance:  float32(math.Round(float64(int26_6ToFloat32(advance)))),
 		}
 		// alternatively, upload entire glyph cache into OpenGL texture
 		// ... but this doesnt take that long and cuts texture size by 95%
@@ -281,38 +286,6 @@ func loadFontTexture(fontName string, fontSize int32) (uint32, []runeInfo, error
 
 	fmt.Printf("Loaded %v at size %v in %v ns\n", fontName, fontSize, sw.stopGetNano())
 	return fontTextureID, runeMap[:], nil
-}
-
-func renderText(font *ttf.Font, fontSize int32, text string, pos coord, align Align, col *sdl.Color, maxH int32) ([]byte, *sdl.Rect, error) {
-	var surf *sdl.Surface
-	var err error
-	if surf, err = font.RenderUTF8Blended(text, *col); err != nil {
-		return nil, nil, err
-	}
-
-	h, err := font.GlyphMetrics('h')
-	rowsFromTop := int32(font.Ascent() - h.MaxY)
-	sliceStart := surf.Pitch * (rowsFromTop)
-	rowsFromBottom := surf.H - fontSize - rowsFromTop
-	sliceStop := surf.Pitch * (surf.H - rowsFromBottom)
-	// copy the pixels so we can free surf before returning
-	slice := make([]byte, len(surf.Pixels()))
-	copy(slice, surf.Pixels()[sliceStart:sliceStop])
-
-	w2 := int32(float64(surf.W) / 2.0)
-	h2 := int32(float64(fontSize) / 2.0)
-	offx := -w2 - int32(align.h)*int32(w2)
-	offy := -h2 - int32(align.v)*int32(h2)
-	var rect = &sdl.Rect{
-		X: pos.x + offx,
-		// apply coordinate conversion from SDL to OpenGL
-		Y: maxH - fontSize - pos.y - offy,
-		W: int32(surf.W),
-		H: fontSize,
-	}
-
-	surf.Free()
-	return slice, rect, nil
 }
 
 func mapRGBA(form *sdl.PixelFormat, r, g, b, a uint8) uint32 {
