@@ -281,7 +281,6 @@ func loadFontTexture(fontName string, fontSize int32) (uint32, []runeInfo, error
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
-	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 4) // TODO Enable byte-alignment restriction ?
 
 	fmt.Printf("Loaded %v at size %v in %v ns\n", fontName, fontSize, sw.stopGetNano())
 	return fontTextureID, runeMap[:], nil

@@ -16,27 +16,21 @@ var _ UIComponent = UIComponent(&ImageView{})
 type ImageView struct {
 	area      *sdl.Rect
 	canvas    *sdl.Rect
-	programID uint32
+	surf      *sdl.Surface
+	cfg       *config
 	mouseLoc  coord
 	mousePix  coord
-	dragging  bool
 	dragPoint coord
+	dragging  bool
 	mult      float64
+	programID uint32
+	textureID uint32
 	glSquare  []float32
 	vaoID     uint32
 	vboID     uint32
-	textureID uint32
-
-	// sel       set.Set
-	surf *sdl.Surface
-	// tex       *sdl.Texture
-	// selSurf   *sdl.Surface
-	// selTex    *sdl.Texture
-	// backTex   *sdl.Texture
-	comms    chan<- imageComm
-	fileName string
-	fullPath string
-	cfg      *config
+	comms     chan<- imageComm
+	fileName  string
+	fullPath  string
 }
 
 type imageComm struct {
@@ -50,26 +44,6 @@ func (iv *ImageView) loadFromFile(fileName string) error {
 	if err != nil {
 		return err
 	}
-	// var selSurf *sdl.Surface
-	// if selSurf, err = sdl.CreateRGBSurfaceWithFormat(0, surf.W, surf.H, 32, uint32(sdl.PIXELFORMAT_RGBA32)); err != nil {
-	// 	return err
-	// }
-	// if err = selSurf.FillRect(nil, mapRGBA(selSurf.Format, 0, 0, 0, 0)); err != nil {
-	// 	return err
-	// }
-	// var selTex *sdl.Texture
-	// if selTex, err = iv.ctx.Rend.CreateTexture(selSurf.Format.Format, sdl.TEXTUREACCESS_STREAMING, selSurf.W, selSurf.H); err != nil {
-	// 	return err
-	// }
-	// if err = selTex.SetBlendMode(sdl.BLENDMODE_BLEND); err != nil {
-	// 	return err
-	// }
-	// if err = iv.createBackTex(); err != nil {
-	// 	return err
-	// }
-	// iv.selSurf = selSurf
-	// iv.tex = tex
-	// iv.selTex = selTex
 	iv.surf = surf
 	iv.canvas = &sdl.Rect{
 		X: 0,
@@ -85,34 +59,6 @@ func (iv *ImageView) loadFromFile(fileName string) error {
 	return nil
 }
 
-// func (iv *ImageView) createBackTex() error {
-// 	var backSurf *sdl.Surface
-// 	var err error
-// 	if backSurf, err = sdl.CreateRGBSurfaceWithFormat(0, iv.area.W, iv.area.H, 32, uint32(sdl.PIXELFORMAT_RGBA32)); err != nil {
-// 		return err
-// 	}
-// 	light := mapRGBA(backSurf.Format, 0xEE, 0xEE, 0xEE, 0xFF)
-// 	backSurf.FillRect(nil, light)
-// 	rects := []sdl.Rect{}
-// 	sqsize := int32(8)
-// 	for i := int32(0); i < backSurf.W; i += 2 * sqsize {
-// 		for j := int32(0); j < backSurf.H; j += sqsize {
-// 			off := ((j/sqsize + 1) % 2) * sqsize
-// 			r := sdl.Rect{X: i + off, Y: j, W: sqsize, H: sqsize}
-// 			rects = append(rects, r)
-// 		}
-// 	}
-// 	dark := mapRGBA(backSurf.Format, 0x99, 0x99, 0x99, 0xFF)
-// 	backSurf.FillRects(rects, dark)
-// 	var backTex *sdl.Texture
-// 	if backTex, err = iv.ctx.Rend.CreateTextureFromSurface(backSurf); err != nil {
-// 		return err
-// 	}
-// 	backSurf.Free()
-// 	iv.backTex = backTex
-// 	return nil
-// }
-
 // NewImageView returns a pointer to a new ImageView struct that implements UIComponent
 func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, cfg *config) (*ImageView, error) {
 	var err error
@@ -121,7 +67,6 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, cfg *
 	iv.area = area
 	iv.comms = comms
 	iv.mult = 1.0
-	// iv.sel = set.NewSet()
 	if err = iv.loadFromFile(fileName); err != nil {
 		return nil, err
 	}
@@ -170,28 +115,6 @@ func (iv *ImageView) Render() error {
 	go func() {
 		iv.comms <- imageComm{fileName: iv.fileName, mousePix: iv.mousePix, mult: iv.mult}
 	}()
-	// iv.sel.Range(func(n int) bool {
-	// 	y := int32(n) % iv.selSurf.W
-	// 	x := int32(n) - y*iv.selSurf.W
-	// 	setPixel(iv.selSurf, coord{x: x, y: y}, sdl.Color{R: 0, G: 0, B: 0, A: 128})
-	// 	return true
-	// })
-	// var err error
-	r := &sdl.Rect{X: iv.canvas.X, Y: iv.canvas.Y, W: iv.canvas.W, H: iv.canvas.H}
-	if r.X < 0 {
-		r.W += r.X
-		r.X = 0
-	}
-	if r.Y < 0 {
-		r.H += r.Y
-		r.Y = 0
-	}
-	if r.X+r.W > iv.area.W {
-		r.W = iv.area.W - r.X
-	}
-	if r.Y+r.H > iv.area.H {
-		r.H = iv.area.H - r.Y
-	}
 
 	// update buffered data
 	tlx, tly := float32(iv.canvas.X), float32(iv.canvas.Y)
@@ -250,6 +173,11 @@ func (iv *ImageView) centerImage() {
 	iv.canvas.Y = int32(float64(iv.area.H)/2.0 - float64(iv.canvas.H)/2.0)
 }
 
+func (iv *ImageView) setPixel(x, y int32, color []byte) {
+	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 4)
+	gl.TextureSubImage2D(iv.textureID, 0, x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, unsafe.Pointer(&color[0]))
+}
+
 func (iv *ImageView) updateMousePos(x, y int32) {
 	iv.mouseLoc.x = x
 	iv.mouseLoc.y = y
@@ -279,12 +207,9 @@ func (iv *ImageView) OnMotion(evt *sdl.MouseMotionEvent) bool {
 		iv.dragPoint.x = evt.X
 		iv.dragPoint.y = evt.Y
 	}
-	// if evt.State == sdl.ButtonLMask() && inBounds(iv.canvas, evt.X, evt.Y) {
-	// 	i := int(iv.surf.W*iv.mousePix.y + iv.mousePix.x)
-	// 	if !iv.sel.Contains(i) {
-	// 		iv.sel.Add(i)
-	// 	}
-	// }
+	if evt.State == sdl.ButtonLMask() && inBounds(iv.canvas, evt.X, evt.Y) {
+		iv.setPixel(iv.mousePix.x, iv.mousePix.y, []byte{0x00, 0x00, 0x00, 0x00})
+	}
 	return true
 }
 
@@ -320,12 +245,9 @@ func (iv *ImageView) OnClick(evt *sdl.MouseButtonEvent) bool {
 		iv.dragPoint.x = evt.X
 		iv.dragPoint.y = evt.Y
 	}
-	// if evt.Button == sdl.BUTTON_LEFT && evt.State == sdl.PRESSED {
-	// 	i := int(iv.surf.W*iv.mousePix.y + iv.mousePix.x)
-	// 	if !iv.sel.Contains(i) {
-	// 		iv.sel.Add(i)
-	// 	}
-	// }
+	if evt.Button == sdl.BUTTON_LEFT && evt.State == sdl.PRESSED {
+		iv.setPixel(iv.mousePix.x, iv.mousePix.y, []byte{0x00, 0x00, 0x00, 0x00})
+	}
 	return true
 }
 

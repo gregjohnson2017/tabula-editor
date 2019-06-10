@@ -69,10 +69,11 @@ func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, cfg *config) (*BottomB
 	gl.Uniform2f(uniScrSizeID, float32(cfg.screenWidth), float32(cfg.screenHeight))
 	gl.Uniform4f(textColorID, textColor[0], textColor[1], textColor[2], textColor[3])
 
-	glSquare := []float32{
+	backTriangles := []float32{
 		-1.0, -1.0, // bottom-left
 		-1.0, +1.0, // top-left
 		+1.0, +1.0, // top-right
+
 		-1.0, -1.0, // bottom-left
 		+1.0, +1.0, // top-right
 		+1.0, -1.0, // bottom-right
@@ -83,7 +84,7 @@ func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, cfg *config) (*BottomB
 	gl.GenBuffers(1, &backVboID)
 	configureVAO(backVaoID, backVboID, []int32{2})
 	gl.BindBuffer(gl.ARRAY_BUFFER, backVboID)
-	gl.BufferData(gl.ARRAY_BUFFER, 4*len(glSquare), gl.Ptr(&glSquare[0]), gl.STATIC_DRAW)
+	gl.BufferData(gl.ARRAY_BUFFER, 4*len(backTriangles), gl.Ptr(&backTriangles[0]), gl.STATIC_DRAW)
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 
 	var textVaoID, textVboID uint32
@@ -215,7 +216,7 @@ func (bb *BottomBar) OnResize(x, y int32) {
 	gl.UseProgram(0)
 }
 
-// String  returns the name of the component type
+// String returns the name of the component type
 func (bb *BottomBar) String() string {
 	return "BottomBar"
 }
