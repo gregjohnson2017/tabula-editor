@@ -112,56 +112,56 @@ func main() {
 		W: cfg.screenWidth,
 		H: cfg.bottomBarHeight,
 	}
-	// buttonAreaOpen := &sdl.Rect{
-	// 	X: 0,
-	// 	Y: 0,
-	// 	W: 125,
-	// 	H: 20,
-	// }
-	// buttonAreaCenter := &sdl.Rect{
-	// 	X: 125,
-	// 	Y: 0,
-	// 	W: 125,
-	// 	H: 20,
-	// }
-	comms := make(chan imageComm)
-	// fileComm := make(chan func())
+	buttonAreaOpen := &sdl.Rect{
+		X: 0,
+		Y: 0,
+		W: 125,
+		H: 20,
+	}
+	buttonAreaCenter := &sdl.Rect{
+		X: 125,
+		Y: 0,
+		W: 125,
+		H: 20,
+	}
+	bottomBarComms := make(chan imageComm)
+	actionComms := make(chan func())
 
-	iv, err := NewImageView(imageViewArea, fileName, comms, cfg)
+	iv, err := NewImageView(imageViewArea, fileName, bottomBarComms, cfg)
 	if err != nil {
 		panic(err)
 	}
-	bottomBar, err := NewBottomBar(bottomBarArea, comms, cfg)
+	bottomBar, err := NewBottomBar(bottomBarArea, bottomBarComms, cfg)
 	if err != nil {
 		panic(err)
 	}
-	// openButton, err := NewButton(buttonAreaOpen, ctx, "Open File", "NotoMono-Regular.ttf", 14, func() {
-	// 	newFileName, err := openFileDialog(ctx.Win)
-	// 	if err != nil {
-	// 		fmt.Printf("No file chosen\n")
-	// 		return
-	// 	}
-	// 	go func() {
-	// 		fileComm <- func() {
-	// 			iv.Destroy()
-	// 			if err = iv.loadFromFile(newFileName); err != nil {
-	// 				panic(err)
-	// 			}
-	// 			iv.mult = 1.0
-	// 			iv.sel = set.NewSet()
-	// 		}
-	// 	}()
-	// })
-	// centerButton, err := NewButton(buttonAreaCenter, ctx, "Center Image", "NotoMono-Regular.ttf", 14, func() {
-	// 	go func() {
-	// 		fileComm <- func() {
-	// 			iv.centerImage()
-	// 		}
-	// 	}()
-	// })
-	// centerButton.SetHighlightBackgroundColor(&sdl.Color{R: 0xFF, G: 0x00, B: 0x00, A: 0xFF})
-	// comps := []UIComponent{iv, bottomBar, openButton, centerButton}
-	comps := []UIComponent{iv, bottomBar}
+	openButton, err := NewButton(buttonAreaOpen, cfg, "Open File", func() {
+		// TODO fix spam click crash bug
+		newFileName, err := openFileDialog(win)
+		if err != nil {
+			fmt.Printf("No file chosen\n")
+			return
+		}
+		go func() {
+			actionComms <- func() {
+				if err = iv.loadFromFile(newFileName); err != nil {
+					panic(err)
+				}
+			}
+		}()
+	})
+	centerButton, err := NewButton(buttonAreaCenter, cfg, "Center Image", func() {
+		go func() {
+			actionComms <- func() {
+				iv.centerImage()
+			}
+		}()
+	})
+	centerButton.SetHighlightBackgroundColor([4]float32{1.0, 0.0, 0.0, 1.0})
+	centerButton.SetDefaultTextColor([4]float32{0.0, 0.0, 1.0, 1.0})
+
+	comps := []UIComponent{iv, bottomBar, openButton, centerButton}
+
 	var lastHover UIComponent
 	var currHover UIComponent
 	var moved bool
@@ -169,6 +169,8 @@ func main() {
 	var iterations int64
 	var imageTotalNs int64
 	var bbTotalNs int64
+	var bTotalNs int64
+
 	for running {
 		var e sdl.Event
 		for e = sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
@@ -235,16 +237,16 @@ func main() {
 		}
 
 		// handle all events in pipe
-		// hasEvents := true
-		// for hasEvents {
-		// 	select {
-		// 	case closure := <-fileComm:
-		// 		closure()
-		// 	default:
-		// 		// no more in pipe
-		// 		hasEvents = false
-		// 	}
-		// }
+		hasEvents := true
+		for hasEvents {
+			select {
+			case closure := <-actionComms:
+				closure()
+			default:
+				// no more in pipe
+				hasEvents = false
+			}
+		}
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
 		for _, comp := range comps {
@@ -258,6 +260,8 @@ func main() {
 				imageTotalNs += ns
 			case *BottomBar:
 				bbTotalNs += ns
+			case *Button:
+				bTotalNs += ns
 			}
 		}
 		iterations++
@@ -268,6 +272,8 @@ func main() {
 
 	fmt.Printf("ImageView avg: %v ns\n", float64(imageTotalNs)/float64(iterations))
 	fmt.Printf("BottomBar avg: %v ns\n", float64(bbTotalNs)/float64(iterations))
+	fmt.Printf("Button avg: %v ns\n", float64(bTotalNs)/float64(iterations))
+
 	// free UIComponent SDL assets
 	for _, comp := range comps {
 		comp.Destroy()

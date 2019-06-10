@@ -14,23 +14,22 @@ var _ UIComponent = UIComponent(&ImageView{})
 
 // ImageView defines an interactable image viewing pane
 type ImageView struct {
-	area      *sdl.Rect
-	canvas    *sdl.Rect
-	surf      *sdl.Surface
-	cfg       *config
-	mouseLoc  coord
-	mousePix  coord
-	dragPoint coord
-	dragging  bool
-	mult      float64
-	programID uint32
-	textureID uint32
-	glSquare  []float32
-	vaoID     uint32
-	vboID     uint32
-	comms     chan<- imageComm
-	fileName  string
-	fullPath  string
+	area         *sdl.Rect
+	canvas       *sdl.Rect
+	origW, origH int32
+	cfg          *config
+	mouseLoc     coord
+	mousePix     coord
+	dragPoint    coord
+	dragging     bool
+	mult         float64
+	programID    uint32
+	textureID    uint32
+	glSquare     []float32
+	vaoID, vboID uint32
+	comms        chan<- imageComm
+	fileName     string
+	fullPath     string
 }
 
 type imageComm struct {
@@ -44,7 +43,21 @@ func (iv *ImageView) loadFromFile(fileName string) error {
 	if err != nil {
 		return err
 	}
-	iv.surf = surf
+	iv.origW = surf.W
+	iv.origH = surf.H
+
+	format := int32(gl.RGBA)
+	gl.DeleteTextures(1, &iv.textureID)
+	gl.GenTextures(1, &iv.textureID)
+	gl.BindTexture(gl.TEXTURE_2D, iv.textureID)
+	// copy pixels to texture
+	gl.TexImage2D(gl.TEXTURE_2D, 0, format, surf.W, surf.H, 0, uint32(format), gl.UNSIGNED_BYTE, unsafe.Pointer(&surf.Pixels()[0]))
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+	gl.GenerateMipmap(gl.TEXTURE_2D)
+	gl.BindTexture(gl.TEXTURE_2D, 0)
+	surf.Free()
+
 	iv.canvas = &sdl.Rect{
 		X: 0,
 		Y: 0,
@@ -52,6 +65,7 @@ func (iv *ImageView) loadFromFile(fileName string) error {
 		H: surf.H,
 	}
 	iv.centerImage()
+	iv.mult = 1.0
 
 	parts := strings.Split(fileName, string(os.PathSeparator))
 	iv.fileName = parts[len(parts)-1]
@@ -66,7 +80,6 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, cfg *
 	iv.cfg = cfg
 	iv.area = area
 	iv.comms = comms
-	iv.mult = 1.0
 	if err = iv.loadFromFile(fileName); err != nil {
 		return nil, err
 	}
@@ -80,16 +93,6 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, cfg *
 	gl.Uniform2f(uniformID, float32(iv.area.W), float32(iv.area.H))
 	gl.UseProgram(0)
 
-	format := int32(gl.RGBA)
-	gl.GenTextures(1, &iv.textureID)
-	gl.BindTexture(gl.TEXTURE_2D, iv.textureID)
-	// copy pixels to texture
-	gl.TexImage2D(gl.TEXTURE_2D, 0, format, iv.surf.W, iv.surf.H, 0, uint32(format), gl.UNSIGNED_BYTE, unsafe.Pointer(&iv.surf.Pixels()[0]))
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
-	gl.GenerateMipmap(gl.TEXTURE_2D)
-	gl.BindTexture(gl.TEXTURE_2D, 0)
-
 	gl.GenBuffers(1, &iv.vboID)
 	gl.GenVertexArrays(1, &iv.vaoID)
 	configureVAO(iv.vaoID, iv.vboID, []int32{2, 2})
@@ -99,7 +102,6 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, cfg *
 
 // Destroy frees all assets acquired by the UIComponent
 func (iv *ImageView) Destroy() {
-	iv.surf.Free()
 	gl.DeleteTextures(1, &iv.textureID)
 	gl.DeleteBuffers(1, &iv.vboID)
 	gl.DeleteVertexArrays(1, &iv.vaoID)
@@ -154,16 +156,16 @@ func (iv *ImageView) Render() error {
 
 func (iv *ImageView) zoomIn() {
 	iv.mult *= 2.0
-	iv.canvas.W = int32(float64(iv.surf.W) * iv.mult)
-	iv.canvas.H = int32(float64(iv.surf.H) * iv.mult)
+	iv.canvas.W = int32(float64(iv.origW) * iv.mult)
+	iv.canvas.H = int32(float64(iv.origH) * iv.mult)
 	iv.canvas.X = 2*iv.canvas.X - int32(math.Round(float64(iv.area.W)/2.0)) //iv.mouseLoc.x
 	iv.canvas.Y = 2*iv.canvas.Y - int32(math.Round(float64(iv.area.H)/2.0)) //iv.mouseLoc.y
 }
 
 func (iv *ImageView) zoomOut() {
 	iv.mult /= 2.0
-	iv.canvas.W = int32(float64(iv.surf.W) * iv.mult)
-	iv.canvas.H = int32(float64(iv.surf.H) * iv.mult)
+	iv.canvas.W = int32(float64(iv.origW) * iv.mult)
+	iv.canvas.H = int32(float64(iv.origH) * iv.mult)
 	iv.canvas.X = int32(math.Round(float64(iv.canvas.X)/2.0 + float64(iv.area.W)/4.0)) //iv.mouseLoc.x/2
 	iv.canvas.Y = int32(math.Round(float64(iv.canvas.Y)/2.0 + float64(iv.area.H)/4.0)) //iv.mouseLoc.y/2
 }
@@ -176,6 +178,12 @@ func (iv *ImageView) centerImage() {
 func (iv *ImageView) setPixel(x, y int32, color []byte) {
 	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 4)
 	gl.TextureSubImage2D(iv.textureID, 0, x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, unsafe.Pointer(&color[0]))
+	// TODO update mipmap textures only when needed
+	gl.BindTexture(gl.TEXTURE_2D, iv.textureID)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+	gl.GenerateMipmap(gl.TEXTURE_2D)
+	gl.BindTexture(gl.TEXTURE_2D, 0)
 }
 
 func (iv *ImageView) updateMousePos(x, y int32) {
@@ -219,11 +227,11 @@ func (iv *ImageView) OnScroll(evt *sdl.MouseWheelEvent) bool {
 		return true
 	}
 	if evt.Y > 0 {
-		if int32(iv.mult*float64(iv.surf.W)*2.0) > iv.canvas.W && int32(iv.mult*float64(iv.surf.H)*2.0) > iv.canvas.H && iv.mult < 256 {
+		if int32(iv.mult*float64(iv.origW)*2.0) > iv.canvas.W && int32(iv.mult*float64(iv.origH)*2.0) > iv.canvas.H && iv.mult < 256 {
 			iv.zoomIn()
 		}
 	} else if evt.Y < 0 {
-		if int32(iv.mult*float64(iv.surf.W)/2.0) > 0 && int32(iv.mult*float64(iv.surf.H)/2.0) > 0 {
+		if int32(iv.mult*float64(iv.origW)/2.0) > 0 && int32(iv.mult*float64(iv.origH)/2.0) > 0 {
 			iv.zoomOut()
 		}
 	}
