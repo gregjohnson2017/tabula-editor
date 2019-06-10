@@ -127,7 +127,7 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, cfg *
 		return nil, err
 	}
 
-	if iv.programID, err = CreateShaderProgram(vertexShaderSource, fragmentShaderSource); err != nil {
+	if iv.programID, err = CreateShaderProgram(vertexShaderSource, checkerShaderFragment); err != nil {
 		return nil, err
 	}
 

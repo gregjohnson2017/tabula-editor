@@ -446,6 +446,23 @@ const (
 		frag_color = vec4(1.0, 1.0, 1.0, texture(frag_tex, tex_coords).r);
 	}
 ` + "\x00"
+
+	checkerShaderFragment = `
+	#version 460
+	uniform sampler2D frag_tex;
+	in vec2 tex_coords;
+	out vec4 frag_color;
+	void main() {
+		float scale = 8.0;
+		float mx = floor(mod(gl_FragCoord.x / scale, 2.0f));
+		float my = floor(mod(gl_FragCoord.y / scale, 2.0f));
+		float m = mx == my ? 1 : 0;
+		float col = 0.3;
+		vec4 checker = vec4(1.0, 1.0, 1.0, 1.0) - vec4(col, col, col, 0.0) * m;
+		vec4 tex = texture(frag_tex, tex_coords);
+		frag_color = mix(checker, tex, tex.a);
+	}
+` + "\x00"
 )
 
 func compileShader(source string, shaderType uint32) (uint32, error) {
