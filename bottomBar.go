@@ -24,18 +24,14 @@ type BottomBar struct {
 	backVboID     uint32
 	textVaoID     uint32
 	textVboID     uint32
-	uniColorID    int32
-	uniScrSizeID  int32
 	fontTexID     uint32
 	runeMap       []runeInfo
 	cfg           *config
 }
 
 // NewBottomBar returns a pointer to a new BottomBar struct that implements UIComponent
-// the background color defaults to grey (0x808080FF)
+// the background color defaults to grey (0x808080FF) and the text white
 func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, cfg *config) (*BottomBar, error) {
-	var m float32 = 255.0
-	color := [4]float32{128.0 / m, 128.0 / m, 128.0 / m, 1.0}
 	var err error
 	var backProgramID uint32
 	if backProgramID, err = CreateShaderProgram(solidColorVertex, solidColorFragment); err != nil {
@@ -52,12 +48,17 @@ func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, cfg *config) (*BottomB
 		return nil, err
 	}
 
-	uniColorID := gl.GetUniformLocation(backProgramID, &[]byte("uni_color\x00")[0])
+	barColor := [4]float32{0.5, 0.5, 0.5, 1.0}
+	textColor := [4]float32{1.0, 1.0, 1.0, 1.0}
+
+	barColorID := gl.GetUniformLocation(backProgramID, &[]byte("uni_color\x00")[0])
 	gl.UseProgram(backProgramID)
-	gl.Uniform4f(uniColorID, color[0], color[1], color[2], color[3])
+	gl.Uniform4f(barColorID, barColor[0], barColor[1], barColor[2], barColor[3])
 
 	uniScrSizeID := gl.GetUniformLocation(textProgramID, &[]byte("screen_size\x00")[0])
 	texSizeID := gl.GetUniformLocation(textProgramID, &[]byte("tex_size\x00")[0])
+	textColorID := gl.GetUniformLocation(textProgramID, &[]byte("text_color\x00")[0])
+
 	var texSheetWidth, texSheetHeight int32
 	gl.BindTexture(gl.TEXTURE_2D, fontTexID)
 	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_WIDTH, &texSheetWidth)
@@ -66,6 +67,7 @@ func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, cfg *config) (*BottomB
 	gl.UseProgram(textProgramID)
 	gl.Uniform2f(texSizeID, float32(texSheetWidth), float32(texSheetHeight))
 	gl.Uniform2f(uniScrSizeID, float32(cfg.screenWidth), float32(cfg.screenHeight))
+	gl.Uniform4f(textColorID, textColor[0], textColor[1], textColor[2], textColor[3])
 
 	glSquare := []float32{
 		-1.0, -1.0, // bottom-left
@@ -94,7 +96,6 @@ func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, cfg *config) (*BottomB
 	return &BottomBar{
 		area:          area,
 		comms:         comms,
-		color:         color,
 		backProgramID: backProgramID,
 		textProgramID: textProgramID,
 		backVaoID:     backVaoID,
@@ -103,18 +104,24 @@ func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, cfg *config) (*BottomB
 		textVboID:     textVboID,
 		fontTexID:     fontTexID,
 		runeMap:       runeMap,
-		uniColorID:    uniColorID,
-		uniScrSizeID:  uniScrSizeID,
 		cfg:           cfg,
 	}, nil
 }
 
 // SetBackgroundColor sets the color for the bottom bar's background texture
-func (bb *BottomBar) SetBackgroundColor(color *sdl.Color) error {
+func (bb *BottomBar) SetBackgroundColor(color []float32) {
+	uniformID := gl.GetUniformLocation(bb.backProgramID, &[]byte("uni_color\x00")[0])
 	gl.UseProgram(bb.backProgramID)
-	gl.Uniform4f(bb.uniColorID, float32(color.R), float32(color.G), float32(color.B), float32(color.A))
+	gl.Uniform4f(uniformID, float32(color[0]), float32(color[1]), float32(color[2]), float32(color[3]))
 	gl.UseProgram(0)
-	return nil
+}
+
+// SetTextColor sets the color for the bottom bar's text elements
+func (bb *BottomBar) SetTextColor(color []float32) {
+	uniformID := gl.GetUniformLocation(bb.textProgramID, &[]byte("text_color\x00")[0])
+	gl.UseProgram(bb.textProgramID)
+	gl.Uniform4f(uniformID, float32(color[0]), float32(color[1]), float32(color[2]), float32(color[3]))
+	gl.UseProgram(0)
 }
 
 // Destroy frees all assets obtained by the UIComponent
@@ -202,8 +209,9 @@ func (bb *BottomBar) OnResize(x, y int32) {
 	bb.area.W += x
 	bb.area.Y += y
 
+	uniformID := gl.GetUniformLocation(bb.textProgramID, &[]byte("screen_size\x00")[0])
 	gl.UseProgram(bb.textProgramID)
-	gl.Uniform2f(bb.uniScrSizeID, float32(bb.cfg.screenWidth), float32(bb.cfg.screenHeight))
+	gl.Uniform2f(uniformID, float32(bb.cfg.screenWidth), float32(bb.cfg.screenHeight))
 	gl.UseProgram(0)
 }
 

@@ -188,14 +188,13 @@ func mapString(str string, runeMap []runeInfo, pos coord, align Align) []float32
 		texBR := pointF32{texTR.x, texBL.y}
 		// create 2 triangles
 		triangles := []float32{
-			// TODO do something better... please
-			float32(math.Ceil(float64(posBL.x))), float32(math.Ceil(float64(posBL.y))), texBL.x, texBL.y, // bottom-left
-			float32(math.Ceil(float64(posTL.x))), float32(math.Ceil(float64(posTL.y))), texTL.x, texTL.y, // top-left
-			float32(math.Ceil(float64(posTR.x))), float32(math.Ceil(float64(posTR.y))), texTR.x, texTR.y, // top-right
+			posBL.x, posBL.y, texBL.x, texBL.y, // bottom-left
+			posTL.x, posTL.y, texTL.x, texTL.y, // top-left
+			posTR.x, posTR.y, texTR.x, texTR.y, // top-right
 
-			float32(math.Ceil(float64(posBL.x))), float32(math.Ceil(float64(posBL.y))), texBL.x, texBL.y, // bottom-left
-			float32(math.Ceil(float64(posTR.x))), float32(math.Ceil(float64(posTR.y))), texTR.x, texTR.y, // top-right
-			float32(math.Ceil(float64(posBR.x))), float32(math.Ceil(float64(posBR.y))), texBR.x, texBR.y, // bottom-right
+			posBL.x, posBL.y, texBL.x, texBL.y, // bottom-left
+			posTR.x, posTR.y, texTR.x, texTR.y, // top-right
+			posBR.x, posBR.y, texBR.x, texBR.y, // bottom-right
 		}
 		buffer = append(buffer, triangles...)
 
@@ -440,10 +439,11 @@ const (
 	glyphShaderFragment = `
 	#version 460
 	uniform sampler2D frag_tex;
+	uniform vec4 text_color;
 	in vec2 tex_coords;
 	out vec4 frag_color;
 	void main() {
-		frag_color = vec4(1.0, 1.0, 1.0, texture(frag_tex, tex_coords).r);
+		frag_color = vec4(text_color.xyz, texture(frag_tex, tex_coords).r * text_color.w);
 	}
 ` + "\x00"
 
@@ -453,12 +453,12 @@ const (
 	in vec2 tex_coords;
 	out vec4 frag_color;
 	void main() {
-		float scale = 8.0;
-		float mx = floor(mod(gl_FragCoord.x / scale, 2.0f));
-		float my = floor(mod(gl_FragCoord.y / scale, 2.0f));
-		float m = mx == my ? 1 : 0;
-		float col = 0.3;
-		vec4 checker = vec4(1.0, 1.0, 1.0, 1.0) - vec4(col, col, col, 0.0) * m;
+		float scale = 10.0;
+		float mx = floor(mod(gl_FragCoord.x / scale, 2.0));
+		float my = floor(mod(gl_FragCoord.y / scale, 2.0));
+		vec4 col1 = vec4(1.0, 1.0, 1.0, 1.0);
+		vec4 col2 = vec4(0.7, 0.7, 0.7, 1.0);
+		vec4 checker = mx == my ? col1 : col2;
 		vec4 tex = texture(frag_tex, tex_coords);
 		frag_color = mix(checker, tex, tex.a);
 	}

@@ -26,7 +26,6 @@ type ImageView struct {
 	vaoID     uint32
 	vboID     uint32
 	textureID uint32
-	uniAreaID int32
 
 	// sel       set.Set
 	surf *sdl.Surface
@@ -131,9 +130,9 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, cfg *
 		return nil, err
 	}
 
-	iv.uniAreaID = gl.GetUniformLocation(iv.programID, &[]byte("area\x00")[0])
+	uniformID := gl.GetUniformLocation(iv.programID, &[]byte("area\x00")[0])
 	gl.UseProgram(iv.programID)
-	gl.Uniform2f(iv.uniAreaID, float32(iv.area.W), float32(iv.area.H))
+	gl.Uniform2f(uniformID, float32(iv.area.W), float32(iv.area.H))
 	gl.UseProgram(0)
 
 	format := int32(gl.RGBA)
@@ -335,9 +334,11 @@ func (iv *ImageView) OnResize(x, y int32) {
 	iv.area.W += x
 	iv.area.H += y
 
+	uniformID := gl.GetUniformLocation(iv.programID, &[]byte("area\x00")[0])
 	gl.UseProgram(iv.programID)
-	gl.Uniform2f(iv.uniAreaID, float32(iv.area.W), float32(iv.area.H))
+	gl.Uniform2f(uniformID, float32(iv.area.W), float32(iv.area.H))
 	gl.UseProgram(0)
+
 	iv.centerImage()
 }
 

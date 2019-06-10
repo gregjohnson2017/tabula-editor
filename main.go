@@ -161,7 +161,7 @@ func main() {
 	// })
 	// centerButton.SetHighlightBackgroundColor(&sdl.Color{R: 0xFF, G: 0x00, B: 0x00, A: 0xFF})
 	// comps := []UIComponent{iv, bottomBar, openButton, centerButton}
-	comps := []UIComponent{iv, bottomBar} // TODO: empty for OpenGL testing
+	comps := []UIComponent{iv, bottomBar}
 	var lastHover UIComponent
 	var currHover UIComponent
 	var moved bool
