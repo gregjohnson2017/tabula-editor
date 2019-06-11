@@ -5,6 +5,11 @@ import (
 	"time"
 )
 
+// Constants for menu bar buttons
+const (
+	MenuExit = iota
+)
+
 type stopWatch struct {
 	t time.Time
 }

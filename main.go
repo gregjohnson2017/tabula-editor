@@ -43,6 +43,7 @@ func initWindow(title string, width, height int32) (*sdl.Window, error) {
 	sdl.GLSetAttribute(sdl.GL_CONTEXT_MINOR_VERSION, 6)
 	sdl.GLSetAttribute(sdl.GL_DOUBLEBUFFER, 1)
 	sdl.GLSetAttribute(sdl.GL_CONTEXT_PROFILE_MASK, sdl.GL_CONTEXT_PROFILE_CORE)
+	sdl.EventState(sdl.SYSWMEVENT, sdl.ENABLE)
 
 	var window *sdl.Window
 	if window, err = sdl.CreateWindow(title, sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, width, height, sdl.WINDOW_HIDDEN|sdl.WINDOW_OPENGL); err != nil {
@@ -90,6 +91,9 @@ func main() {
 			fmt.Printf("%v\n", err)
 			os.Exit(1)
 		}
+	}
+	if err = setupMenuBar(win); err != nil {
+		panic(err)
 	}
 
 	win.Show()
@@ -233,6 +237,8 @@ func main() {
 						comp.OnResize(diffx, diffy)
 					}
 				}
+			case *sdl.SysWMEvent:
+				// TODO https://github.com/veandco/go-sdl2/issues/410
 			}
 		}
 
