@@ -9,6 +9,6 @@ require (
 	github.com/kroppt/IntSet v0.0.0-20190419004518-ef69714198d7
 	github.com/kroppt/winfileask v0.0.0-20190604203301-8c2224e10487
 	github.com/kroppt/winmenu v0.0.0-20190611010410-1381bdf9f5a5
-	github.com/veandco/go-sdl2 v0.3.1-0.20180618054924-09947465530a
+	github.com/veandco/go-sdl2 v0.3.1-0.20190611114228-24851c1f2d98
 	golang.org/x/image v0.0.0-20190523035834-f03afa92d3ff
 )

@@ -49,7 +49,7 @@ func setupMenuBar(win *sdl.Window) error {
 		if ok = mii.SetAsString("Exit"); !ok {
 			return fmt.Errorf("could not set exit menu item as string")
 		}
-		mii.SetID(MenuExit)
+		mii.SetID(uint32(MenuExit))
 		if ok = hfile.InsertMenuItem(0, false, mii); !ok {
 			return fmt.Errorf("could not insert exit menu item")
 		}
@@ -68,4 +68,17 @@ func setupMenuBar(win *sdl.Window) error {
 		return fmt.Errorf("could not set current window's menu")
 	}
 	return nil
+}
+
+func getMenuAction(evt *sdl.SysWMEvent) MenuAction {
+	const WmCommand = 0x0111
+	winmsg := evt.Msg.Windows()
+	if winmsg.Msg != WmCommand {
+		return MenuNone
+	}
+	switch MenuAction(winmsg.WParam) {
+	case MenuExit:
+		return MenuExit
+	}
+	return MenuNone
 }

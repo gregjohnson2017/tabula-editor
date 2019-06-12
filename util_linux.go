@@ -17,6 +17,11 @@ func openFileDialog(win *sdl.Window) (string, error) {
 }
 
 func setupMenuBar(win *sdl.Window) error {
-	fmt.Fprintf(os.Stderr, "setupMenuBar not implemented")
+	fmt.Fprintln(os.Stderr, "setupMenuBar not implemented")
 	return nil
+}
+
+func getMenuAction(evt *sdl.SysWMEvent) MenuAction {
+	fmt.Fprintln(os.Stderr, "handleWMEvent not implemented")
+	return MenuNone
 }

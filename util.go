@@ -5,9 +5,14 @@ import (
 	"time"
 )
 
-// Constants for menu bar buttons
+// MenuAction is an identifier for the event handling to know which menu button
+// has been pressed.
+type MenuAction uint32
+
+// Constants for all possible menu actions.
 const (
-	MenuExit = iota
+	MenuNone MenuAction = iota
+	MenuExit
 )
 
 type stopWatch struct {

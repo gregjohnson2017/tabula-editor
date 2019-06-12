@@ -238,7 +238,12 @@ func main() {
 					}
 				}
 			case *sdl.SysWMEvent:
-				// TODO https://github.com/veandco/go-sdl2/issues/410
+				var ma MenuAction
+				ma = getMenuAction(evt)
+				switch ma {
+				case MenuExit:
+					running = false
+				}
 			}
 		}
 
