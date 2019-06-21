@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/gotk3/gotk3/gdk"
+	"github.com/gotk3/gotk3/gtk"
+
 	"github.com/go-gl/gl/v2.1/gl"
-	"github.com/veandco/go-sdl2/gfx"
+
 	"github.com/veandco/go-sdl2/img"
-	"github.com/veandco/go-sdl2/sdl"
-	"github.com/veandco/go-sdl2/ttf"
 )
 
 type config struct {
@@ -17,282 +18,175 @@ type config struct {
 	bottomBarHeight int32
 }
 
-func inBounds(area *sdl.Rect, x int32, y int32) bool {
+func inBounds(area *Rect, x int32, y int32) bool {
 	if x < area.X || x >= area.X+area.W || y < area.Y || y >= area.Y+area.H {
 		return false
 	}
 	return true
 }
 
-func initWindow(title string, width, height int32) (*sdl.Window, error) {
-	if sdl.SetHint(sdl.HINT_RENDER_DRIVER, "opengl") != true {
-		return nil, fmt.Errorf("failed to set opengl render driver hint")
-	}
-	var err error
-	if err = sdl.Init(sdl.INIT_VIDEO | sdl.INIT_EVENTS); err != nil {
-		return nil, err
-	}
+func initLibs() error {
+	gtk.Init(nil)
 	// other libraries
-	if img.Init(img.INIT_PNG) != img.INIT_PNG {
-		return nil, fmt.Errorf("could not initialize PNG")
-	}
-	if err = ttf.Init(); err != nil {
-		return nil, err
-	}
-	sdl.GLSetAttribute(sdl.GL_CONTEXT_MAJOR_VERSION, 4)
-	sdl.GLSetAttribute(sdl.GL_CONTEXT_MINOR_VERSION, 6)
-	sdl.GLSetAttribute(sdl.GL_DOUBLEBUFFER, 1)
-	sdl.GLSetAttribute(sdl.GL_CONTEXT_PROFILE_MASK, sdl.GL_CONTEXT_PROFILE_CORE)
-	sdl.EventState(sdl.SYSWMEVENT, sdl.ENABLE)
-
-	var window *sdl.Window
-	if window, err = sdl.CreateWindow(title, sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, width, height, sdl.WINDOW_HIDDEN|sdl.WINDOW_OPENGL); err != nil {
-		return nil, err
-	}
-	window.SetResizable(true)
-	// creates context AND makes current
-	if _, err = window.GLCreateContext(); err != nil {
-		return nil, err
-	}
-	if err = sdl.GLSetSwapInterval(1); err != nil {
-		return nil, err
+	if img.Init(img.INIT_PNG) != img.INIT_PNG { // TODO is there a gtk library for this?
+		return fmt.Errorf("could not initialize PNG")
 	}
 
-	// INIT OPENGL
-	if err = gl.Init(); err != nil {
-		return nil, err
-	}
-	gl.ClearColor(1.0, 1.0, 1.0, 1.0)
-	gl.Enable(gl.MULTISAMPLE)
-	gl.Enable(gl.BLEND)
-	// enable anti-aliasing
-	// gl.Enable(gl.LINE_SMOOTH)
-	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
-	gl.Hint(gl.LINE_SMOOTH_HINT, gl.NICEST)
+	return nil
+}
 
-	// version := gl.GoStr(gl.GetString(gl.VERSION))
-	// log.Println("OpenGL version", version)
-	return window, nil
+func errCheck(err error) {
+	if err != nil {
+		panic(err)
+	}
 }
 
 func main() {
-	cfg := &config{screenWidth: 960, screenHeight: 720, bottomBarHeight: 30}
 	var err error
-	var win *sdl.Window
-	if win, err = initWindow("Tabula Editor", cfg.screenWidth, cfg.screenHeight); err != nil {
-		panic(err)
-	}
+	errCheck(initLibs())
 
-	var fileName string
+	builder, err := gtk.BuilderNewFromFile("layout.ui")
+	errCheck(err)
+	winObj, err := builder.GetObject("main_window")
+	errCheck(err)
+	win, ok := winObj.(*gtk.Window)
+	if !ok {
+		panic(fmt.Errorf("obj is not a window"))
+	}
+	running := true
+	win.Connect("destroy", func() {
+		running = false
+	})
+	winWidth, winHeight := win.GetSize()
+	win.AddEvents(int(gdk.SCROLL_MASK | gdk.POINTER_MOTION_MASK | gdk.BUTTON_PRESS_MASK | gdk.BUTTON_RELEASE_MASK))
+
+	glareaObj, err := builder.GetObject("gl_drawing_area")
+	errCheck(err)
+	glarea, ok := glareaObj.(*gtk.GLArea)
+	if !ok {
+		panic(fmt.Errorf("obj is not a glarea"))
+	}
+	glarea.SetRequiredVersion(4, 6)
+
+	fileName := "happyhug.png"
 	if len(os.Args) == 2 {
 		fileName = os.Args[1]
-	} else {
-		if fileName, err = openFileDialog(win); err != nil {
-			fmt.Printf("%v\n", err)
-			os.Exit(1)
-		}
-	}
-	if err = setupMenuBar(win); err != nil {
-		panic(err)
 	}
 
-	win.Show()
-
-	var framerate = &gfx.FPSmanager{}
-	gfx.InitFramerate(framerate)
-	if gfx.SetFramerate(framerate, 144) != true {
-		panic(fmt.Errorf("could not set framerate: %v", sdl.GetError()))
+	bottomBarHeight := int32(30)
+	imageViewArea := &Rect{
+		X: 0,
+		Y: bottomBarHeight,
+		W: int32(winWidth),
+		H: int32(winHeight) - bottomBarHeight,
 	}
-
-	imageViewArea := &sdl.Rect{
+	bottomBarArea := &Rect{
 		X: 0,
 		Y: 0,
-		W: cfg.screenWidth,
-		H: cfg.screenHeight - cfg.bottomBarHeight,
-	}
-	bottomBarArea := &sdl.Rect{
-		X: 0,
-		Y: cfg.screenHeight - cfg.bottomBarHeight,
-		W: cfg.screenWidth,
-		H: cfg.bottomBarHeight,
-	}
-	buttonAreaOpen := &sdl.Rect{
-		X: 0,
-		Y: 0,
-		W: 125,
-		H: 20,
-	}
-	buttonAreaCenter := &sdl.Rect{
-		X: 125,
-		Y: 0,
-		W: 125,
-		H: 20,
+		W: int32(winWidth),
+		H: bottomBarHeight,
 	}
 	bottomBarComms := make(chan imageComm)
-	actionComms := make(chan func())
-
-	iv, err := NewImageView(imageViewArea, fileName, bottomBarComms, cfg)
-	if err != nil {
-		panic(err)
+	cfg := &config{int32(winWidth), int32(winHeight), bottomBarHeight}
+	var iv *ImageView
+	var bb *BottomBar
+	var comps []UIComponent
+	realize := func(glarea *gtk.GLArea) {
+		glarea.MakeCurrent()
+		// INIT OPENGL
+		errCheck(gl.Init())
+		gl.ClearColor(1.0, 1.0, 1.0, 1.0)
+		gl.Enable(gl.MULTISAMPLE)
+		gl.Enable(gl.BLEND)
+		gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+		gl.Hint(gl.LINE_SMOOTH_HINT, gl.NICEST)
+		// version := gl.GoStr(gl.GetString(gl.VERSION))
+		// fmt.Printf("OpenGL version %s\n", version)
+		var err error
+		iv, err = NewImageView(imageViewArea, fileName, bottomBarComms, cfg)
+		errCheck(err)
+		bb, err = NewBottomBar(bottomBarArea, bottomBarComms, cfg)
+		errCheck(err)
+		comps = append(comps, iv, bb)
 	}
-	bottomBar, err := NewBottomBar(bottomBarArea, bottomBarComms, cfg)
-	if err != nil {
-		panic(err)
-	}
-	openButton, err := NewButton(buttonAreaOpen, cfg, "Open File", func() {
-		// TODO fix spam click crash bug
-		newFileName, err := openFileDialog(win)
-		if err != nil {
-			fmt.Printf("No file chosen\n")
-			return
-		}
-		go func() {
-			actionComms <- func() {
-				if err = iv.loadFromFile(newFileName); err != nil {
-					panic(err)
-				}
-			}
-		}()
-	})
-	centerButton, err := NewButton(buttonAreaCenter, cfg, "Center Image", func() {
-		go func() {
-			actionComms <- func() {
-				iv.centerImage()
-			}
-		}()
-	})
-	centerButton.SetHighlightBackgroundColor([4]float32{1.0, 0.0, 0.0, 1.0})
-	centerButton.SetDefaultTextColor([4]float32{0.0, 0.0, 1.0, 1.0})
 
-	comps := []UIComponent{iv, bottomBar, openButton, centerButton}
-
-	var lastHover UIComponent
-	var currHover UIComponent
-	var moved bool
-	running := true
 	var iterations int64
 	var imageTotalNs int64
 	var bbTotalNs int64
-	var bTotalNs int64
+	signals := map[string]interface{}{
+		"init": realize,
+		"draw": func(glarea *gtk.GLArea) bool {
+			gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+			for _, comp := range comps {
+				sw := start()
+				errCheck(comp.Render())
+				ns := sw.stopGetNano()
+				switch comp.(type) {
+				case *ImageView:
+					imageTotalNs += ns
+				case *BottomBar:
+					bbTotalNs += ns
+				}
+			}
+			iterations++
+			return true
+		},
+		"quit": func(glarea *gtk.GLArea) {
+			for _, comp := range comps {
+				comp.Destroy()
+			}
+		},
+		"window_resize": func(glarea *gtk.GLArea, width, height int) {
+			diffx := int32(width - winWidth)
+			diffy := int32(height - winHeight)
+			winWidth = width
+			winHeight = height
+			for _, comp := range comps {
+				comp.OnResize(diffx, diffy)
+			}
+			glarea.QueueRender()
+		},
+		"mouse_motion": func(win *gtk.Window, evt *gdk.Event) bool {
+			motionEvt := &gdk.EventMotion{Event: evt}
+			x, y := motionEvt.MotionVal()
+			for _, comp := range comps {
+				comp.OnMotion(int32(x), int32(y), motionEvt.State())
+			}
+			glarea.QueueRender()
+			return true
+		},
+		"mouse_click": func(win *gtk.Window, evt *gdk.Event) bool {
+			clickEvt := &gdk.EventButton{Event: evt}
+			x, y := clickEvt.MotionVal()
+			for _, comp := range comps {
+				comp.OnClick(int32(x), int32(y), clickEvt)
+			}
+			glarea.QueueRender()
+			return true
+		},
+		"mouse_scroll": func(win *gtk.Window, evt *gdk.Event) bool {
+			scrollEvt := &gdk.EventScroll{Event: evt}
+			for _, comp := range comps {
+				comp.OnScroll(int32(scrollEvt.DeltaY()))
+			}
+			glarea.QueueRender()
+			return true
+		},
+	}
+	builder.ConnectSignals(signals)
 
+	win.ShowAll()
 	for running {
-		var e sdl.Event
-		for e = sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
-			switch evt := e.(type) {
-			case *sdl.QuitEvent:
-				running = false
-			case *sdl.MouseButtonEvent:
-				for i := range comps {
-					comp := comps[len(comps)-i-1]
-					if inBounds(comp.GetBoundary(), evt.X, evt.Y) {
-						comp.OnClick(evt)
-						break
-					}
-				}
-			case *sdl.MouseMotionEvent:
-				// search top down through components until exhausted or one absorbs the event
-				for i := range comps {
-					comp := comps[len(comps)-i-1]
-					if inBounds(comp.GetBoundary(), evt.X, evt.Y) {
-						if currHover != comp {
-							// entered a new component
-							comp.OnEnter()
-							lastHover = currHover
-							currHover = comp
-							moved = true
-						}
-						if comp.OnMotion(evt) {
-							break
-						}
-					}
-				}
-				if lastHover != nil && moved {
-					lastHover.OnLeave()
-					moved = false
-				}
-			case *sdl.MouseWheelEvent:
-				for i := range comps {
-					comp := comps[len(comps)-i-1]
-					x, y, _ := sdl.GetMouseState()
-					if inBounds(comp.GetBoundary(), x, y) {
-						if comp.OnScroll(evt) {
-							break
-						}
-					}
-				}
-			case *sdl.WindowEvent:
-				if evt.Event == sdl.WINDOWEVENT_LEAVE || evt.Event == sdl.WINDOWEVENT_FOCUS_LOST || evt.Event == sdl.WINDOWEVENT_MINIMIZED {
-					if currHover != nil {
-						currHover.OnLeave()
-						lastHover = currHover
-						currHover = nil
-						moved = false
-					}
-				} else if evt.Event == sdl.WINDOWEVENT_RESIZED {
-					diffx := evt.Data1 - cfg.screenWidth
-					diffy := evt.Data2 - cfg.screenHeight
-					cfg.screenWidth = evt.Data1
-					cfg.screenHeight = evt.Data2
-					for _, comp := range comps {
-						comp.OnResize(diffx, diffy)
-					}
-				}
-			case *sdl.SysWMEvent:
-				var ma MenuAction
-				ma = getMenuAction(evt)
-				switch ma {
-				case MenuExit:
-					running = false
-				}
-			}
-		}
-
-		// handle all events in pipe
-		hasEvents := true
-		for hasEvents {
-			select {
-			case closure := <-actionComms:
-				closure()
-			default:
-				// no more in pipe
-				hasEvents = false
-			}
-		}
-		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
-
-		for _, comp := range comps {
-			sw := start()
-			if err = comp.Render(); err != nil {
-				panic(err)
-			}
-			ns := sw.stopGetNano()
-			switch comp.(type) {
-			case *ImageView:
-				imageTotalNs += ns
-			case *BottomBar:
-				bbTotalNs += ns
-			case *Button:
-				bTotalNs += ns
-			}
-		}
-		iterations++
-
-		win.GLSwap()
-		gfx.FramerateDelay(framerate)
+		gtk.MainIterationDo(false) // do not block
 	}
 
-	fmt.Printf("ImageView avg: %v ns\n", float64(imageTotalNs)/float64(iterations))
-	fmt.Printf("BottomBar avg: %v ns\n", float64(bbTotalNs)/float64(iterations))
-	fmt.Printf("Button avg: %v ns\n", float64(bTotalNs)/float64(iterations))
+	// print statistics
+	fmt.Printf("Average render times:\n")
+	fmt.Printf("ImageView: %v ns\n", float64(imageTotalNs)/float64(iterations))
+	fmt.Printf("BottomBar: %v ns\n", float64(bbTotalNs)/float64(iterations))
 
-	// free UIComponent SDL assets
-	for _, comp := range comps {
-		comp.Destroy()
-	}
-
-	gl.UseProgram(0)
+	// cleanup
+	glarea.Destroy()
 	win.Destroy()
-	sdl.Quit()
 	img.Quit()
-	ttf.Quit()
 }

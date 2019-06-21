@@ -7,15 +7,15 @@ import (
 	"unsafe"
 
 	"github.com/go-gl/gl/v2.1/gl"
-	"github.com/veandco/go-sdl2/sdl"
+	"github.com/gotk3/gotk3/gdk"
 )
 
 var _ UIComponent = UIComponent(&ImageView{})
 
 // ImageView defines an interactable image viewing pane
 type ImageView struct {
-	area         *sdl.Rect
-	canvas       *sdl.Rect
+	area         *Rect
+	canvas       *Rect
 	origW, origH int32
 	cfg          *config
 	mouseLoc     coord
@@ -58,7 +58,7 @@ func (iv *ImageView) loadFromFile(fileName string) error {
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 	surf.Free()
 
-	iv.canvas = &sdl.Rect{
+	iv.canvas = &Rect{
 		X: 0,
 		Y: 0,
 		W: surf.W,
@@ -74,7 +74,7 @@ func (iv *ImageView) loadFromFile(fileName string) error {
 }
 
 // NewImageView returns a pointer to a new ImageView struct that implements UIComponent
-func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, cfg *config) (*ImageView, error) {
+func NewImageView(area *Rect, fileName string, comms chan<- imageComm, cfg *config) (*ImageView, error) {
 	var err error
 	var iv = &ImageView{}
 	iv.cfg = cfg
@@ -108,7 +108,7 @@ func (iv *ImageView) Destroy() {
 }
 
 // GetBoundary returns the clickable region of the UIComponent
-func (iv *ImageView) GetBoundary() *sdl.Rect {
+func (iv *ImageView) GetBoundary() *Rect {
 	return iv.area
 }
 
@@ -137,7 +137,7 @@ func (iv *ImageView) Render() error {
 	gl.BufferData(gl.ARRAY_BUFFER, 4*len(triangles), gl.Ptr(&triangles[0]), gl.STATIC_DRAW)
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 
-	gl.Viewport(iv.area.X, iv.area.Y+iv.cfg.bottomBarHeight, iv.area.W, iv.area.H)
+	gl.Viewport(iv.area.X, iv.area.Y, iv.area.W, iv.area.H)
 	gl.UseProgram(iv.programID)
 
 	gl.BindVertexArray(iv.vaoID)
@@ -202,35 +202,35 @@ func (iv *ImageView) OnLeave() {
 }
 
 // OnMotion is called when the cursor moves within the UIComponent's region
-func (iv *ImageView) OnMotion(evt *sdl.MouseMotionEvent) bool {
+func (iv *ImageView) OnMotion(x int32, y int32, state gdk.ModifierType) bool {
 	if !iv.dragging {
-		iv.updateMousePos(evt.X, evt.Y)
+		iv.updateMousePos(x, y)
 	}
-	if !iv.dragging && !inBounds(iv.canvas, evt.X, evt.Y) {
+	if !iv.dragging && !inBounds(iv.canvas, x, y) {
 		return false
 	}
-	if evt.State == sdl.ButtonRMask() && iv.dragging {
-		iv.canvas.X += evt.X - iv.dragPoint.x
-		iv.canvas.Y += evt.Y - iv.dragPoint.y
-		iv.dragPoint.x = evt.X
-		iv.dragPoint.y = evt.Y
+	if state&gdk.GDK_BUTTON3_MASK == gdk.GDK_BUTTON3_MASK && iv.dragging {
+		iv.canvas.X += x - iv.dragPoint.x
+		iv.canvas.Y += y - iv.dragPoint.y
+		iv.dragPoint.x = x
+		iv.dragPoint.y = y
 	}
-	if evt.State == sdl.ButtonLMask() && inBounds(iv.canvas, evt.X, evt.Y) {
+	if state&gdk.GDK_BUTTON1_MASK == gdk.GDK_BUTTON1_MASK && inBounds(iv.canvas, x, y) {
 		iv.setPixel(iv.mousePix.x, iv.mousePix.y, []byte{0x00, 0x00, 0x00, 0x00})
 	}
 	return true
 }
 
 // OnScroll is called when the user scrolls within the UIComponent's region
-func (iv *ImageView) OnScroll(evt *sdl.MouseWheelEvent) bool {
+func (iv *ImageView) OnScroll(dY int32) bool {
 	if iv.dragging {
 		return true
 	}
-	if evt.Y > 0 {
+	if dY < 0 {
 		if int32(iv.mult*float64(iv.origW)*2.0) > iv.canvas.W && int32(iv.mult*float64(iv.origH)*2.0) > iv.canvas.H && iv.mult < 256 {
 			iv.zoomIn()
 		}
-	} else if evt.Y < 0 {
+	} else if dY > 0 {
 		if int32(iv.mult*float64(iv.origW)/2.0) > 0 && int32(iv.mult*float64(iv.origH)/2.0) > 0 {
 			iv.zoomOut()
 		}
@@ -239,21 +239,21 @@ func (iv *ImageView) OnScroll(evt *sdl.MouseWheelEvent) bool {
 }
 
 // OnClick is called when the user clicks within the UIComponent's region
-func (iv *ImageView) OnClick(evt *sdl.MouseButtonEvent) bool {
-	iv.updateMousePos(evt.X, evt.Y)
-	if !inBounds(iv.canvas, evt.X, evt.Y) {
+func (iv *ImageView) OnClick(x int32, y int32, evt *gdk.EventButton) bool {
+	iv.updateMousePos(x, y)
+	if !inBounds(iv.canvas, x, y) {
 		return true
 	}
-	if evt.Button == sdl.BUTTON_RIGHT {
-		if evt.State == sdl.PRESSED {
+	if evt.Button() == 3 {
+		if evt.Type() == gdk.EVENT_BUTTON_PRESS {
 			iv.dragging = true
-		} else if evt.State == sdl.RELEASED {
+		} else if evt.Type() == gdk.EVENT_BUTTON_RELEASE {
 			iv.dragging = false
 		}
-		iv.dragPoint.x = evt.X
-		iv.dragPoint.y = evt.Y
+		iv.dragPoint.x = x
+		iv.dragPoint.y = y
 	}
-	if evt.Button == sdl.BUTTON_LEFT && evt.State == sdl.PRESSED {
+	if evt.Button() == 1 && evt.Type() == gdk.EVENT_BUTTON_PRESS {
 		iv.setPixel(iv.mousePix.x, iv.mousePix.y, []byte{0x00, 0x00, 0x00, 0x00})
 	}
 	return true

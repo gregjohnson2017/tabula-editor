@@ -4,19 +4,17 @@ import (
 	"fmt"
 
 	"github.com/go-gl/gl/v2.1/gl"
-	"github.com/veandco/go-sdl2/sdl"
-	"github.com/veandco/go-sdl2/ttf"
+	"github.com/gotk3/gotk3/gdk"
 )
 
 var _ UIComponent = UIComponent(&BottomBar{})
 
 // BottomBar defines a solid color bar with text displays
 type BottomBar struct {
-	area          *sdl.Rect
+	area          *Rect
 	comms         <-chan imageComm
 	color         [4]float32
 	mousePix      coord
-	font          *ttf.Font
 	fontSize      int32
 	backProgramID uint32
 	textProgramID uint32
@@ -31,7 +29,7 @@ type BottomBar struct {
 
 // NewBottomBar returns a pointer to a new BottomBar struct that implements UIComponent
 // the background color defaults to grey (0x808080FF) and the text white
-func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, cfg *config) (*BottomBar, error) {
+func NewBottomBar(area *Rect, comms <-chan imageComm, cfg *config) (*BottomBar, error) {
 	var err error
 	var backProgramID uint32
 	if backProgramID, err = CreateShaderProgram(solidColorVertex, solidColorFragment); err != nil {
@@ -134,7 +132,7 @@ func (bb *BottomBar) Destroy() {
 }
 
 // GetBoundary returns the clickable region of the UIComponent
-func (bb *BottomBar) GetBoundary() *sdl.Rect {
+func (bb *BottomBar) GetBoundary() *Rect {
 	return bb.area
 }
 
@@ -191,17 +189,17 @@ func (bb *BottomBar) OnEnter() {}
 func (bb *BottomBar) OnLeave() {}
 
 // OnMotion is called when the cursor moves within the UIComponent's region
-func (bb *BottomBar) OnMotion(evt *sdl.MouseMotionEvent) bool {
+func (bb *BottomBar) OnMotion(x int32, y int32, state gdk.ModifierType) bool {
 	return true
 }
 
 // OnScroll is called when the user scrolls within the UIComponent's region
-func (bb *BottomBar) OnScroll(evt *sdl.MouseWheelEvent) bool {
+func (bb *BottomBar) OnScroll(dY int32) bool {
 	return true
 }
 
 // OnClick is called when the user clicks within the UIComponent's region
-func (bb *BottomBar) OnClick(evt *sdl.MouseButtonEvent) bool {
+func (bb *BottomBar) OnClick(x int32, y int32, evt *gdk.EventButton) bool {
 	return true
 }
 

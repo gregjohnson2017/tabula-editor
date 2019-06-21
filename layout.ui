@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <!-- interface-requires gtk+ 3.16 -->
+  <object class="GtkWindow" id="main_window">
+    <property name="can_focus">False</property>
+    <!-- <property name="border_width">1</property> -->
+    <property name="default_width">960</property>
+    <property name="default_height">720</property>
+    <property name="window-position">GTK_WIN_POS_CENTER</property>
+    <signal name="motion-notify-event" handler="mouse_motion" object="main_window" swapped="yes"/>
+    <signal name="button-press-event" handler="mouse_click" object="main_window" swapped="yes"/>
+    <signal name="button-release-event" handler="mouse_click" object="main_window" swapped="yes"/>
+    <signal name="scroll-event" handler="mouse_scroll" object="main_window" swapped="yes"/>
+    <child>
+      <object class="GtkBox" id="main_box">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="orientation">vertical</property>
+        <property name="spacing">6</property>
+        <child>
+          <object class="GtkGLArea" id="gl_drawing_area">
+            <signal name="realize" handler="init" object="main_window" swapped="yes"/>
+            <signal name="unrealize" handler="quit" object="main_window" swapped="yes"/>
+            <signal name="render" handler="draw" object="main_window" swapped="yes"/>
+            <signal name="resize" handler="window_resize" object="main_window" swapped="yes"/>
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+            <property name="hexpand">True</property>
+            <property name="vexpand">True</property>
+          </object>
+        </child>
+      </object>
+    </child>
+  </object>
+</interface>
