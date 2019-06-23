@@ -164,7 +164,7 @@ func (b *Button) GetBoundary() *sdl.Rect {
 }
 
 // Render draws the UIComponent
-func (b *Button) Render() error {
+func (b *Button) Render() {
 	// render solid color background
 	gl.Viewport(b.area.X, b.cfg.screenHeight-b.area.Y-b.area.H, b.area.W, b.area.H)
 	gl.UseProgram(b.backProgramID)
@@ -192,8 +192,6 @@ func (b *Button) Render() error {
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 
 	gl.UseProgram(0)
-
-	return nil
 }
 
 // OnEnter is called when the cursor enters the UIComponent's region

@@ -113,7 +113,7 @@ func (iv *ImageView) GetBoundary() *sdl.Rect {
 }
 
 // Render draws the UIComponent
-func (iv *ImageView) Render() error {
+func (iv *ImageView) Render() {
 	go func() {
 		iv.comms <- imageComm{fileName: iv.fileName, mousePix: iv.mousePix, mult: iv.mult}
 	}()
@@ -151,7 +151,6 @@ func (iv *ImageView) Render() error {
 	gl.BindVertexArray(0)
 
 	gl.UseProgram(0)
-	return nil
 }
 
 func (iv *ImageView) zoomIn() {

@@ -139,7 +139,7 @@ func (bb *BottomBar) GetBoundary() *sdl.Rect {
 }
 
 // Render draws the UIComponent
-func (bb *BottomBar) Render() error {
+func (bb *BottomBar) Render() {
 	msg := <-bb.comms
 
 	// first render solid color background
@@ -181,7 +181,6 @@ func (bb *BottomBar) Render() error {
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 
 	gl.UseProgram(0)
-	return nil
 }
 
 // OnEnter is called when the cursor enters the UIComponent's region

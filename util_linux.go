@@ -1,9 +1,6 @@
 package main
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/jcmuller/gozenity"
 	"github.com/veandco/go-sdl2/sdl"
 )
@@ -17,11 +14,11 @@ func openFileDialog(win *sdl.Window) (string, error) {
 }
 
 func setupMenuBar(win *sdl.Window) error {
-	fmt.Fprintln(os.Stderr, "setupMenuBar not implemented")
+	// fmt.Fprintln(os.Stderr, "setupMenuBar not implemented")
 	return nil
 }
 
 func getMenuAction(evt *sdl.SysWMEvent) MenuAction {
-	fmt.Fprintln(os.Stderr, "handleWMEvent not implemented")
+	// fmt.Fprintln(os.Stderr, "handleWMEvent not implemented")
 	return MenuNone
 }

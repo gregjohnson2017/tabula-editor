@@ -22,7 +22,7 @@ import (
 // UIComponent says what functions a UIComponent must implement
 type UIComponent interface {
 	GetBoundary() *sdl.Rect
-	Render() error
+	Render()
 	Destroy()
 	OnEnter()
 	OnLeave()
@@ -66,23 +66,6 @@ type Align struct {
 type coord struct {
 	x int32
 	y int32
-}
-
-func createSolidColorTexture(rend *sdl.Renderer, w int32, h int32, r uint8, g uint8, b uint8, a uint8) (*sdl.Texture, error) {
-	var surf *sdl.Surface
-	var err error
-	if surf, err = sdl.CreateRGBSurfaceWithFormat(0, w, h, 32, uint32(sdl.PIXELFORMAT_RGBA32)); err != nil {
-		return nil, err
-	}
-	if err = surf.FillRect(nil, mapRGBA(surf.Format, r, g, b, a)); err != nil {
-		return nil, err
-	}
-	var tex *sdl.Texture
-	if tex, err = rend.CreateTextureFromSurface(surf); err != nil {
-		return nil, err
-	}
-	surf.Free()
-	return tex, nil
 }
 
 func writeRuneToFile(fileName string, mask image.Image, maskp image.Point, rec image.Rectangle) error {
@@ -284,37 +267,6 @@ func loadFontTexture(fontName string, fontSize int32) (uint32, []runeInfo, error
 
 	fmt.Printf("Loaded %v at size %v in %v ns\n", fontName, fontSize, sw.stopGetNano())
 	return fontTextureID, runeMap[:], nil
-}
-
-func mapRGBA(form *sdl.PixelFormat, r, g, b, a uint8) uint32 {
-	ur := uint32(r)
-	ur |= ur<<8 | ur<<16 | ur<<24
-	ug := uint32(g)
-	ug |= ug<<8 | ug<<16 | ug<<24
-	ub := uint32(b)
-	ub |= ub<<8 | ub<<16 | ub<<24
-	ua := uint32(a)
-	ua |= ua<<8 | ua<<16 | ua<<24
-	return form.Rmask&ur |
-		form.Gmask&ug |
-		form.Bmask&ub |
-		form.Amask&ua
-}
-
-func setPixel(surf *sdl.Surface, p coord, c sdl.Color) {
-	d := mapRGBA(surf.Format, c.R, c.G, c.B, c.A)
-	bs := []byte{byte(d), byte(d >> 8), byte(d >> 16), byte(d >> 24)}
-	i := int32(surf.BytesPerPixel())*p.x + surf.Pitch*p.y
-	copy(surf.Pixels()[i:], bs)
-}
-
-func copyToTexture(tex *sdl.Texture, pixels []byte, region *sdl.Rect) error {
-	var bytes []byte
-	var err error
-	bytes, _, err = tex.Lock(region)
-	copy(bytes, pixels)
-	tex.Unlock()
-	return err
 }
 
 func loadImage(fileName string) (*sdl.Surface, error) {

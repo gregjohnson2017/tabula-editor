@@ -24,6 +24,12 @@ func inBounds(area *sdl.Rect, x int32, y int32) bool {
 	return true
 }
 
+func errCheck(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
 func initWindow(title string, width, height int32) (*sdl.Window, error) {
 	if sdl.SetHint(sdl.HINT_RENDER_DRIVER, "opengl") != true {
 		return nil, fmt.Errorf("failed to set opengl render driver hint")
@@ -78,10 +84,8 @@ func initWindow(title string, width, height int32) (*sdl.Window, error) {
 func main() {
 	cfg := &config{screenWidth: 960, screenHeight: 720, bottomBarHeight: 30}
 	var err error
-	var win *sdl.Window
-	if win, err = initWindow("Tabula Editor", cfg.screenWidth, cfg.screenHeight); err != nil {
-		panic(err)
-	}
+	win, err := initWindow("Tabula Editor", cfg.screenWidth, cfg.screenHeight)
+	errCheck(err)
 
 	var fileName string
 	if len(os.Args) == 2 {
@@ -92,9 +96,8 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	if err = setupMenuBar(win); err != nil {
-		panic(err)
-	}
+	err = setupMenuBar(win)
+	errCheck(err)
 
 	win.Show()
 
@@ -132,13 +135,9 @@ func main() {
 	actionComms := make(chan func())
 
 	iv, err := NewImageView(imageViewArea, fileName, bottomBarComms, cfg)
-	if err != nil {
-		panic(err)
-	}
+	errCheck(err)
 	bottomBar, err := NewBottomBar(bottomBarArea, bottomBarComms, cfg)
-	if err != nil {
-		panic(err)
-	}
+	errCheck(err)
 	openButton, err := NewButton(buttonAreaOpen, cfg, "Open File", func() {
 		// TODO fix spam click crash bug
 		newFileName, err := openFileDialog(win)
@@ -148,9 +147,8 @@ func main() {
 		}
 		go func() {
 			actionComms <- func() {
-				if err = iv.loadFromFile(newFileName); err != nil {
-					panic(err)
-				}
+				err = iv.loadFromFile(newFileName)
+				errCheck(err)
 			}
 		}()
 	})
@@ -262,9 +260,7 @@ func main() {
 
 		for _, comp := range comps {
 			sw := start()
-			if err = comp.Render(); err != nil {
-				panic(err)
-			}
+			comp.Render()
 			ns := sw.stopGetNano()
 			switch comp.(type) {
 			case *ImageView:
