@@ -8,7 +8,6 @@ import (
 	"github.com/veandco/go-sdl2/gfx"
 	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
-	"github.com/veandco/go-sdl2/ttf"
 )
 
 type config struct {
@@ -41,9 +40,6 @@ func initWindow(title string, width, height int32) (*sdl.Window, error) {
 	// other libraries
 	if img.Init(img.INIT_PNG) != img.INIT_PNG {
 		return nil, fmt.Errorf("could not initialize PNG")
-	}
-	if err = ttf.Init(); err != nil {
-		return nil, err
 	}
 	sdl.GLSetAttribute(sdl.GL_CONTEXT_MAJOR_VERSION, 4)
 	sdl.GLSetAttribute(sdl.GL_CONTEXT_MINOR_VERSION, 6)
@@ -286,9 +282,7 @@ func main() {
 		comp.Destroy()
 	}
 
-	gl.UseProgram(0)
 	win.Destroy()
 	sdl.Quit()
 	img.Quit()
-	ttf.Quit()
 }
