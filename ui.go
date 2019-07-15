@@ -121,6 +121,33 @@ type pointF32 struct {
 	y float32
 }
 
+func calcStringDims(str string, runeMap []runeInfo) (float64, float64) {
+	var strHeight, maxAscent, maxDescent int32
+	var strWidth, largestBearingY float32
+	for _, r := range str {
+		info := runeMap[r-minASCII]
+		if info.ascent > maxAscent {
+			maxAscent = info.ascent
+		}
+		if info.descent > maxDescent {
+			maxDescent = info.descent
+		}
+		if info.bearingY > largestBearingY {
+			largestBearingY = info.bearingY
+		}
+		strWidth += info.advance
+	}
+	// adjust strWidth if last rune's width + bearingX > advance
+	lastInfo := runeMap[str[len(str)-1]-minASCII]
+	if float32(lastInfo.width)+lastInfo.bearingX > lastInfo.advance {
+		strWidth += (float32(lastInfo.width) + lastInfo.bearingX - lastInfo.advance)
+	}
+
+	strHeight = maxAscent + maxDescent
+
+	return float64(strWidth), float64(strHeight)
+}
+
 // mapString turns each character in the string into a pair of
 // (x,y,s,t)-vertex triangles using glyph information from a
 // pre-loaded font. The vertex info is returned as []float32

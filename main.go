@@ -158,7 +158,25 @@ func main() {
 	centerButton.SetHighlightBackgroundColor([4]float32{1.0, 0.0, 0.0, 1.0})
 	centerButton.SetDefaultTextColor([4]float32{0.0, 0.0, 1.0, 1.0})
 
-	comps := []UIComponent{iv, bottomBar, openButton, centerButton}
+	menuBar := NewMenuList(cfg, true)
+	menuItems := []struct {
+		str string
+		ml  *MenuList
+		act func()
+	}{
+		{"cat", &MenuList{}, func() { fmt.Println("cat") }},
+		{"dog", &MenuList{}, func() { fmt.Println("dog") }},
+		{"wolf", &MenuList{}, func() { fmt.Println("wolf") }},
+		{"giraffe", &MenuList{}, func() { fmt.Println("giraffe") }},
+		{"elephant", &MenuList{}, func() { fmt.Println("elephant") }},
+		{"lynx", &MenuList{}, func() { fmt.Println("lynx") }},
+		{"zebra", &MenuList{}, func() { fmt.Println("zebra") }},
+	}
+	if err = menuBar.SetChildren(0, 0, menuItems); err != nil {
+		panic(err)
+	}
+
+	comps := []UIComponent{iv, bottomBar, openButton, centerButton, menuBar}
 
 	var lastHover UIComponent
 	var currHover UIComponent
