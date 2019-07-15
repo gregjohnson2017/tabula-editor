@@ -117,13 +117,13 @@ func main() {
 	}
 	buttonAreaOpen := &sdl.Rect{
 		X: 0,
-		Y: 0,
+		Y: 30,
 		W: 125,
 		H: 20,
 	}
 	buttonAreaCenter := &sdl.Rect{
 		X: 125,
-		Y: 0,
+		Y: 30,
 		W: 125,
 		H: 20,
 	}
