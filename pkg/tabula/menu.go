@@ -1,4 +1,4 @@
-package main
+package tabula
 
 import (
 	"fmt"
@@ -18,9 +18,9 @@ type MenuEntry struct {
 }
 
 // NewMenuEntry returns the struct with the given label and list
-func NewMenuEntry(area *sdl.Rect, label string, list *MenuList, cfg *config, act func()) (MenuEntry, error) {
+func NewMenuEntry(area *sdl.Rect, label string, list *MenuList, cfg *Config, act func()) (MenuEntry, error) {
 	if cfg == nil {
-		return MenuEntry{}, fmt.Errorf("NewMenuEntry found nil config")
+		return MenuEntry{}, fmt.Errorf("NewMenuEntry found nil Config")
 	}
 	if list == nil && act == nil {
 		return MenuEntry{}, fmt.Errorf("NewMenuEntry needs a list and/or an action")
@@ -78,14 +78,14 @@ func (me MenuEntry) OnResize(x, y int32) {
 // MenuList is the horizontal menu bar
 type MenuList struct {
 	area    *sdl.Rect
-	cfg     *config
+	cfg     *Config
 	entries []MenuEntry
 	hover   *MenuEntry
 	horiz   bool
 }
 
 // NewMenuList returns a pointer to a new MenuList struct that implements UIComponent
-func NewMenuList(cfg *config, horiz bool) *MenuList {
+func NewMenuList(cfg *Config, horiz bool) *MenuList {
 	return &MenuList{
 		area:  &sdl.Rect{},
 		cfg:   cfg,

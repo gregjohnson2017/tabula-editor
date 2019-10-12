@@ -1,4 +1,4 @@
-package main
+package tabula
 
 import (
 	"fmt"
@@ -26,12 +26,12 @@ type BottomBar struct {
 	textVboID     uint32
 	fontTexID     uint32
 	runeMap       []runeInfo
-	cfg           *config
+	cfg           *Config
 }
 
 // NewBottomBar returns a pointer to a new BottomBar struct that implements UIComponent
 // the background color defaults to grey (0x808080FF) and the text white
-func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, cfg *config) (*BottomBar, error) {
+func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, cfg *Config) (*BottomBar, error) {
 	var err error
 	var backProgramID uint32
 	if backProgramID, err = CreateShaderProgram(solidColorVertex, solidColorFragment); err != nil {
@@ -66,7 +66,7 @@ func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, cfg *config) (*BottomB
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 	gl.UseProgram(textProgramID)
 	gl.Uniform2f(texSizeID, float32(texSheetWidth), float32(texSheetHeight))
-	gl.Uniform2f(uniScrSizeID, float32(cfg.screenWidth), float32(cfg.screenHeight))
+	gl.Uniform2f(uniScrSizeID, float32(cfg.ScreenWidth), float32(cfg.ScreenHeight))
 	gl.Uniform4f(textColorID, textColor[0], textColor[1], textColor[2], textColor[3])
 
 	backTriangles := []float32{
@@ -154,15 +154,15 @@ func (bb *BottomBar) Render() {
 
 	// second render text on top
 	// TODO optimize rendering by no-oping if string hasn't changed (or window size)
-	fileNameTriangles := mapString(msg.fileName, bb.runeMap, coord{0, bb.cfg.bottomBarHeight / 2}, Align{AlignMiddle, AlignLeft})
-	zoomTriangles := mapString(fmt.Sprintf("%vx", msg.mult), bb.runeMap, coord{bb.cfg.screenWidth / 2, bb.cfg.bottomBarHeight / 2}, Align{AlignMiddle, AlignCenter})
-	mousePixTriangles := mapString(fmt.Sprintf("(%v, %v)", msg.mousePix.x, msg.mousePix.y), bb.runeMap, coord{bb.cfg.screenWidth, bb.cfg.bottomBarHeight / 2}, Align{AlignMiddle, AlignRight})
+	fileNameTriangles := mapString(msg.fileName, bb.runeMap, coord{0, bb.cfg.BottomBarHeight / 2}, Align{AlignMiddle, AlignLeft})
+	zoomTriangles := mapString(fmt.Sprintf("%vx", msg.mult), bb.runeMap, coord{bb.cfg.ScreenWidth / 2, bb.cfg.BottomBarHeight / 2}, Align{AlignMiddle, AlignCenter})
+	mousePixTriangles := mapString(fmt.Sprintf("(%v, %v)", msg.mousePix.x, msg.mousePix.y), bb.runeMap, coord{bb.cfg.ScreenWidth, bb.cfg.BottomBarHeight / 2}, Align{AlignMiddle, AlignRight})
 	triangles := make([]float32, len(fileNameTriangles)+len(zoomTriangles)+len(mousePixTriangles))
 	triangles = append(triangles, fileNameTriangles...)
 	triangles = append(triangles, zoomTriangles...)
 	triangles = append(triangles, mousePixTriangles...)
 
-	gl.Viewport(0, 0, bb.cfg.screenWidth, bb.cfg.screenHeight)
+	gl.Viewport(0, 0, bb.cfg.ScreenWidth, bb.cfg.ScreenHeight)
 	gl.UseProgram(bb.textProgramID)
 
 	gl.BindBuffer(gl.ARRAY_BUFFER, bb.textVboID)
@@ -211,7 +211,7 @@ func (bb *BottomBar) OnResize(x, y int32) {
 
 	uniformID := gl.GetUniformLocation(bb.textProgramID, &[]byte("screen_size\x00")[0])
 	gl.UseProgram(bb.textProgramID)
-	gl.Uniform2f(uniformID, float32(bb.cfg.screenWidth), float32(bb.cfg.screenHeight))
+	gl.Uniform2f(uniformID, float32(bb.cfg.ScreenWidth), float32(bb.cfg.ScreenHeight))
 	gl.UseProgram(0)
 }
 

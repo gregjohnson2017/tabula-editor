@@ -1,4 +1,4 @@
-package main
+package tabula
 
 import (
 	"github.com/go-gl/gl/v2.1/gl"
@@ -10,7 +10,7 @@ var _ UIComponent = UIComponent(&Button{})
 // Button defines an interactive button
 type Button struct {
 	area               *sdl.Rect
-	cfg                *config
+	cfg                *Config
 	defaultBackColor   [4]float32
 	highlightBackColor [4]float32
 	defaultTextColor   [4]float32
@@ -32,7 +32,7 @@ type Button struct {
 
 // NewButton returns a pointer to a Button struct
 // defaultColor and highlightColor default to light grey (0xD6CFCFFF) and blue (0X0046AFFF) respectively, if nil
-func NewButton(area *sdl.Rect, cfg *config, text string, action func()) (*Button, error) {
+func NewButton(area *sdl.Rect, cfg *Config, text string, action func()) (*Button, error) {
 	var err error
 	var backProgramID uint32
 	if backProgramID, err = CreateShaderProgram(solidColorVertex, solidColorFragment); err != nil {
@@ -66,7 +66,7 @@ func NewButton(area *sdl.Rect, cfg *config, text string, action func()) (*Button
 	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_HEIGHT, &texSheetHeight)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 	gl.UseProgram(textProgramID)
-	gl.Uniform2f(uniScrSizeID, float32(cfg.screenWidth), float32(cfg.screenHeight))
+	gl.Uniform2f(uniScrSizeID, float32(cfg.ScreenWidth), float32(cfg.ScreenHeight))
 	gl.Uniform2f(texSizeID, float32(texSheetWidth), float32(texSheetHeight))
 	gl.Uniform4f(textColorID, textColor[0], textColor[1], textColor[2], textColor[3])
 
@@ -79,7 +79,7 @@ func NewButton(area *sdl.Rect, cfg *config, text string, action func()) (*Button
 		+1.0, +1.0, // top-right
 		+1.0, -1.0, // bottom-right
 	}
-	textTriangles := mapString(text, runeMap, coord{area.X + area.W/2, cfg.screenHeight - area.Y - area.H/2}, Align{AlignMiddle, AlignCenter})
+	textTriangles := mapString(text, runeMap, coord{area.X + area.W/2, cfg.ScreenHeight - area.Y - area.H/2}, Align{AlignMiddle, AlignCenter})
 
 	var backVaoID, backVboID uint32
 	gl.GenVertexArrays(1, &backVaoID)
@@ -166,7 +166,7 @@ func (b *Button) GetBoundary() *sdl.Rect {
 // Render draws the UIComponent
 func (b *Button) Render() {
 	// render solid color background
-	gl.Viewport(b.area.X, b.cfg.screenHeight-b.area.Y-b.area.H, b.area.W, b.area.H)
+	gl.Viewport(b.area.X, b.cfg.ScreenHeight-b.area.Y-b.area.H, b.area.W, b.area.H)
 	gl.UseProgram(b.backProgramID)
 
 	gl.BindVertexArray(b.backVaoID)
@@ -176,7 +176,7 @@ func (b *Button) Render() {
 	gl.BindVertexArray(0)
 
 	// render text on top
-	gl.Viewport(0, 0, b.cfg.screenWidth, b.cfg.screenHeight)
+	gl.Viewport(0, 0, b.cfg.ScreenWidth, b.cfg.ScreenHeight)
 	gl.UseProgram(b.textProgramID)
 
 	gl.BindBuffer(gl.ARRAY_BUFFER, b.textVboID)
@@ -247,10 +247,10 @@ func (b *Button) OnResize(x, y int32) {
 	// recompute text triangles
 	uniformID := gl.GetUniformLocation(b.textProgramID, &[]byte("screen_size\x00")[0])
 	gl.UseProgram(b.textProgramID)
-	gl.Uniform2f(uniformID, float32(b.cfg.screenWidth), float32(b.cfg.screenHeight))
+	gl.Uniform2f(uniformID, float32(b.cfg.ScreenWidth), float32(b.cfg.ScreenHeight))
 	gl.UseProgram(0)
 
-	textTriangles := mapString(b.text, b.runeMap, coord{b.area.X + b.area.W/2, b.cfg.screenHeight - b.area.Y - b.area.H/2}, Align{AlignMiddle, AlignCenter})
+	textTriangles := mapString(b.text, b.runeMap, coord{b.area.X + b.area.W/2, b.cfg.ScreenHeight - b.area.Y - b.area.H/2}, Align{AlignMiddle, AlignCenter})
 	gl.BindBuffer(gl.ARRAY_BUFFER, b.textVboID)
 	gl.BufferData(gl.ARRAY_BUFFER, 4*len(textTriangles), gl.Ptr(&textTriangles[0]), gl.STATIC_DRAW)
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)

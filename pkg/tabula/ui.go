@@ -1,4 +1,4 @@
-package main
+package tabula
 
 import (
 	"fmt"
@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/golang/freetype/truetype"
+	"github.com/gregjohnson2017/tabula-editor/pkg/util"
 	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
 
@@ -218,7 +219,7 @@ func mapString(str string, runeMap []runeInfo, pos coord, align Align) []float32
 // a given font at a given size. It returns the OpenGL ID for this texture,
 // along with a runeInfo array for indexing into the texture per rune at runtime
 func loadFontTexture(fontName string, fontSize int32) (uint32, []runeInfo, error) {
-	sw := start()
+	sw := util.Start()
 
 	var err error
 	var fontBytes []byte
@@ -292,7 +293,7 @@ func loadFontTexture(fontName string, fontSize int32) (uint32, []runeInfo, error
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 
-	fmt.Printf("Loaded %v at size %v in %v ns\n", fontName, fontSize, sw.stopGetNano())
+	fmt.Printf("Loaded %v at size %v in %v ns\n", fontName, fontSize, sw.StopGetNano())
 	return fontTextureID, runeMap[:], nil
 }
 

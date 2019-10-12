@@ -1,4 +1,4 @@
-package main
+package tabula
 
 import (
 	"math"
@@ -17,7 +17,7 @@ type ImageView struct {
 	area         *sdl.Rect
 	canvas       *sdl.Rect
 	origW, origH int32
-	cfg          *config
+	cfg          *Config
 	mouseLoc     coord
 	mousePix     coord
 	dragPoint    coord
@@ -74,7 +74,7 @@ func (iv *ImageView) loadFromFile(fileName string) error {
 }
 
 // NewImageView returns a pointer to a new ImageView struct that implements UIComponent
-func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, cfg *config) (*ImageView, error) {
+func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, cfg *Config) (*ImageView, error) {
 	var err error
 	var iv = &ImageView{}
 	iv.cfg = cfg
@@ -137,7 +137,7 @@ func (iv *ImageView) Render() {
 	gl.BufferData(gl.ARRAY_BUFFER, 4*len(triangles), gl.Ptr(&triangles[0]), gl.STATIC_DRAW)
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 
-	gl.Viewport(iv.area.X, iv.area.Y+iv.cfg.bottomBarHeight, iv.area.W, iv.area.H)
+	gl.Viewport(iv.area.X, iv.area.Y+iv.cfg.BottomBarHeight, iv.area.W, iv.area.H)
 	gl.UseProgram(iv.programID)
 
 	gl.BindVertexArray(iv.vaoID)

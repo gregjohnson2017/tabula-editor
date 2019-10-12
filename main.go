@@ -2,32 +2,12 @@ package main
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/go-gl/gl/v2.1/gl"
-	"github.com/veandco/go-sdl2/gfx"
+	"github.com/gregjohnson2017/tabula-editor/pkg/tabula"
 	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
 )
-
-type config struct {
-	screenWidth     int32
-	screenHeight    int32
-	bottomBarHeight int32
-}
-
-func inBounds(area *sdl.Rect, x int32, y int32) bool {
-	if x < area.X || x >= area.X+area.W || y < area.Y || y >= area.Y+area.H {
-		return false
-	}
-	return true
-}
-
-func errCheck(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
 
 func initWindow(title string, width, height int32) (*sdl.Window, error) {
 	if sdl.SetHint(sdl.HINT_RENDER_DRIVER, "opengl") != true {
@@ -45,7 +25,7 @@ func initWindow(title string, width, height int32) (*sdl.Window, error) {
 	sdl.GLSetAttribute(sdl.GL_CONTEXT_MINOR_VERSION, 6)
 	sdl.GLSetAttribute(sdl.GL_DOUBLEBUFFER, 1)
 	sdl.GLSetAttribute(sdl.GL_CONTEXT_PROFILE_MASK, sdl.GL_CONTEXT_PROFILE_CORE)
-	sdl.EventState(sdl.SYSWMEVENT, sdl.ENABLE)
+	//sdl.EventState(sdl.SYSWMEVENT, sdl.ENABLE)
 
 	var window *sdl.Window
 	if window, err = sdl.CreateWindow(title, sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, width, height, sdl.WINDOW_HIDDEN|sdl.WINDOW_OPENGL); err != nil {
@@ -78,229 +58,27 @@ func initWindow(title string, width, height int32) (*sdl.Window, error) {
 }
 
 func main() {
-	cfg := &config{screenWidth: 960, screenHeight: 720, bottomBarHeight: 30}
+	cfg := tabula.Config{ScreenWidth: 960, ScreenHeight: 720, BottomBarHeight: 30}
 	var err error
-	win, err := initWindow("Tabula Editor", cfg.screenWidth, cfg.screenHeight)
+	win, err := initWindow("Tabula Editor", cfg.ScreenWidth, cfg.ScreenHeight)
 	errCheck(err)
 
-	var fileName string
-	if len(os.Args) == 2 {
-		fileName = os.Args[1]
-	} else {
-		if fileName, err = openFileDialog(win); err != nil {
-			fmt.Printf("%v\n", err)
-			os.Exit(1)
+	app := tabula.NewApplication(win, cfg)
+	app.Start()
+
+	for app.Running() { // TODO fix looping
+		for evt := sdl.PollEvent(); evt != nil; evt = sdl.PollEvent() {
+			app.HandleSdlEvent(evt)
 		}
-	}
-	err = setupMenuBar(win)
-	errCheck(err)
 
-	win.Show()
-
-	var framerate = &gfx.FPSmanager{}
-	gfx.InitFramerate(framerate)
-	if gfx.SetFramerate(framerate, 144) != true {
-		panic(fmt.Errorf("could not set framerate: %v", sdl.GetError()))
+		app.PostEventActions()
 	}
 
-	imageViewArea := &sdl.Rect{
-		X: 0,
-		Y: 0,
-		W: cfg.screenWidth,
-		H: cfg.screenHeight - cfg.bottomBarHeight,
-	}
-	bottomBarArea := &sdl.Rect{
-		X: 0,
-		Y: cfg.screenHeight - cfg.bottomBarHeight,
-		W: cfg.screenWidth,
-		H: cfg.bottomBarHeight,
-	}
-	buttonAreaOpen := &sdl.Rect{
-		X: 0,
-		Y: 30,
-		W: 125,
-		H: 20,
-	}
-	buttonAreaCenter := &sdl.Rect{
-		X: 125,
-		Y: 30,
-		W: 125,
-		H: 20,
-	}
-	bottomBarComms := make(chan imageComm)
-	actionComms := make(chan func())
+	app.Quit()
+}
 
-	iv, err := NewImageView(imageViewArea, fileName, bottomBarComms, cfg)
-	errCheck(err)
-	bottomBar, err := NewBottomBar(bottomBarArea, bottomBarComms, cfg)
-	errCheck(err)
-	openButton, err := NewButton(buttonAreaOpen, cfg, "Open File", func() {
-		// TODO fix spam click crash bug
-		newFileName, err := openFileDialog(win)
-		if err != nil {
-			fmt.Printf("No file chosen\n")
-			return
-		}
-		go func() {
-			actionComms <- func() {
-				err = iv.loadFromFile(newFileName)
-				errCheck(err)
-			}
-		}()
-	})
-	centerButton, err := NewButton(buttonAreaCenter, cfg, "Center Image", func() {
-		go func() {
-			actionComms <- func() {
-				iv.centerImage()
-			}
-		}()
-	})
-	centerButton.SetHighlightBackgroundColor([4]float32{1.0, 0.0, 0.0, 1.0})
-	centerButton.SetDefaultTextColor([4]float32{0.0, 0.0, 1.0, 1.0})
-
-	menuBar := NewMenuList(cfg, true)
-	menuItems := []struct {
-		str string
-		ml  *MenuList
-		act func()
-	}{
-		{"cat", &MenuList{}, func() { fmt.Println("cat") }},
-		{"dog", &MenuList{}, func() { fmt.Println("dog") }},
-		{"wolf", &MenuList{}, func() { fmt.Println("wolf") }},
-		{"giraffe", &MenuList{}, func() { fmt.Println("giraffe") }},
-		{"elephant", &MenuList{}, func() { fmt.Println("elephant") }},
-		{"lynx", &MenuList{}, func() { fmt.Println("lynx") }},
-		{"zebra", &MenuList{}, func() { fmt.Println("zebra") }},
-	}
-	if err = menuBar.SetChildren(0, 0, menuItems); err != nil {
+func errCheck(err error) {
+	if err != nil {
 		panic(err)
 	}
-
-	comps := []UIComponent{iv, bottomBar, openButton, centerButton, menuBar}
-
-	var lastHover UIComponent
-	var currHover UIComponent
-	var moved bool
-	running := true
-	var iterations int64
-	var imageTotalNs int64
-	var bbTotalNs int64
-	var bTotalNs int64
-
-	for running {
-		var e sdl.Event
-		for e = sdl.PollEvent(); e != nil; e = sdl.PollEvent() {
-			switch evt := e.(type) {
-			case *sdl.QuitEvent:
-				running = false
-			case *sdl.MouseButtonEvent:
-				for i := range comps {
-					comp := comps[len(comps)-i-1]
-					if inBounds(comp.GetBoundary(), evt.X, evt.Y) {
-						comp.OnClick(evt)
-						break
-					}
-				}
-			case *sdl.MouseMotionEvent:
-				// search top down through components until exhausted or one absorbs the event
-				for i := range comps {
-					comp := comps[len(comps)-i-1]
-					if inBounds(comp.GetBoundary(), evt.X, evt.Y) {
-						if currHover != comp {
-							// entered a new component
-							comp.OnEnter()
-							lastHover = currHover
-							currHover = comp
-							moved = true
-						}
-						if comp.OnMotion(evt) {
-							break
-						}
-					}
-				}
-				if lastHover != nil && moved {
-					lastHover.OnLeave()
-					moved = false
-				}
-			case *sdl.MouseWheelEvent:
-				for i := range comps {
-					comp := comps[len(comps)-i-1]
-					x, y, _ := sdl.GetMouseState()
-					if inBounds(comp.GetBoundary(), x, y) {
-						if comp.OnScroll(evt) {
-							break
-						}
-					}
-				}
-			case *sdl.WindowEvent:
-				if evt.Event == sdl.WINDOWEVENT_LEAVE || evt.Event == sdl.WINDOWEVENT_FOCUS_LOST || evt.Event == sdl.WINDOWEVENT_MINIMIZED {
-					if currHover != nil {
-						currHover.OnLeave()
-						lastHover = currHover
-						currHover = nil
-						moved = false
-					}
-				} else if evt.Event == sdl.WINDOWEVENT_RESIZED {
-					diffx := evt.Data1 - cfg.screenWidth
-					diffy := evt.Data2 - cfg.screenHeight
-					cfg.screenWidth = evt.Data1
-					cfg.screenHeight = evt.Data2
-					for _, comp := range comps {
-						comp.OnResize(diffx, diffy)
-					}
-				}
-			case *sdl.SysWMEvent:
-				var ma MenuAction
-				ma = getMenuAction(evt)
-				switch ma {
-				case MenuExit:
-					running = false
-				}
-			}
-		}
-
-		// handle all events in pipe
-		hasEvents := true
-		for hasEvents {
-			select {
-			case closure := <-actionComms:
-				closure()
-			default:
-				// no more in pipe
-				hasEvents = false
-			}
-		}
-		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
-
-		for _, comp := range comps {
-			sw := start()
-			comp.Render()
-			ns := sw.stopGetNano()
-			switch comp.(type) {
-			case *ImageView:
-				imageTotalNs += ns
-			case *BottomBar:
-				bbTotalNs += ns
-			case *Button:
-				bTotalNs += ns
-			}
-		}
-		iterations++
-
-		win.GLSwap()
-		gfx.FramerateDelay(framerate)
-	}
-
-	fmt.Printf("ImageView avg: %v ns\n", float64(imageTotalNs)/float64(iterations))
-	fmt.Printf("BottomBar avg: %v ns\n", float64(bbTotalNs)/float64(iterations))
-	fmt.Printf("Button avg: %v ns\n", float64(bTotalNs)/float64(iterations))
-
-	// free UIComponent SDL assets
-	for _, comp := range comps {
-		comp.Destroy()
-	}
-
-	win.Destroy()
-	sdl.Quit()
-	img.Quit()
 }
