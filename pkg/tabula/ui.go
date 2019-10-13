@@ -22,6 +22,7 @@ import (
 
 // UIComponent says what functions a UIComponent must implement
 type UIComponent interface {
+	InBoundary(sdl.Point) bool
 	GetBoundary() *sdl.Rect
 	Render()
 	Destroy()

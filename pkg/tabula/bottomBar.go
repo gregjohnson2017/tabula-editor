@@ -133,6 +133,11 @@ func (bb *BottomBar) Destroy() {
 	gl.DeleteVertexArrays(1, &bb.textVaoID)
 }
 
+// InBoundary returns whether a point is in this UIComponent's bounds
+func (bb *BottomBar) InBoundary(pt sdl.Point) bool {
+	return inBounds(bb.area, pt.X, pt.Y)
+}
+
 // GetBoundary returns the clickable region of the UIComponent
 func (bb *BottomBar) GetBoundary() *sdl.Rect {
 	return bb.area

@@ -107,6 +107,11 @@ func (iv *ImageView) Destroy() {
 	gl.DeleteVertexArrays(1, &iv.vaoID)
 }
 
+// InBoundary returns whether a point is in this UIComponent's bounds
+func (iv *ImageView) InBoundary(pt sdl.Point) bool {
+	return inBounds(iv.area, pt.X, pt.Y)
+}
+
 // GetBoundary returns the clickable region of the UIComponent
 func (iv *ImageView) GetBoundary() *sdl.Rect {
 	return iv.area

@@ -43,6 +43,17 @@ func (me MenuEntry) Destroy() {
 	me.list.Destroy()
 }
 
+// InBoundary returns whether a point is in this UIComponent's bounds
+func (me MenuEntry) InBoundary(pt sdl.Point) bool {
+	if me.button.InBoundary(pt) {
+		return true
+	}
+	if me.enabled && me.list != nil && me.list.InBoundary(pt) {
+		return true
+	}
+	return false
+}
+
 // GetBoundary returns the underlying button's boundary
 func (me MenuEntry) GetBoundary() *sdl.Rect {
 	return me.button.GetBoundary()
@@ -61,12 +72,16 @@ func (me *MenuEntry) OnLeave() {
 // OnClick calls the underlying button's OnClick method
 func (me *MenuEntry) OnClick(evt *sdl.MouseButtonEvent) bool {
 	me.button.OnClick(evt)
+	me.enabled = true
 	return true
 }
 
 // Render calls the underlying button's render function
 func (me MenuEntry) Render() {
 	me.button.Render()
+	if me.list != nil && me.enabled {
+		me.list.Render()
+	}
 }
 
 // OnResize calls the underlying UIComponents' OnResize function
@@ -109,7 +124,7 @@ func (ml *MenuList) SetChildren(offx int32, offy int32, childs []struct {
 	}
 	ml.area.X = offx
 	ml.area.Y = offy
-	// normalize height
+	// normalize height or width
 	var max int32
 	for _, c := range childs {
 		w, h := calcStringDims(c.str, runeMap)
@@ -134,7 +149,7 @@ func (ml *MenuList) SetChildren(offx int32, offy int32, childs []struct {
 		if ml.horiz {
 			area = &sdl.Rect{X: ml.area.X + off, Y: ml.area.Y, W: w32, H: max}
 		} else {
-			area = &sdl.Rect{X: ml.area.Y, Y: ml.area.Y + off, W: max, H: h32}
+			area = &sdl.Rect{X: ml.area.X, Y: ml.area.Y + off, W: max, H: h32}
 		}
 		e, err := NewMenuEntry(area, c.str, c.ml, ml.cfg, c.act)
 		if err != nil {
@@ -168,6 +183,16 @@ func (ml *MenuList) SetChildren(offx int32, offy int32, childs []struct {
 	return nil
 }
 
+// InBoundary returns whether a point is in this UIComponent's bounds
+func (ml MenuList) InBoundary(pt sdl.Point) bool {
+	for _, c := range ml.entries {
+		if c.InBoundary(pt) {
+			return true
+		}
+	}
+	return false
+}
+
 // GetBoundary returns the clickable region of the UIComponent
 func (ml *MenuList) GetBoundary() *sdl.Rect {
 	return ml.area
@@ -198,19 +223,14 @@ func (ml *MenuList) OnLeave() {
 
 // GetEntryAt returns the menu entry below the given mouse coordinates
 func (ml *MenuList) GetEntryAt(x int32, y int32) (*MenuEntry, error) {
-	var off int32
 	for i := range ml.entries {
 		c := &ml.entries[i]
 		r := c.GetBoundary()
-		if ml.horiz {
-			off += r.W
-			if off > x {
-				return c, nil
-			}
-		} else {
-			off += r.H
-			if off > y {
-				return c, nil
+		if inBounds(r, x, y) {
+			return c, nil
+		} else if c.enabled && c.list != nil {
+			if me, err := c.list.GetEntryAt(x, y); err == nil {
+				return me, nil
 			}
 		}
 	}

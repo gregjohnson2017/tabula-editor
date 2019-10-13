@@ -158,6 +158,11 @@ func (b *Button) Destroy() {
 	gl.DeleteVertexArrays(1, &b.textVaoID)
 }
 
+// InBoundary returns whether a point is in this UIComponent's bounds
+func (b *Button) InBoundary(pt sdl.Point) bool {
+	return inBounds(b.area, pt.X, pt.Y)
+}
+
 // GetBoundary returns the clickable region of the UIComponent
 func (b *Button) GetBoundary() *sdl.Rect {
 	return b.area

@@ -3,6 +3,7 @@ package tabula
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/util"
@@ -12,7 +13,7 @@ import (
 )
 
 // performance debugging metrics
-var imageTotalNs, bbTotalNs, bTotalNs, iterations int64
+var imageTotalNs, bbTotalNs, bTotalNs, mlTotalNs, iterations int64
 
 // Config represents the window configuration for the application
 type Config struct {
@@ -105,13 +106,15 @@ func NewApplication(win *sdl.Window, cfg Config) *Application {
 	centerButton.SetHighlightBackgroundColor([4]float32{1.0, 0.0, 0.0, 1.0})
 	centerButton.SetDefaultTextColor([4]float32{0.0, 0.0, 1.0, 1.0})
 
+	catmenuList := NewMenuList(&cfg, false)
+
 	menuBar := NewMenuList(&cfg, true)
 	menuItems := []struct {
 		str string
 		ml  *MenuList
 		act func()
 	}{
-		{"cat", &MenuList{}, func() { fmt.Println("cat") }},
+		{"cat", catmenuList, func() { fmt.Println("cat") }},
 		{"dog", &MenuList{}, func() { fmt.Println("dog") }},
 		{"wolf", &MenuList{}, func() { fmt.Println("wolf") }},
 		{"giraffe", &MenuList{}, func() { fmt.Println("giraffe") }},
@@ -120,6 +123,18 @@ func NewApplication(win *sdl.Window, cfg Config) *Application {
 		{"zebra", &MenuList{}, func() { fmt.Println("zebra") }},
 	}
 	if err = menuBar.SetChildren(0, 0, menuItems); err != nil {
+		panic(err)
+	}
+
+	submenuItems := []struct {
+		str string
+		ml  *MenuList
+		act func()
+	}{
+		{"kitty", &MenuList{}, func() { fmt.Println("kitty") }},
+		{"kitten", &MenuList{}, func() { fmt.Println("kitten") }},
+	}
+	if err = catmenuList.SetChildren(0, menuBar.area.H, submenuItems); err != nil {
 		panic(err)
 	}
 
@@ -189,6 +204,8 @@ func (app *Application) PostEventActions() {
 			bbTotalNs += ns
 		case *Button:
 			bTotalNs += ns
+		case *MenuList:
+			mlTotalNs += ns
 		}
 	}
 	iterations++
@@ -204,7 +221,7 @@ func (app *Application) handleQuitEvent(evt *sdl.QuitEvent) {
 func (app *Application) handleMouseButtonEvent(evt *sdl.MouseButtonEvent) {
 	for i := range app.comps {
 		comp := app.comps[len(app.comps)-i-1]
-		if inBounds(comp.GetBoundary(), evt.X, evt.Y) {
+		if comp.InBoundary(sdl.Point{X: evt.X, Y: evt.Y}) {
 			comp.OnClick(evt)
 			break
 		}
@@ -215,7 +232,7 @@ func (app *Application) handleMouseMotionEvent(evt *sdl.MouseMotionEvent) {
 	// search top down through components until exhausted or one absorbs the event
 	for i := range app.comps {
 		comp := app.comps[len(app.comps)-i-1]
-		if inBounds(comp.GetBoundary(), evt.X, evt.Y) {
+		if comp.InBoundary(sdl.Point{X: evt.X, Y: evt.Y}) {
 			if app.currHover != comp {
 				// entered a new component
 				comp.OnEnter()
@@ -238,7 +255,7 @@ func (app *Application) handleMouseWheelEvent(evt *sdl.MouseWheelEvent) {
 	for i := range app.comps {
 		comp := app.comps[len(app.comps)-i-1]
 		x, y, _ := sdl.GetMouseState()
-		if inBounds(comp.GetBoundary(), x, y) {
+		if comp.InBoundary(sdl.Point{X: x, Y: y}) {
 			if comp.OnScroll(evt) {
 				break
 			}
@@ -283,9 +300,18 @@ func (app *Application) Running() bool {
 
 // Quit cleans up resources
 func (app *Application) Quit() {
-	fmt.Printf("ImageView avg: %v ns\n", float64(imageTotalNs)/float64(iterations))
-	fmt.Printf("BottomBar avg: %v ns\n", float64(bbTotalNs)/float64(iterations))
-	fmt.Printf("Button avg: %v ns\n", float64(bTotalNs)/float64(iterations))
+	avgNs := int64(float64(imageTotalNs) / float64(iterations))
+	avg := time.Duration(int64(time.Nanosecond) * avgNs)
+	fmt.Printf("ImageView avg: %v ns, %v\n", avgNs, avg)
+	avgNs = int64(float64(bbTotalNs) / float64(iterations))
+	avg = time.Duration(int64(time.Nanosecond) * avgNs)
+	fmt.Printf("BottomBar avg: %v ns, %v\n", avgNs, avg)
+	avgNs = int64(float64(bTotalNs) / float64(iterations))
+	avg = time.Duration(int64(time.Nanosecond) * avgNs)
+	fmt.Printf("Button avg: %v ns, %v\n", avgNs, avg)
+	avgNs = int64(float64(mlTotalNs) / float64(iterations))
+	avg = time.Duration(int64(time.Nanosecond) * avgNs)
+	fmt.Printf("MenuList avg: %v ns, %v\n", avgNs, avg)
 
 	// free UIComponent SDL assets
 	for _, comp := range app.comps {
