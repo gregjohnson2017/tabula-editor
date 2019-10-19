@@ -12,9 +12,26 @@ var _ UIComponent = UIComponent(&MenuList{})
 // MenuEntry is the clickable entry which opens a MenuList
 type MenuEntry struct {
 	enabled bool
-	button  *Button
+	button  *MenuBarButton
 	list    *MenuList
 	action  func()
+}
+
+// MenuBarButton defines an interactive button, but redefines OnClick to perform action on press, not release
+type MenuBarButton struct {
+	*Button
+}
+
+// OnClick is called when the user clicks within the UIComponent's region
+func (mbb *MenuBarButton) OnClick(evt *sdl.MouseButtonEvent) bool {
+	if evt.Button == sdl.BUTTON_LEFT && evt.State == sdl.PRESSED {
+		mbb.pressed = true
+		mbb.action()
+	} else if evt.Button == sdl.BUTTON_LEFT && evt.State == sdl.RELEASED && mbb.pressed {
+		mbb.pressed = false
+		// TODO add release action
+	}
+	return true
 }
 
 // NewMenuEntry returns the struct with the given label and list
@@ -32,7 +49,7 @@ func NewMenuEntry(area *sdl.Rect, label string, list *MenuList, cfg *Config, act
 	}
 	return MenuEntry{
 		enabled: false,
-		button:  btn,
+		button:  &MenuBarButton{btn},
 		list:    list,
 	}, nil
 }
@@ -67,12 +84,22 @@ func (me *MenuEntry) OnEnter() {
 // OnLeave calls the underlying button's OnLeave method
 func (me *MenuEntry) OnLeave() {
 	me.button.OnLeave()
+	me.list.OnLeave()
 }
 
 // OnClick calls the underlying button's OnClick method
 func (me *MenuEntry) OnClick(evt *sdl.MouseButtonEvent) bool {
-	me.button.OnClick(evt)
-	me.enabled = true
+	if evt.Button != sdl.BUTTON_LEFT || evt.State != sdl.PRESSED {
+		return true
+	}
+	if inBounds(me.GetBoundary(), evt.X, evt.Y) {
+		me.button.OnClick(evt)
+		me.enabled = !me.enabled
+		return true
+	}
+	if e, err := me.list.GetEntryAt(evt.X, evt.Y); err == nil {
+		e.OnClick(evt)
+	}
 	return true
 }
 
@@ -88,6 +115,14 @@ func (me MenuEntry) Render() {
 func (me MenuEntry) OnResize(x, y int32) {
 	me.button.OnResize(x, y)
 	me.list.OnResize(x, y)
+}
+
+// OnMotion is called when the cursor moves within the UIComponent's region - bad comment
+func (me *MenuEntry) OnMotion(evt *sdl.MouseMotionEvent) bool {
+	if me.list.InBoundary(sdl.Point{X: evt.X, Y: evt.Y}) {
+		me.list.OnMotion(evt)
+	}
+	return true
 }
 
 // MenuList is the horizontal menu bar
@@ -140,9 +175,10 @@ func (ml *MenuList) SetChildren(offx int32, offy int32, childs []struct {
 			}
 		}
 	}
+	// populate list of menu entries with appropriately boundaries
 	var off int32
-	for _, c := range childs {
-		w, h := calcStringDims(c.str, runeMap)
+	for _, child := range childs {
+		w, h := calcStringDims(child.str, runeMap)
 		w32 := int32(math.Ceil(w)) + 14
 		h32 := int32(math.Ceil(h)) + 10
 		var area *sdl.Rect
@@ -151,35 +187,25 @@ func (ml *MenuList) SetChildren(offx int32, offy int32, childs []struct {
 		} else {
 			area = &sdl.Rect{X: ml.area.X, Y: ml.area.Y + off, W: max, H: h32}
 		}
-		e, err := NewMenuEntry(area, c.str, c.ml, ml.cfg, c.act)
+		entry, err := NewMenuEntry(area, child.str, child.ml, ml.cfg, child.act)
 		if err != nil {
 			return err
 		}
-		ml.entries = append(ml.entries, e)
-		r := e.GetBoundary()
+		ml.entries = append(ml.entries, entry)
+		r := entry.GetBoundary()
 		if ml.horiz {
 			off += r.W
 		} else {
 			off += r.H
 		}
 	}
-	var w, h int32
-	for _, e := range ml.entries {
-		r := e.GetBoundary()
-		if ml.horiz {
-			if r.H > h {
-				h = r.H
-			}
-			w += r.W
-		} else {
-			if r.W > w {
-				w = r.W
-			}
-			h += r.H
-		}
+	if ml.horiz {
+		ml.area.W = off
+		ml.area.H = max
+	} else {
+		ml.area.W = max
+		ml.area.H = off
 	}
-	ml.area.W = w
-	ml.area.H = h
 	return nil
 }
 
@@ -225,8 +251,7 @@ func (ml *MenuList) OnLeave() {
 func (ml *MenuList) GetEntryAt(x int32, y int32) (*MenuEntry, error) {
 	for i := range ml.entries {
 		c := &ml.entries[i]
-		r := c.GetBoundary()
-		if inBounds(r, x, y) {
+		if c.InBoundary(sdl.Point{X: x, Y: y}) {
 			return c, nil
 		} else if c.enabled && c.list != nil {
 			if me, err := c.list.GetEntryAt(x, y); err == nil {
@@ -237,7 +262,7 @@ func (ml *MenuList) GetEntryAt(x int32, y int32) (*MenuEntry, error) {
 	return nil, fmt.Errorf("no entry at given position")
 }
 
-// OnMotion is called when the cursor moves within the UIComponent's region
+// OnMotion is called when the cursor moves within the UIComponent's region - bad comment
 func (ml *MenuList) OnMotion(evt *sdl.MouseMotionEvent) bool {
 	e, err := ml.GetEntryAt(evt.X, evt.Y)
 	if err != nil {
@@ -246,10 +271,25 @@ func (ml *MenuList) OnMotion(evt *sdl.MouseMotionEvent) bool {
 	if e != ml.hover {
 		if ml.hover != nil {
 			ml.hover.OnLeave()
+			ml.hover.enabled = false
 		}
 		e.OnEnter()
+		if evt.State == sdl.ButtonLMask() {
+			btnEvt := sdl.MouseButtonEvent{
+				Type:      sdl.MOUSEBUTTONDOWN,
+				Timestamp: evt.Timestamp,
+				WindowID:  evt.WindowID,
+				Which:     evt.Which,
+				State:     sdl.PRESSED,
+				X:         evt.X,
+				Y:         evt.Y,
+				Button:    sdl.BUTTON_LEFT,
+			}
+			e.OnClick(&btnEvt)
+		}
 		ml.hover = e
 	}
+	e.OnMotion(evt)
 	return true
 }
 
