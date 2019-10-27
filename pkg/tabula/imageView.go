@@ -93,18 +93,13 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, cfg *
 		return nil, err
 	}
 
-	if iv.selProgramID, err = CreateShaderProgram(outlineVsh, solidColorFragment); err != nil {
+	if iv.selProgramID, err = CreateShaderProgram(outlineVsh, outlineFsh); err != nil {
 		return nil, err
 	}
 
 	uniformID := gl.GetUniformLocation(iv.programID, &[]byte("area\x00")[0])
 	gl.UseProgram(iv.programID)
 	gl.Uniform2f(uniformID, float32(iv.area.W), float32(iv.area.H))
-	gl.UseProgram(0)
-
-	selColor := gl.GetUniformLocation(iv.selProgramID, &[]byte("uni_color\x00")[0])
-	gl.UseProgram(iv.selProgramID)
-	gl.Uniform4f(selColor, 0xFF, 0x00, 0x00, 0xFF)
 	gl.UseProgram(0)
 
 	uniformID = gl.GetUniformLocation(iv.selProgramID, &[]byte("area\x00")[0])
@@ -156,21 +151,25 @@ func (iv *ImageView) Render() {
 		texelX := float32(i % iv.origW)
 		texelY := float32((float32(i) - texelX) / float32(iv.origW))
 		// TODO casting mult (float 64) to float 32, problem?
+		tlx, tly := texelX*float32(iv.mult)+float32(iv.canvas.X), texelY*float32(iv.mult)+float32(iv.canvas.Y)
+		trx, try := (texelX+1)*float32(iv.mult)+float32(iv.canvas.X), texelY*float32(iv.mult)+float32(iv.canvas.Y)
+		blx, bly := texelX*float32(iv.mult)+float32(iv.canvas.X), (texelY+1)*float32(iv.mult)+float32(iv.canvas.Y)
+		brx, bry := (texelX+1)*float32(iv.mult)+float32(iv.canvas.X), (texelY+1)*float32(iv.mult)+float32(iv.canvas.Y)
+		// left edge
 		if !iv.selection.Contains(i - 1) {
-			// left edge
-			lines = append(lines, texelX*float32(iv.mult)+float32(iv.canvas.X), texelY*float32(iv.mult)+float32(iv.canvas.Y), texelX*float32(iv.mult)+float32(iv.canvas.X), (texelY+1)*float32(iv.mult)+float32(iv.canvas.Y))
+			lines = append(lines, tlx, tly, blx, bly)
 		}
+		// top edge
 		if !iv.selection.Contains(i - iv.origW) {
-			// top edge
-			lines = append(lines, texelX*float32(iv.mult)+float32(iv.canvas.X), texelY*float32(iv.mult)+float32(iv.canvas.Y), (texelX+1)*float32(iv.mult)+float32(iv.canvas.X), texelY*float32(iv.mult)+float32(iv.canvas.Y))
+			lines = append(lines, tlx, tly, trx, try)
 		}
+		// right edge
 		if !iv.selection.Contains(i + 1) {
-			// right edge
-			lines = append(lines, (texelX+1)*float32(iv.mult)+float32(iv.canvas.X), texelY*float32(iv.mult)+float32(iv.canvas.Y), (texelX+1)*float32(iv.mult)+float32(iv.canvas.X), (texelY+1)*float32(iv.mult)+float32(iv.canvas.Y))
+			lines = append(lines, trx, try, brx, bry)
 		}
+		// bottom edge
 		if !iv.selection.Contains(i + iv.origW) {
-			// bottom edge
-			lines = append(lines, texelX*float32(iv.mult)+float32(iv.canvas.X), (texelY+1)*float32(iv.mult)+float32(iv.canvas.Y), (texelX+1)*float32(iv.mult)+float32(iv.canvas.X), (texelY+1)*float32(iv.mult)+float32(iv.canvas.Y))
+			lines = append(lines, blx, bly, brx, bry)
 		}
 		return true
 	})

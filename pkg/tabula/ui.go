@@ -356,6 +356,21 @@ const (
 	}
 ` + "\x00"
 
+	outlineFsh = `
+	#version 460
+	in vec4 color;
+	out vec4 frag_color;
+	void main() {
+		float scale = 4.0;
+		float mx = floor(mod(gl_FragCoord.x / scale, 2.0));
+		float my = floor(mod(gl_FragCoord.y / scale, 2.0));
+		vec4 col1 = vec4(1.0, 1.0, 1.0, 1.0);
+		vec4 col2 = vec4(0.3, 0.3, 0.3, 1.0);
+		vec4 checker = mx == my ? col1 : col2;
+		frag_color = checker;
+	}
+` + "\x00"
+
 	solidColorVertex = `
 	#version 460
 	uniform vec4 uni_color;
