@@ -343,6 +343,19 @@ func configureVAO(vaoID uint32, vboID uint32, layout []int32) {
 const (
 	minASCII = 32
 
+	outlineVsh = `
+	#version 460
+	uniform vec4 uni_color;
+	uniform vec2 area;
+	in vec2 position_in;
+	out vec4 color;
+	void main() {
+		vec2 glSpace = vec2(2.0, -2.0) * (position_in / area) + vec2(-1.0, 1.0);
+		gl_Position = vec4(glSpace, 0.0, 1.0);
+		color = uni_color;
+	}
+` + "\x00"
+
 	solidColorVertex = `
 	#version 460
 	uniform vec4 uni_color;

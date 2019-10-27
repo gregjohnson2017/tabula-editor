@@ -8,28 +8,33 @@ import (
 
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/veandco/go-sdl2/sdl"
+
+	set "github.com/kroppt/Int32Set"
 )
 
 var _ UIComponent = UIComponent(&ImageView{})
 
 // ImageView defines an interactable image viewing pane
 type ImageView struct {
-	area         *sdl.Rect
-	canvas       *sdl.Rect
-	origW, origH int32
-	cfg          *Config
-	mouseLoc     coord
-	mousePix     coord
-	dragPoint    coord
-	dragging     bool
-	mult         float64
-	programID    uint32
-	textureID    uint32
-	glSquare     []float32
-	vaoID, vboID uint32
-	comms        chan<- imageComm
-	fileName     string
-	fullPath     string
+	area           *sdl.Rect
+	canvas         *sdl.Rect
+	origW, origH   int32
+	cfg            *Config
+	mouseLoc       coord
+	mousePix       coord
+	dragPoint      coord
+	dragging       bool
+	mult           float64
+	programID      uint32
+	selProgramID   uint32
+	textureID      uint32
+	glSquare       []float32
+	vaoID, vboID   uint32
+	selVao, selVbo uint32
+	comms          chan<- imageComm
+	fileName       string
+	fullPath       string
+	selection      set.Set
 }
 
 type imageComm struct {
@@ -88,14 +93,34 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, cfg *
 		return nil, err
 	}
 
+	if iv.selProgramID, err = CreateShaderProgram(outlineVsh, solidColorFragment); err != nil {
+		return nil, err
+	}
+
 	uniformID := gl.GetUniformLocation(iv.programID, &[]byte("area\x00")[0])
 	gl.UseProgram(iv.programID)
+	gl.Uniform2f(uniformID, float32(iv.area.W), float32(iv.area.H))
+	gl.UseProgram(0)
+
+	selColor := gl.GetUniformLocation(iv.selProgramID, &[]byte("uni_color\x00")[0])
+	gl.UseProgram(iv.selProgramID)
+	gl.Uniform4f(selColor, 0xFF, 0x00, 0x00, 0xFF)
+	gl.UseProgram(0)
+
+	uniformID = gl.GetUniformLocation(iv.selProgramID, &[]byte("area\x00")[0])
+	gl.UseProgram(iv.selProgramID)
 	gl.Uniform2f(uniformID, float32(iv.area.W), float32(iv.area.H))
 	gl.UseProgram(0)
 
 	gl.GenBuffers(1, &iv.vboID)
 	gl.GenVertexArrays(1, &iv.vaoID)
 	configureVAO(iv.vaoID, iv.vboID, []int32{2, 2})
+
+	gl.GenBuffers(1, &iv.selVbo)
+	gl.GenVertexArrays(1, &iv.selVao)
+	configureVAO(iv.selVao, iv.selVbo, []int32{2})
+
+	iv.selection = set.NewSet()
 
 	return iv, nil
 }
@@ -122,6 +147,39 @@ func (iv *ImageView) Render() {
 	go func() {
 		iv.comms <- imageComm{fileName: iv.fileName, mousePix: iv.mousePix, mult: iv.mult}
 	}()
+
+	// TODO optimize this (move elsewhere, update as changes come in)
+	// make array of 2d-vertex pairs representing texel selection outlines
+	lines := []float32{}
+	iv.selection.Range(func(i int32) bool {
+		// i is every y*width+x index
+		texelX := float32(i % iv.origW)
+		texelY := float32((float32(i) - texelX) / float32(iv.origW))
+		// TODO casting mult (float 64) to float 32, problem?
+		if !iv.selection.Contains(i - 1) {
+			// left edge
+			lines = append(lines, texelX*float32(iv.mult)+float32(iv.canvas.X), texelY*float32(iv.mult)+float32(iv.canvas.Y), texelX*float32(iv.mult)+float32(iv.canvas.X), (texelY+1)*float32(iv.mult)+float32(iv.canvas.Y))
+		}
+		if !iv.selection.Contains(i - iv.origW) {
+			// top edge
+			lines = append(lines, texelX*float32(iv.mult)+float32(iv.canvas.X), texelY*float32(iv.mult)+float32(iv.canvas.Y), (texelX+1)*float32(iv.mult)+float32(iv.canvas.X), texelY*float32(iv.mult)+float32(iv.canvas.Y))
+		}
+		if !iv.selection.Contains(i + 1) {
+			// right edge
+			lines = append(lines, (texelX+1)*float32(iv.mult)+float32(iv.canvas.X), texelY*float32(iv.mult)+float32(iv.canvas.Y), (texelX+1)*float32(iv.mult)+float32(iv.canvas.X), (texelY+1)*float32(iv.mult)+float32(iv.canvas.Y))
+		}
+		if !iv.selection.Contains(i + iv.origW) {
+			// bottom edge
+			lines = append(lines, texelX*float32(iv.mult)+float32(iv.canvas.X), (texelY+1)*float32(iv.mult)+float32(iv.canvas.Y), (texelX+1)*float32(iv.mult)+float32(iv.canvas.X), (texelY+1)*float32(iv.mult)+float32(iv.canvas.Y))
+		}
+		return true
+	})
+
+	if len(lines) > 0 {
+		gl.BindBuffer(gl.ARRAY_BUFFER, iv.selVbo)
+		gl.BufferData(gl.ARRAY_BUFFER, 4*len(lines), gl.Ptr(&lines[0]), gl.STATIC_DRAW)
+		gl.BindBuffer(gl.ARRAY_BUFFER, 0)
+	}
 
 	// update buffered data
 	tlx, tly := float32(iv.canvas.X), float32(iv.canvas.Y)
@@ -153,6 +211,16 @@ func (iv *ImageView) Render() {
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 	gl.DisableVertexAttribArray(0)
 	gl.DisableVertexAttribArray(1)
+	gl.BindVertexArray(0)
+
+	// gl.Viewport(iv.area.X+iv.canvas.X, iv.area.Y+iv.cfg.BottomBarHeight+iv.canvas.Y, iv.canvas.W, iv.canvas.H)
+	// fmt.Printf("area: %v, canvas: %v, calc: %v %v %v %v\n", iv.area, iv.canvas, iv.area.X+iv.canvas.X, iv.area.Y+iv.cfg.BottomBarHeight+iv.canvas.Y, iv.canvas.W, iv.canvas.H)
+	gl.UseProgram(iv.selProgramID)
+
+	gl.BindVertexArray(iv.selVao)
+	gl.EnableVertexAttribArray(0)
+	gl.DrawArrays(gl.LINES, 0, int32(len(lines)/2))
+	gl.DisableVertexAttribArray(0)
 	gl.BindVertexArray(0)
 
 	gl.UseProgram(0)
@@ -220,7 +288,8 @@ func (iv *ImageView) OnMotion(evt *sdl.MouseMotionEvent) bool {
 		iv.dragPoint.y = evt.Y
 	}
 	if evt.State == sdl.ButtonLMask() && inBounds(iv.canvas, evt.X, evt.Y) {
-		iv.setPixel(iv.mousePix.x, iv.mousePix.y, []byte{0x00, 0x00, 0x00, 0x00})
+		//iv.setPixel(iv.mousePix.x, iv.mousePix.y, []byte{0x00, 0x00, 0x00, 0x00})
+		iv.selection.Add(iv.mousePix.x + iv.mousePix.y*iv.origW)
 	}
 	return true
 }
@@ -258,7 +327,8 @@ func (iv *ImageView) OnClick(evt *sdl.MouseButtonEvent) bool {
 		iv.dragPoint.y = evt.Y
 	}
 	if evt.Button == sdl.BUTTON_LEFT && evt.State == sdl.PRESSED {
-		iv.setPixel(iv.mousePix.x, iv.mousePix.y, []byte{0x00, 0x00, 0x00, 0x00})
+		//iv.setPixel(iv.mousePix.x, iv.mousePix.y, []byte{0x00, 0x00, 0x00, 0x00})
+		iv.selection.Add(iv.mousePix.x + iv.mousePix.y*iv.origW)
 	}
 	return true
 }
@@ -270,6 +340,11 @@ func (iv *ImageView) OnResize(x, y int32) {
 
 	uniformID := gl.GetUniformLocation(iv.programID, &[]byte("area\x00")[0])
 	gl.UseProgram(iv.programID)
+	gl.Uniform2f(uniformID, float32(iv.area.W), float32(iv.area.H))
+	gl.UseProgram(0)
+
+	uniformID = gl.GetUniformLocation(iv.selProgramID, &[]byte("area\x00")[0])
+	gl.UseProgram(iv.selProgramID)
 	gl.Uniform2f(uniformID, float32(iv.area.W), float32(iv.area.H))
 	gl.UseProgram(0)
 
