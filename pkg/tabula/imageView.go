@@ -156,7 +156,7 @@ func (iv *ImageView) Render() {
 		blx, bly := texelX*float32(iv.mult)+float32(iv.canvas.X), (texelY+1)*float32(iv.mult)+float32(iv.canvas.Y)
 		brx, bry := (texelX+1)*float32(iv.mult)+float32(iv.canvas.X), (texelY+1)*float32(iv.mult)+float32(iv.canvas.Y)
 		// left edge
-		if !iv.selection.Contains(i - 1) {
+		if !iv.selection.Contains(i-1) || i%iv.origW == 0 {
 			lines = append(lines, tlx, tly, blx, bly)
 		}
 		// top edge
@@ -164,7 +164,7 @@ func (iv *ImageView) Render() {
 			lines = append(lines, tlx, tly, trx, try)
 		}
 		// right edge
-		if !iv.selection.Contains(i + 1) {
+		if !iv.selection.Contains(i+1) || (i+1)%iv.origW == 0 {
 			lines = append(lines, trx, try, brx, bry)
 		}
 		// bottom edge
