@@ -106,7 +106,7 @@ func NewApplication(win *sdl.Window, cfg Config) *Application {
 	centerButton.SetHighlightBackgroundColor([4]float32{1.0, 0.0, 0.0, 1.0})
 	centerButton.SetDefaultTextColor([4]float32{0.0, 0.0, 1.0, 1.0})
 
-	catmenuList := NewMenuList(&cfg, false)
+	catMenuList := NewMenuList(&cfg, false)
 
 	menuBar := NewMenuList(&cfg, true)
 	menuItems := []struct {
@@ -114,7 +114,7 @@ func NewApplication(win *sdl.Window, cfg Config) *Application {
 		ml  *MenuList
 		act func()
 	}{
-		{"cat", catmenuList, func() { fmt.Println("cat") }},
+		{"cat", catMenuList, func() { fmt.Println("cat") }},
 		{"dog", &MenuList{}, func() { fmt.Println("dog") }},
 		{"wolf", &MenuList{}, func() { fmt.Println("wolf") }},
 		{"giraffe", &MenuList{}, func() { fmt.Println("giraffe") }},
@@ -126,15 +126,29 @@ func NewApplication(win *sdl.Window, cfg Config) *Application {
 		panic(err)
 	}
 
-	submenuItems := []struct {
+	kittenMenuList := NewMenuList(&cfg, false)
+	catSubmenuItems := []struct {
 		str string
 		ml  *MenuList
 		act func()
 	}{
 		{"kitty", &MenuList{}, func() { fmt.Println("kitty") }},
-		{"kitten", &MenuList{}, func() { fmt.Println("kitten") }},
+		{"kitten", kittenMenuList, func() { fmt.Println("kitten") }},
 	}
-	if err = catmenuList.SetChildren(0, menuBar.area.H, submenuItems); err != nil {
+	if err = catMenuList.SetChildren(0, menuBar.area.H, catSubmenuItems); err != nil {
+		panic(err)
+	}
+
+	kittenSubmenuItems := []struct {
+		str string
+		ml  *MenuList
+		act func()
+	}{
+		{"Mooney", &MenuList{}, func() { fmt.Println("Mooney") }},
+		{"Buttercup", &MenuList{}, func() { fmt.Println("Buttercup") }},
+		{"Sunny", &MenuList{}, func() { fmt.Println("Sunny") }},
+	}
+	if err = kittenMenuList.SetChildren(catMenuList.area.W, menuBar.area.H+catMenuList.area.H/2, kittenSubmenuItems); err != nil {
 		panic(err)
 	}
 
