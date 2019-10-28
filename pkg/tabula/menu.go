@@ -312,7 +312,6 @@ func (ml *MenuList) OnResize(x, y int32) {
 	for _, c := range ml.entries {
 		c.OnResize(x, y)
 	}
-	fmt.Println("MenuList OnResize")
 }
 
 func (ml *MenuList) String() string {

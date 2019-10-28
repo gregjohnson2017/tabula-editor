@@ -63,7 +63,7 @@ func main() {
 	win, err := initWindow("Tabula Editor", cfg.ScreenWidth, cfg.ScreenHeight)
 	errCheck(err)
 
-	app := tabula.NewApplication(win, cfg)
+	app := tabula.NewApplication(win, &cfg)
 	app.Start()
 
 	for app.Running() { // TODO fix looping

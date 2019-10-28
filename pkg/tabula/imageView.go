@@ -125,6 +125,10 @@ func (iv *ImageView) Destroy() {
 	gl.DeleteTextures(1, &iv.textureID)
 	gl.DeleteBuffers(1, &iv.vboID)
 	gl.DeleteVertexArrays(1, &iv.vaoID)
+	gl.DeleteBuffers(1, &iv.selVbo)
+	gl.DeleteVertexArrays(1, &iv.selVao)
+	gl.DeleteProgram(iv.programID)
+	gl.DeleteProgram(iv.selProgramID)
 }
 
 // InBoundary returns whether a point is in this UIComponent's bounds
@@ -143,14 +147,13 @@ func (iv *ImageView) Render() {
 		iv.comms <- imageComm{fileName: iv.fileName, mousePix: iv.mousePix, mult: iv.mult}
 	}()
 
-	// TODO optimize this (move elsewhere, update as changes come in)
+	// TODO optimize this (ex: move elsewhere, update as changes come in, use a better algorithm)
 	// make array of 2d-vertex pairs representing texel selection outlines
 	lines := []float32{}
 	iv.selection.Range(func(i int32) bool {
 		// i is every y*width+x index
 		texelX := float32(i % iv.origW)
 		texelY := float32((float32(i) - texelX) / float32(iv.origW))
-		// TODO casting mult (float 64) to float 32, problem?
 		tlx, tly := texelX*float32(iv.mult)+float32(iv.canvas.X), texelY*float32(iv.mult)+float32(iv.canvas.Y)
 		trx, try := (texelX+1)*float32(iv.mult)+float32(iv.canvas.X), texelY*float32(iv.mult)+float32(iv.canvas.Y)
 		blx, bly := texelX*float32(iv.mult)+float32(iv.canvas.X), (texelY+1)*float32(iv.mult)+float32(iv.canvas.Y)
@@ -180,7 +183,7 @@ func (iv *ImageView) Render() {
 		gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 	}
 
-	// update buffered data
+	// update triangles that represent the position and scale of the image (these are SDL/window coordinates, converted to -1,1 gl space coordinates in the vertex shader)
 	tlx, tly := float32(iv.canvas.X), float32(iv.canvas.Y)
 	trx, try := float32(iv.canvas.X+iv.canvas.W), float32(iv.canvas.Y)
 	blx, bly := float32(iv.canvas.X), float32(iv.canvas.H+iv.canvas.Y)
@@ -200,6 +203,7 @@ func (iv *ImageView) Render() {
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 
 	gl.Viewport(iv.area.X, iv.area.Y+iv.cfg.BottomBarHeight, iv.area.W, iv.area.H)
+	// draw image
 	gl.UseProgram(iv.programID)
 
 	gl.BindVertexArray(iv.vaoID)
@@ -212,8 +216,7 @@ func (iv *ImageView) Render() {
 	gl.DisableVertexAttribArray(1)
 	gl.BindVertexArray(0)
 
-	// gl.Viewport(iv.area.X+iv.canvas.X, iv.area.Y+iv.cfg.BottomBarHeight+iv.canvas.Y, iv.canvas.W, iv.canvas.H)
-	// fmt.Printf("area: %v, canvas: %v, calc: %v %v %v %v\n", iv.area, iv.canvas, iv.area.X+iv.canvas.X, iv.area.Y+iv.cfg.BottomBarHeight+iv.canvas.Y, iv.canvas.W, iv.canvas.H)
+	// draw selection outlines
 	gl.UseProgram(iv.selProgramID)
 
 	gl.BindVertexArray(iv.selVao)

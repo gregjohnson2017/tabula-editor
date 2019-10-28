@@ -24,7 +24,7 @@ type Config struct {
 
 // Application holds state for the tabula application
 type Application struct {
-	cfg         Config
+	cfg         *Config
 	comps       []UIComponent
 	currHover   UIComponent
 	framerate   *gfx.FPSmanager
@@ -36,7 +36,7 @@ type Application struct {
 }
 
 // NewApplication returns a newly instantiated application state struct
-func NewApplication(win *sdl.Window, cfg Config) *Application {
+func NewApplication(win *sdl.Window, cfg *Config) *Application {
 	var fileName string
 	var err error
 	if len(os.Args) == 2 {
@@ -78,11 +78,11 @@ func NewApplication(win *sdl.Window, cfg Config) *Application {
 	bottomBarComms := make(chan imageComm)
 	actionComms := make(chan func())
 
-	iv, err := NewImageView(imageViewArea, fileName, bottomBarComms, &cfg)
+	iv, err := NewImageView(imageViewArea, fileName, bottomBarComms, cfg)
 	errCheck(err)
-	bottomBar, err := NewBottomBar(bottomBarArea, bottomBarComms, &cfg)
+	bottomBar, err := NewBottomBar(bottomBarArea, bottomBarComms, cfg)
 	errCheck(err)
-	openButton, err := NewButton(buttonAreaOpen, &cfg, "Open File", func() {
+	openButton, err := NewButton(buttonAreaOpen, cfg, "Open File", func() {
 		// TODO fix spam click crash bug
 		newFileName, err := util.OpenFileDialog(win)
 		if err != nil {
@@ -96,7 +96,7 @@ func NewApplication(win *sdl.Window, cfg Config) *Application {
 			}
 		}()
 	})
-	centerButton, err := NewButton(buttonAreaCenter, &cfg, "Center Image", func() {
+	centerButton, err := NewButton(buttonAreaCenter, cfg, "Center Image", func() {
 		go func() {
 			actionComms <- func() {
 				iv.centerImage()
@@ -106,9 +106,9 @@ func NewApplication(win *sdl.Window, cfg Config) *Application {
 	centerButton.SetHighlightBackgroundColor([4]float32{1.0, 0.0, 0.0, 1.0})
 	centerButton.SetDefaultTextColor([4]float32{0.0, 0.0, 1.0, 1.0})
 
-	catMenuList := NewMenuList(&cfg, false)
+	catMenuList := NewMenuList(cfg, false)
 
-	menuBar := NewMenuList(&cfg, true)
+	menuBar := NewMenuList(cfg, true)
 	menuItems := []struct {
 		str string
 		ml  *MenuList
@@ -126,7 +126,7 @@ func NewApplication(win *sdl.Window, cfg Config) *Application {
 		panic(err)
 	}
 
-	kittenMenuList := NewMenuList(&cfg, false)
+	kittenMenuList := NewMenuList(cfg, false)
 	catSubmenuItems := []struct {
 		str string
 		ml  *MenuList
