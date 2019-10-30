@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"strings"
+	"time"
 	"unicode"
 	"unsafe"
 
@@ -226,6 +227,7 @@ type fontInfo struct {
 	runeMap   []runeInfo // map of character-specific spacing info
 }
 
+// TODO save cached fonts to local direct
 // fontMap caches previously loaded fonts
 var fontMap map[fontKey]fontInfo
 
@@ -313,7 +315,7 @@ func loadFontTexture(fontName string, fontSize int32) (uint32, []runeInfo, error
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 
-	fmt.Printf("Loaded %v at size %v in %v ns\n", fontName, fontSize, sw.StopGetNano())
+	fmt.Printf("Loaded %v at size %v:\t%v\n", fontName, fontSize, time.Duration(int64(time.Nanosecond)*sw.StopGetNano()))
 	fontMap[fontKey{fontName, fontSize}] = fontInfo{fontTextureID, runeMap[:]}
 	return fontTextureID, runeMap[:], nil
 }
