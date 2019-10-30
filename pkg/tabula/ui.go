@@ -216,10 +216,29 @@ func mapString(str string, runeMap []runeInfo, pos coord, align Align) []float32
 	return buffer
 }
 
+type fontKey struct {
+	fontName string
+	fontSize int32
+}
+
+type fontInfo struct {
+	textureID uint32     // OpenGL texture ID of cached glyph data
+	runeMap   []runeInfo // map of character-specific spacing info
+}
+
+// fontMap caches previously loaded fonts
+var fontMap map[fontKey]fontInfo
+
 // loadFontTexture caches all of the glyph pixel data in an OpenGL texture for
 // a given font at a given size. It returns the OpenGL ID for this texture,
 // along with a runeInfo array for indexing into the texture per rune at runtime
 func loadFontTexture(fontName string, fontSize int32) (uint32, []runeInfo, error) {
+	if fontMap == nil {
+		fontMap = make(map[fontKey]fontInfo)
+	}
+	if val, ok := fontMap[fontKey{fontName, fontSize}]; ok {
+		return val.textureID, val.runeMap[:], nil
+	}
 	sw := util.Start()
 
 	var err error
@@ -295,6 +314,7 @@ func loadFontTexture(fontName string, fontSize int32) (uint32, []runeInfo, error
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 
 	fmt.Printf("Loaded %v at size %v in %v ns\n", fontName, fontSize, sw.StopGetNano())
+	fontMap[fontKey{fontName, fontSize}] = fontInfo{fontTextureID, runeMap[:]}
 	return fontTextureID, runeMap[:], nil
 }
 

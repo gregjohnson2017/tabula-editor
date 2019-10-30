@@ -66,7 +66,7 @@ func main() {
 	app := tabula.NewApplication(win, &cfg)
 	app.Start()
 
-	for app.Running() { // TODO fix looping
+	for app.Running() {
 		for evt := sdl.PollEvent(); evt != nil; evt = sdl.PollEvent() {
 			app.HandleSdlEvent(evt)
 		}

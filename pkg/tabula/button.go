@@ -43,7 +43,6 @@ func NewButton(area *sdl.Rect, cfg *Config, text string, action func()) (*Button
 		return nil, err
 	}
 
-	// TODO preload fonts & sizes in main.go and store in a collection for all UIComponents
 	fontTexID, runeMap, err := loadFontTexture("NotoMono-Regular.ttf", 14)
 	if err != nil {
 		return nil, err

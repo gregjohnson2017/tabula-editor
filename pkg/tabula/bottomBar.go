@@ -42,7 +42,6 @@ func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, cfg *Config) (*BottomB
 		return nil, err
 	}
 
-	// TODO preload fonts & sizes in main.go and store in a collection for all UIComponents
 	fontTexID, runeMap, err := loadFontTexture("NotoMono-Regular.ttf", 24)
 	if err != nil {
 		return nil, err
