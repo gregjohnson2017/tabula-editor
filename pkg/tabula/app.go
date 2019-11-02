@@ -76,9 +76,10 @@ func NewApplication(win *sdl.Window, cfg *Config) *Application {
 	}
 
 	bottomBarComms := make(chan imageComm)
+	toolComms := make(chan ImageTool)
 	actionComms := make(chan func())
 
-	iv, err := NewImageView(imageViewArea, fileName, bottomBarComms, cfg)
+	iv, err := NewImageView(imageViewArea, fileName, bottomBarComms, toolComms, cfg)
 	errCheck(err)
 	bottomBar, err := NewBottomBar(bottomBarArea, bottomBarComms, cfg)
 	errCheck(err)
@@ -107,6 +108,7 @@ func NewApplication(win *sdl.Window, cfg *Config) *Application {
 	centerButton.SetDefaultTextColor([4]float32{0.0, 0.0, 1.0, 1.0})
 
 	catMenuList := NewMenuList(cfg, false)
+	toolsMenuList := NewMenuList(cfg, false)
 
 	menuBar := NewMenuList(cfg, true)
 	menuItems := []struct {
@@ -115,12 +117,7 @@ func NewApplication(win *sdl.Window, cfg *Config) *Application {
 		act func()
 	}{
 		{"cat", catMenuList, func() { fmt.Println("cat") }},
-		{"dog", &MenuList{}, func() { fmt.Println("dog") }},
-		{"wolf", &MenuList{}, func() { fmt.Println("wolf") }},
-		{"giraffe", &MenuList{}, func() { fmt.Println("giraffe") }},
-		{"elephant", &MenuList{}, func() { fmt.Println("elephant") }},
-		{"lynx", &MenuList{}, func() { fmt.Println("lynx") }},
-		{"zebra", &MenuList{}, func() { fmt.Println("zebra") }},
+		{"Tools", toolsMenuList, func() {}},
 	}
 	if err = menuBar.SetChildren(0, 0, menuItems); err != nil {
 		panic(err)
@@ -149,6 +146,24 @@ func NewApplication(win *sdl.Window, cfg *Config) *Application {
 		{"Sunny", &MenuList{}, func() { fmt.Println("Sunny") }},
 	}
 	if err = kittenMenuList.SetChildren(catMenuList.area.W, menuBar.area.H+catMenuList.area.H/2, kittenSubmenuItems); err != nil {
+		panic(err)
+	}
+
+	toolsSubmenuItems := []struct {
+		str string
+		ml  *MenuList
+		act func()
+	}{
+		{"No tool", &MenuList{}, func() {
+			// clear the image view tool
+			go func() { toolComms <- EmptyTool{} }()
+		}},
+		{"Pixel selection tool", &MenuList{}, func() {
+			// set the image view tool to the pixel selection tool
+			go func() { toolComms <- PixelSelectionTool{} }()
+		}},
+	}
+	if err = toolsMenuList.SetChildren(0, menuBar.area.H, toolsSubmenuItems); err != nil {
 		panic(err)
 	}
 

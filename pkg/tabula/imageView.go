@@ -1,6 +1,7 @@
 package tabula
 
 import (
+	"fmt"
 	"math"
 	"os"
 	"strings"
@@ -31,9 +32,11 @@ type ImageView struct {
 	glSquare       []float32
 	vaoID, vboID   uint32
 	selVao, selVbo uint32
-	comms          chan<- imageComm
+	bbComms        chan<- imageComm
 	fileName       string
 	fullPath       string
+	toolComms      <-chan ImageTool
+	activeTool     ImageTool
 	selection      set.Set
 }
 
@@ -81,12 +84,13 @@ func (iv *ImageView) loadFromFile(fileName string) error {
 }
 
 // NewImageView returns a pointer to a new ImageView struct that implements UIComponent
-func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, cfg *Config) (*ImageView, error) {
+func NewImageView(area *sdl.Rect, fileName string, bbComms chan<- imageComm, toolComms <-chan ImageTool, cfg *Config) (*ImageView, error) {
 	var err error
 	var iv = &ImageView{}
 	iv.cfg = cfg
 	iv.area = area
-	iv.comms = comms
+	iv.bbComms = bbComms
+	iv.toolComms = toolComms
 	if err = iv.loadFromFile(fileName); err != nil {
 		return nil, err
 	}
@@ -123,6 +127,7 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, cfg *
 	configureVAO(iv.selVao, iv.selVbo, []int32{2})
 
 	iv.selection = set.NewSet()
+	iv.activeTool = EmptyTool{}
 
 	return iv, nil
 }
@@ -151,7 +156,7 @@ func (iv *ImageView) GetBoundary() *sdl.Rect {
 // Render draws the UIComponent
 func (iv *ImageView) Render() {
 	go func() {
-		iv.comms <- imageComm{fileName: iv.fileName, mousePix: iv.mousePix, mult: iv.mult}
+		iv.bbComms <- imageComm{fileName: iv.fileName, mousePix: iv.mousePix, mult: iv.mult}
 	}()
 
 	// TODO optimize this (ex: move elsewhere, update as changes come in, use a better algorithm)
@@ -235,6 +240,12 @@ func (iv *ImageView) Render() {
 	gl.BindVertexArray(0)
 
 	gl.UseProgram(0)
+
+	select {
+	case tool := <-iv.toolComms:
+		iv.activeTool = tool
+	default:
+	}
 }
 
 func (iv *ImageView) zoomIn() {
@@ -306,10 +317,7 @@ func (iv *ImageView) OnMotion(evt *sdl.MouseMotionEvent) bool {
 		iv.dragPoint.x = evt.X
 		iv.dragPoint.y = evt.Y
 	}
-	if evt.State == sdl.ButtonLMask() && inBounds(iv.canvas, evt.X, evt.Y) {
-		//iv.setPixel(iv.mousePix.x, iv.mousePix.y, []byte{0x00, 0x00, 0x00, 0x00})
-		iv.selection.Add(iv.mousePix.x + iv.mousePix.y*iv.origW)
-	}
+	iv.activeTool.OnMotion(evt, iv)
 	return true
 }
 
@@ -330,6 +338,15 @@ func (iv *ImageView) OnScroll(evt *sdl.MouseWheelEvent) bool {
 	return true
 }
 
+// SelectPixel adds the given x, y pixel to the
+func (iv *ImageView) SelectPixel(x, y int32) error {
+	if x < 0 || y < 0 || x > iv.area.W || y > iv.area.H {
+		return fmt.Errorf("x and y coordinates (%v, %v) are out of range", x, y)
+	}
+	iv.selection.Add(iv.mousePix.x + iv.mousePix.y*iv.origW)
+	return nil
+}
+
 // OnClick is called when the user clicks within the UIComponent's region
 func (iv *ImageView) OnClick(evt *sdl.MouseButtonEvent) bool {
 	iv.updateMousePos(evt.X, evt.Y)
@@ -345,10 +362,7 @@ func (iv *ImageView) OnClick(evt *sdl.MouseButtonEvent) bool {
 		iv.dragPoint.x = evt.X
 		iv.dragPoint.y = evt.Y
 	}
-	if evt.Button == sdl.BUTTON_LEFT && evt.State == sdl.PRESSED {
-		//iv.setPixel(iv.mousePix.x, iv.mousePix.y, []byte{0x00, 0x00, 0x00, 0x00})
-		iv.selection.Add(iv.mousePix.x + iv.mousePix.y*iv.origW)
-	}
+	iv.activeTool.OnClick(evt, iv)
 	return true
 }
 
