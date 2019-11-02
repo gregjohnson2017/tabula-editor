@@ -75,6 +75,8 @@ func (iv *ImageView) loadFromFile(fileName string) error {
 	parts := strings.Split(fileName, string(os.PathSeparator))
 	iv.fileName = parts[len(parts)-1]
 	iv.fullPath = fileName
+
+	iv.selection = set.NewSet()
 	return nil
 }
 
@@ -102,9 +104,14 @@ func NewImageView(area *sdl.Rect, fileName string, comms chan<- imageComm, cfg *
 	gl.Uniform2f(uniformID, float32(iv.area.W), float32(iv.area.H))
 	gl.UseProgram(0)
 
-	uniformID = gl.GetUniformLocation(iv.selProgramID, &[]byte("area\x00")[0])
+	uniformID = gl.GetUniformLocation(iv.selProgramID, &[]byte("origDims\x00")[0])
 	gl.UseProgram(iv.selProgramID)
-	gl.Uniform2f(uniformID, float32(iv.area.W), float32(iv.area.H))
+	gl.Uniform2f(uniformID, float32(iv.origW), float32(iv.origH))
+	gl.UseProgram(0)
+
+	uniformID = gl.GetUniformLocation(iv.selProgramID, &[]byte("mult\x00")[0])
+	gl.UseProgram(iv.selProgramID)
+	gl.Uniform1f(uniformID, float32(iv.mult))
 	gl.UseProgram(0)
 
 	gl.GenBuffers(1, &iv.vboID)
@@ -154,10 +161,10 @@ func (iv *ImageView) Render() {
 		// i is every y*width+x index
 		texelX := float32(i % iv.origW)
 		texelY := float32((float32(i) - texelX) / float32(iv.origW))
-		tlx, tly := texelX*float32(iv.mult)+float32(iv.canvas.X), texelY*float32(iv.mult)+float32(iv.canvas.Y)
-		trx, try := (texelX+1)*float32(iv.mult)+float32(iv.canvas.X), texelY*float32(iv.mult)+float32(iv.canvas.Y)
-		blx, bly := texelX*float32(iv.mult)+float32(iv.canvas.X), (texelY+1)*float32(iv.mult)+float32(iv.canvas.Y)
-		brx, bry := (texelX+1)*float32(iv.mult)+float32(iv.canvas.X), (texelY+1)*float32(iv.mult)+float32(iv.canvas.Y)
+		tlx, tly := texelX, texelY
+		trx, try := (texelX + 1), texelY
+		blx, bly := texelX, (texelY + 1)
+		brx, bry := (texelX + 1), (texelY + 1)
 		// left edge
 		if !iv.selection.Contains(i-1) || i%iv.origW == 0 {
 			lines = append(lines, tlx, tly, blx, bly)
@@ -202,7 +209,8 @@ func (iv *ImageView) Render() {
 	gl.BufferData(gl.ARRAY_BUFFER, 4*len(triangles), gl.Ptr(&triangles[0]), gl.STATIC_DRAW)
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 
-	gl.Viewport(iv.area.X, iv.area.Y+iv.cfg.BottomBarHeight, iv.area.W, iv.area.H)
+	// gl viewport x,y is bottom left
+	gl.Viewport(iv.area.X, iv.cfg.ScreenHeight-iv.area.H-iv.area.Y, iv.area.W, iv.area.H)
 	// draw image
 	gl.UseProgram(iv.programID)
 
@@ -217,6 +225,7 @@ func (iv *ImageView) Render() {
 	gl.BindVertexArray(0)
 
 	// draw selection outlines
+	gl.Viewport(iv.area.X+iv.canvas.X, iv.cfg.ScreenHeight-iv.area.Y-iv.canvas.Y-iv.canvas.H, iv.canvas.W, iv.canvas.H)
 	gl.UseProgram(iv.selProgramID)
 
 	gl.BindVertexArray(iv.selVao)
@@ -234,6 +243,10 @@ func (iv *ImageView) zoomIn() {
 	iv.canvas.H = int32(float64(iv.origH) * iv.mult)
 	iv.canvas.X = 2*iv.canvas.X - int32(math.Round(float64(iv.area.W)/2.0)) //iv.mouseLoc.x
 	iv.canvas.Y = 2*iv.canvas.Y - int32(math.Round(float64(iv.area.H)/2.0)) //iv.mouseLoc.y
+	uniformID := gl.GetUniformLocation(iv.selProgramID, &[]byte("mult\x00")[0])
+	gl.UseProgram(iv.selProgramID)
+	gl.Uniform1f(uniformID, float32(iv.mult))
+	gl.UseProgram(0)
 }
 
 func (iv *ImageView) zoomOut() {
@@ -242,6 +255,10 @@ func (iv *ImageView) zoomOut() {
 	iv.canvas.H = int32(float64(iv.origH) * iv.mult)
 	iv.canvas.X = int32(math.Round(float64(iv.canvas.X)/2.0 + float64(iv.area.W)/4.0)) //iv.mouseLoc.x/2
 	iv.canvas.Y = int32(math.Round(float64(iv.canvas.Y)/2.0 + float64(iv.area.H)/4.0)) //iv.mouseLoc.y/2
+	uniformID := gl.GetUniformLocation(iv.selProgramID, &[]byte("mult\x00")[0])
+	gl.UseProgram(iv.selProgramID)
+	gl.Uniform1f(uniformID, float32(iv.mult))
+	gl.UseProgram(0)
 }
 
 func (iv *ImageView) centerImage() {
@@ -342,11 +359,6 @@ func (iv *ImageView) OnResize(x, y int32) {
 
 	uniformID := gl.GetUniformLocation(iv.programID, &[]byte("area\x00")[0])
 	gl.UseProgram(iv.programID)
-	gl.Uniform2f(uniformID, float32(iv.area.W), float32(iv.area.H))
-	gl.UseProgram(0)
-
-	uniformID = gl.GetUniformLocation(iv.selProgramID, &[]byte("area\x00")[0])
-	gl.UseProgram(iv.selProgramID)
 	gl.Uniform2f(uniformID, float32(iv.area.W), float32(iv.area.H))
 	gl.UseProgram(0)
 

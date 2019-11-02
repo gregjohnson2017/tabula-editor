@@ -175,7 +175,7 @@ func (ml *MenuList) SetChildren(offx int32, offy int32, childs []struct {
 			}
 		}
 	}
-	// populate list of menu entries with appropriately boundaries
+	// populate list of menu entries with appropriate boundaries
 	var off int32
 	for _, child := range childs {
 		w, h := calcStringDims(child.str, runeMap)

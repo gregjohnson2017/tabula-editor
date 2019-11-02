@@ -368,11 +368,14 @@ const (
 	outlineVsh = `
 	#version 460
 	uniform vec4 uni_color;
-	uniform vec2 area;
+	uniform vec2 origDims;
+	uniform float mult;
 	in vec2 position_in;
 	out vec4 color;
 	void main() {
-		vec2 glSpace = vec2(2.0, -2.0) * (position_in / area) + vec2(-1.0, 1.0);
+		vec2 canvasArea = mult * origDims;
+		vec2 pos = vec2(mult * position_in.x, canvasArea.y - mult * position_in.y);
+		vec2 glSpace = vec2(2.0, 2.0) * (pos / canvasArea) + vec2(-1.0, -1.0);
 		gl_Position = vec4(glSpace, 0.0, 1.0);
 		color = uni_color;
 	}
