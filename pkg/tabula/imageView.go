@@ -53,6 +53,10 @@ func (iv *ImageView) loadFromFile(fileName string) error {
 	}
 	iv.origW = surf.W
 	iv.origH = surf.H
+	uniformID := gl.GetUniformLocation(iv.selProgramID, &[]byte("origDims\x00")[0])
+	gl.UseProgram(iv.selProgramID)
+	gl.Uniform2f(uniformID, float32(iv.origW), float32(iv.origH))
+	gl.UseProgram(0)
 
 	format := int32(gl.RGBA)
 	gl.DeleteTextures(1, &iv.textureID)
@@ -74,6 +78,10 @@ func (iv *ImageView) loadFromFile(fileName string) error {
 	}
 	iv.centerImage()
 	iv.mult = 1.0
+	uniformID = gl.GetUniformLocation(iv.selProgramID, &[]byte("mult\x00")[0])
+	gl.UseProgram(iv.selProgramID)
+	gl.Uniform1f(uniformID, float32(iv.mult))
+	gl.UseProgram(0)
 
 	parts := strings.Split(fileName, string(os.PathSeparator))
 	iv.fileName = parts[len(parts)-1]
