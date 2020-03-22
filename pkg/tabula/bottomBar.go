@@ -154,9 +154,14 @@ func (bb *BottomBar) Render() {
 
 	// second render text on top
 	// TODO optimize rendering by no-oping if string hasn't changed (or window size)
-	fileNameTriangles := mapString(msg.fileName, bb.font, coord{0, bb.cfg.BottomBarHeight / 2}, Align{AlignMiddle, AlignLeft})
-	zoomTriangles := mapString(fmt.Sprintf("%vx", msg.mult), bb.font, coord{bb.cfg.ScreenWidth / 2, bb.cfg.BottomBarHeight / 2}, Align{AlignMiddle, AlignCenter})
-	mousePixTriangles := mapString(fmt.Sprintf("(%v, %v)", msg.mousePix.x, msg.mousePix.y), bb.font, coord{bb.cfg.ScreenWidth, bb.cfg.BottomBarHeight / 2}, Align{AlignMiddle, AlignRight})
+	fileNameMessage := msg.fileName
+	zoomMessage := fmt.Sprintf("%vx", msg.mult)
+	mousePixMessage := fmt.Sprintf("(%v, %v)", msg.mousePix.x, msg.mousePix.y)
+	maxBearingY := getMaxVerticalBearing(fileNameMessage+zoomMessage+mousePixMessage, bb.font)
+
+	fileNameTriangles := mapStringWithBearing(fileNameMessage, bb.font, maxBearingY, coord{0, bb.cfg.BottomBarHeight / 2}, Align{AlignMiddle, AlignLeft})
+	zoomTriangles := mapStringWithBearing(zoomMessage, bb.font, maxBearingY, coord{bb.cfg.ScreenWidth / 2, bb.cfg.BottomBarHeight / 2}, Align{AlignMiddle, AlignCenter})
+	mousePixTriangles := mapStringWithBearing(mousePixMessage, bb.font, maxBearingY, coord{bb.cfg.ScreenWidth, bb.cfg.BottomBarHeight / 2}, Align{AlignMiddle, AlignRight})
 	triangles := make([]float32, len(fileNameTriangles)+len(zoomTriangles)+len(mousePixTriangles))
 	triangles = append(triangles, fileNameTriangles...)
 	triangles = append(triangles, zoomTriangles...)
