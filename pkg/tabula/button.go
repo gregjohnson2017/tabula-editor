@@ -77,7 +77,7 @@ func NewButton(area *sdl.Rect, cfg *Config, text string, action func()) (*Button
 		+1.0, +1.0, // top-right
 		+1.0, -1.0, // bottom-right
 	}
-	_, textTriangles := mapString(text, font, 0, coord{area.X + area.W/2, cfg.ScreenHeight - area.Y - area.H/2}, Align{AlignMiddle, AlignCenter})
+	textTriangles := mapString(text, font, coord{area.X + area.W/2, cfg.ScreenHeight - area.Y - area.H/2}, Align{AlignMiddle, AlignCenter})
 
 	var backVaoID, backVboID uint32
 	gl.GenVertexArrays(1, &backVaoID)
@@ -252,7 +252,7 @@ func (b *Button) OnResize(x, y int32) {
 	gl.Uniform2f(uniformID, float32(b.cfg.ScreenWidth), float32(b.cfg.ScreenHeight))
 	gl.UseProgram(0)
 
-	_, textTriangles := mapString(b.text, b.font, 0, coord{b.area.X + b.area.W/2, b.cfg.ScreenHeight - b.area.Y - b.area.H/2}, Align{AlignMiddle, AlignCenter})
+	textTriangles := mapString(b.text, b.font, coord{b.area.X + b.area.W/2, b.cfg.ScreenHeight - b.area.Y - b.area.H/2}, Align{AlignMiddle, AlignCenter})
 	gl.BindBuffer(gl.ARRAY_BUFFER, b.textVboID)
 	gl.BufferData(gl.ARRAY_BUFFER, 4*len(textTriangles), gl.Ptr(&textTriangles[0]), gl.STATIC_DRAW)
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
