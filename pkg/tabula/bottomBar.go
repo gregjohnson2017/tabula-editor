@@ -162,7 +162,7 @@ func (bb *BottomBar) Render() {
 	fileNameTriangles := mapStringWithBearing(fileNameMessage, bb.font, maxBearingY, coord{0, bb.cfg.BottomBarHeight / 2}, Align{AlignMiddle, AlignLeft})
 	zoomTriangles := mapStringWithBearing(zoomMessage, bb.font, maxBearingY, coord{bb.cfg.ScreenWidth / 2, bb.cfg.BottomBarHeight / 2}, Align{AlignMiddle, AlignCenter})
 	mousePixTriangles := mapStringWithBearing(mousePixMessage, bb.font, maxBearingY, coord{bb.cfg.ScreenWidth, bb.cfg.BottomBarHeight / 2}, Align{AlignMiddle, AlignRight})
-	triangles := make([]float32, len(fileNameTriangles)+len(zoomTriangles)+len(mousePixTriangles))
+	triangles := make([]float32, 0, len(fileNameTriangles)+len(zoomTriangles)+len(mousePixTriangles))
 	triangles = append(triangles, fileNameTriangles...)
 	triangles = append(triangles, zoomTriangles...)
 	triangles = append(triangles, mousePixTriangles...)
