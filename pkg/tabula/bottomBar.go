@@ -5,7 +5,6 @@ import (
 
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/veandco/go-sdl2/sdl"
-	"github.com/veandco/go-sdl2/ttf"
 )
 
 var _ UIComponent = UIComponent(&BottomBar{})
@@ -16,7 +15,6 @@ type BottomBar struct {
 	comms         <-chan imageComm
 	color         [4]float32
 	mousePix      coord
-	font          *ttf.Font
 	fontSize      int32
 	backProgramID uint32
 	textProgramID uint32
@@ -24,8 +22,7 @@ type BottomBar struct {
 	backVboID     uint32
 	textVaoID     uint32
 	textVboID     uint32
-	fontTexID     uint32
-	runeMap       []runeInfo
+	font          fontInfo
 	cfg           *Config
 }
 
@@ -42,7 +39,7 @@ func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, cfg *Config) (*BottomB
 		return nil, err
 	}
 
-	fontTexID, runeMap, err := loadFontTexture("NotoMono-Regular.ttf", 24)
+	font, err := loadFontTexture("NotoMono-Regular.ttf", 24)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +56,7 @@ func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, cfg *Config) (*BottomB
 	textColorID := gl.GetUniformLocation(textProgramID, &[]byte("text_color\x00")[0])
 
 	var texSheetWidth, texSheetHeight int32
-	gl.BindTexture(gl.TEXTURE_2D, fontTexID)
+	gl.BindTexture(gl.TEXTURE_2D, font.textureID)
 	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_WIDTH, &texSheetWidth)
 	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_HEIGHT, &texSheetHeight)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
@@ -102,8 +99,7 @@ func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, cfg *Config) (*BottomB
 		backVboID:     backVboID,
 		textVaoID:     textVaoID,
 		textVboID:     textVboID,
-		fontTexID:     fontTexID,
-		runeMap:       runeMap,
+		font:          font,
 		cfg:           cfg,
 	}, nil
 }
@@ -158,9 +154,9 @@ func (bb *BottomBar) Render() {
 
 	// second render text on top
 	// TODO optimize rendering by no-oping if string hasn't changed (or window size)
-	fileNameTriangles := mapString(msg.fileName, bb.runeMap, coord{0, bb.cfg.BottomBarHeight / 2}, Align{AlignMiddle, AlignLeft})
-	zoomTriangles := mapString(fmt.Sprintf("%vx", msg.mult), bb.runeMap, coord{bb.cfg.ScreenWidth / 2, bb.cfg.BottomBarHeight / 2}, Align{AlignMiddle, AlignCenter})
-	mousePixTriangles := mapString(fmt.Sprintf("(%v, %v)", msg.mousePix.x, msg.mousePix.y), bb.runeMap, coord{bb.cfg.ScreenWidth, bb.cfg.BottomBarHeight / 2}, Align{AlignMiddle, AlignRight})
+	fileNameTriangles := mapString(msg.fileName, bb.font, coord{0, bb.cfg.BottomBarHeight / 2}, Align{AlignMiddle, AlignLeft})
+	zoomTriangles := mapString(fmt.Sprintf("%vx", msg.mult), bb.font, coord{bb.cfg.ScreenWidth / 2, bb.cfg.BottomBarHeight / 2}, Align{AlignMiddle, AlignCenter})
+	mousePixTriangles := mapString(fmt.Sprintf("(%v, %v)", msg.mousePix.x, msg.mousePix.y), bb.font, coord{bb.cfg.ScreenWidth, bb.cfg.BottomBarHeight / 2}, Align{AlignMiddle, AlignRight})
 	triangles := make([]float32, len(fileNameTriangles)+len(zoomTriangles)+len(mousePixTriangles))
 	triangles = append(triangles, fileNameTriangles...)
 	triangles = append(triangles, zoomTriangles...)
@@ -173,7 +169,7 @@ func (bb *BottomBar) Render() {
 	gl.BindVertexArray(bb.textVaoID)
 	gl.EnableVertexAttribArray(0)
 	gl.EnableVertexAttribArray(1)
-	gl.BindTexture(gl.TEXTURE_2D, bb.fontTexID)
+	gl.BindTexture(gl.TEXTURE_2D, bb.font.textureID)
 
 	gl.BufferData(gl.ARRAY_BUFFER, 4*len(triangles), gl.Ptr(&triangles[0]), gl.STATIC_DRAW)
 	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(triangles)/4))

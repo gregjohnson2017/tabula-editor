@@ -114,8 +114,6 @@ type runeInfo struct {
 	height   int32
 	bearingX float32
 	bearingY float32
-	ascent   int32
-	descent  int32
 	advance  float32
 }
 
@@ -124,70 +122,53 @@ type pointF32 struct {
 	y float32
 }
 
-func calcStringDims(str string, runeMap []runeInfo) (float64, float64) {
-	var strHeight, maxAscent, maxDescent int32
+func calcStringDims(str string, font fontInfo) (float64, float64) {
 	var strWidth, largestBearingY float32
 	for _, r := range str {
-		info := runeMap[r-minASCII]
-		if info.ascent > maxAscent {
-			maxAscent = info.ascent
-		}
-		if info.descent > maxDescent {
-			maxDescent = info.descent
-		}
+		info := font.runeMap[r-minASCII]
 		if info.bearingY > largestBearingY {
 			largestBearingY = info.bearingY
 		}
 		strWidth += info.advance
 	}
 	// adjust strWidth if last rune's width + bearingX > advance
-	lastInfo := runeMap[str[len(str)-1]-minASCII]
+	lastInfo := font.runeMap[str[len(str)-1]-minASCII]
 	if float32(lastInfo.width)+lastInfo.bearingX > lastInfo.advance {
 		strWidth += (float32(lastInfo.width) + lastInfo.bearingX - lastInfo.advance)
 	}
 
-	strHeight = maxAscent + maxDescent
-
-	return float64(strWidth), float64(strHeight)
+	return float64(strWidth), float64(font.textHeight)
 }
 
 // mapString turns each character in the string into a pair of
 // (x,y,s,t)-vertex triangles using glyph information from a
 // pre-loaded font. The vertex info is returned as []float32
-func mapString(str string, runeMap []runeInfo, pos coord, align Align) []float32 {
+func mapString(str string, font fontInfo, pos coord, align Align) []float32 {
 	// 2 triangles per rune, 3 vertices per triangle, 4 float32's per vertex (x,y,s,t)
 	buffer := make([]float32, 0, len(str)*24)
 	// get glyph information for alignment
-	var strHeight, maxAscent, maxDescent int32
 	var strWidth, largestBearingY float32
 	for _, r := range str {
-		info := runeMap[r-minASCII]
-		if info.ascent > maxAscent {
-			maxAscent = info.ascent
-		}
-		if info.descent > maxDescent {
-			maxDescent = info.descent
-		}
+		info := font.runeMap[r-minASCII]
 		if info.bearingY > largestBearingY {
 			largestBearingY = info.bearingY
 		}
 		strWidth += info.advance
 	}
 	// adjust strWidth if last rune's width + bearingX > advance
-	lastInfo := runeMap[str[len(str)-1]-minASCII]
+	lastInfo := font.runeMap[str[len(str)-1]-minASCII]
 	if float32(lastInfo.width)+lastInfo.bearingX > lastInfo.advance {
 		strWidth += (float32(lastInfo.width) + lastInfo.bearingX - lastInfo.advance)
 	}
 
-	strHeight = maxAscent + maxDescent
 	w2 := float64(strWidth) / 2.0
-	h2 := float64(strHeight) / 2.0
+	h2 := float64(font.textHeight) / 2.0
 	offx := int32(-w2 - float64(align.h)*w2)
 	offy := int32(-h2 - float64(align.v)*h2)
 	// offset origin to account for alignment
 	origin := pointF32{float32(pos.x + offx), float32(pos.y+offy) + largestBearingY}
 	for _, r := range str {
-		info := runeMap[r-minASCII]
+		info := font.runeMap[r-minASCII]
 
 		// calculate x,y position coordinates - use bottom left as (0,0); shader converts for you
 		posTL := pointF32{origin.x + info.bearingX, origin.y + (float32(info.height) - info.bearingY)}
@@ -223,8 +204,9 @@ type fontKey struct {
 }
 
 type fontInfo struct {
-	textureID uint32     // OpenGL texture ID of cached glyph data
-	runeMap   []runeInfo // map of character-specific spacing info
+	textureID  uint32     // OpenGL texture ID of cached glyph data
+	runeMap    []runeInfo // map of character-specific spacing info
+	textHeight float32    // how much space is between two lines of text in this font
 }
 
 // TODO save cached fonts to local direct
@@ -234,12 +216,12 @@ var fontMap map[fontKey]fontInfo
 // loadFontTexture caches all of the glyph pixel data in an OpenGL texture for
 // a given font at a given size. It returns the OpenGL ID for this texture,
 // along with a runeInfo array for indexing into the texture per rune at runtime
-func loadFontTexture(fontName string, fontSize int32) (uint32, []runeInfo, error) {
+func loadFontTexture(fontName string, fontSize int32) (fontInfo, error) {
 	if fontMap == nil {
 		fontMap = make(map[fontKey]fontInfo)
 	}
 	if val, ok := fontMap[fontKey{fontName, fontSize}]; ok {
-		return val.textureID, val.runeMap[:], nil
+		return val, nil
 	}
 	sw := util.Start()
 
@@ -247,10 +229,10 @@ func loadFontTexture(fontName string, fontSize int32) (uint32, []runeInfo, error
 	var fontBytes []byte
 	var font *truetype.Font
 	if fontBytes, err = ioutil.ReadFile(fontName); err != nil {
-		return 0, nil, err
+		return fontInfo{0, nil, 0}, err
 	}
 	if font, err = truetype.Parse(fontBytes); err != nil {
-		return 0, nil, err
+		return fontInfo{0, nil, 0}, err
 	}
 	face := truetype.NewFace(font, &truetype.Options{Size: float64(fontSize)})
 
@@ -262,12 +244,12 @@ func loadFontTexture(fontName string, fontSize int32) (uint32, []runeInfo, error
 
 		roundedRect, mask, maskp, advance, okGlyph := face.Glyph(fixed.Point26_6{X: 0, Y: 0}, c)
 		if !okGlyph {
-			return 0, nil, fmt.Errorf("%v does not contain glyph for '%c'", fontName, c)
+			return fontInfo{0, nil, 0}, fmt.Errorf("%v does not contain glyph for '%c'", fontName, c)
 		}
 		accurateRect, _, okBounds := face.GlyphBounds(c)
 		glyph, okCast := mask.(*image.Alpha)
 		if !okBounds || !okCast {
-			return 0, nil, fmt.Errorf("%v does not contain glyph for '%c'", fontName, c)
+			return fontInfo{0, nil, 0}, fmt.Errorf("%v does not contain glyph for '%c'", fontName, c)
 		}
 
 		runeMap[i-minASCII] = runeInfo{
@@ -276,8 +258,6 @@ func loadFontTexture(fontName string, fontSize int32) (uint32, []runeInfo, error
 			height:   int32(roundedRect.Dy()),
 			bearingX: float32(math.Round(float64(accurateRect.Min.X.Ceil()))),
 			bearingY: float32(accurateRect.Max.Y.Ceil()),
-			ascent:   int32(math.Abs(float64(roundedRect.Max.Y))),
-			descent:  int32(math.Abs(float64(roundedRect.Min.Y))),
 			advance:  float32(math.Round(float64(int26_6ToFloat32(advance)))),
 		}
 		// alternatively, upload entire glyph cache into OpenGL texture
@@ -292,7 +272,7 @@ func loadFontTexture(fontName string, fontSize int32) (uint32, []runeInfo, error
 
 	_, mask, _, _, aOK := face.Glyph(fixed.Point26_6{X: 0, Y: 0}, 'A')
 	if !aOK {
-		return 0, nil, fmt.Errorf("Failed to get glyph for 'A'")
+		return fontInfo{0, nil, 0}, fmt.Errorf("Failed to get glyph for 'A'")
 	}
 
 	// writeme, _ := mask.(*image.Alpha)
@@ -315,9 +295,12 @@ func loadFontTexture(fontName string, fontSize int32) (uint32, []runeInfo, error
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 
+	fontHeight := int26_6ToFloat32(face.Metrics().Height)
+
 	fmt.Printf("Loaded %v at size %v:\t%v\n", fontName, fontSize, time.Duration(int64(time.Nanosecond)*sw.StopGetNano()))
-	fontMap[fontKey{fontName, fontSize}] = fontInfo{fontTextureID, runeMap[:]}
-	return fontTextureID, runeMap[:], nil
+	fontInfoLoaded := fontInfo{fontTextureID, runeMap[:], fontHeight}
+	fontMap[fontKey{fontName, fontSize}] = fontInfoLoaded
+	return fontInfoLoaded, nil
 }
 
 func loadImage(fileName string) (*sdl.Surface, error) {
