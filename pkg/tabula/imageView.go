@@ -299,8 +299,10 @@ func (iv *ImageView) setPixel(x, y int32, color []byte) {
 func (iv *ImageView) updateMousePos(x, y int32) {
 	iv.mouseLoc.x = x
 	iv.mouseLoc.y = y
-	iv.mousePix.x = int32(float64(iv.mouseLoc.x-iv.canvas.X) / iv.mult)
-	iv.mousePix.y = int32(float64(iv.mouseLoc.y-iv.canvas.Y) / iv.mult)
+	relx := float64(iv.mouseLoc.x - iv.canvas.X)
+	rely := float64(iv.mouseLoc.y - iv.canvas.Y)
+	iv.mousePix.x = int32(math.Floor(relx / iv.mult))
+	iv.mousePix.y = int32(math.Floor(rely / iv.mult))
 }
 
 // OnEnter is called when the cursor enters the UIComponent's region
