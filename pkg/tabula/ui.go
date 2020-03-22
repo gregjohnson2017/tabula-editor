@@ -143,15 +143,15 @@ func calcStringDims(str string, font fontInfo) (float64, float64) {
 // mapString turns each character in the string into a pair of
 // (x,y,s,t)-vertex triangles using glyph information from a
 // pre-loaded font. The vertex info is returned as []float32
-func mapString(str string, font fontInfo, pos coord, align Align) []float32 {
+func mapString(str string, font fontInfo, minBearingY float32, pos coord, align Align) (float32, []float32) {
 	// 2 triangles per rune, 3 vertices per triangle, 4 float32's per vertex (x,y,s,t)
 	buffer := make([]float32, 0, len(str)*24)
 	// get glyph information for alignment
-	var strWidth, largestBearingY float32
+	var strWidth float32
 	for _, r := range str {
 		info := font.runeMap[r-minASCII]
-		if info.bearingY > largestBearingY {
-			largestBearingY = info.bearingY
+		if info.bearingY > minBearingY {
+			minBearingY = info.bearingY
 		}
 		strWidth += info.advance
 	}
@@ -166,7 +166,7 @@ func mapString(str string, font fontInfo, pos coord, align Align) []float32 {
 	offx := int32(-w2 - float64(align.h)*w2)
 	offy := int32(-h2 - float64(align.v)*h2)
 	// offset origin to account for alignment
-	origin := pointF32{float32(pos.x + offx), float32(pos.y+offy) + largestBearingY}
+	origin := pointF32{float32(pos.x + offx), float32(pos.y+offy) + minBearingY}
 	for _, r := range str {
 		info := font.runeMap[r-minASCII]
 
@@ -195,7 +195,7 @@ func mapString(str string, font fontInfo, pos coord, align Align) []float32 {
 		origin.x += info.advance
 	}
 
-	return buffer
+	return minBearingY, buffer
 }
 
 type fontKey struct {
