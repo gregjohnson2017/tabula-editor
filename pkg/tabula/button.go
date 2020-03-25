@@ -22,8 +22,7 @@ type Button struct {
 	backVboID          uint32
 	textVaoID          uint32
 	textVboID          uint32
-	fontTexID          uint32
-	runeMap            []runeInfo
+	font               fontInfo
 	text               string
 	pressed            bool
 	hovering           bool
@@ -43,7 +42,7 @@ func NewButton(area *sdl.Rect, cfg *Config, text string, action func()) (*Button
 		return nil, err
 	}
 
-	fontTexID, runeMap, err := loadFontTexture("NotoMono-Regular.ttf", 14)
+	font, err := loadFontTexture("NotoMono-Regular.ttf", 14)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +59,7 @@ func NewButton(area *sdl.Rect, cfg *Config, text string, action func()) (*Button
 	textColorID := gl.GetUniformLocation(textProgramID, &[]byte("text_color\x00")[0])
 
 	var texSheetWidth, texSheetHeight int32
-	gl.BindTexture(gl.TEXTURE_2D, fontTexID)
+	gl.BindTexture(gl.TEXTURE_2D, font.textureID)
 	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_WIDTH, &texSheetWidth)
 	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_HEIGHT, &texSheetHeight)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
@@ -78,7 +77,7 @@ func NewButton(area *sdl.Rect, cfg *Config, text string, action func()) (*Button
 		+1.0, +1.0, // top-right
 		+1.0, -1.0, // bottom-right
 	}
-	textTriangles := mapString(text, runeMap, coord{area.X + area.W/2, cfg.ScreenHeight - area.Y - area.H/2}, Align{AlignMiddle, AlignCenter})
+	textTriangles := mapString(text, font, coord{area.X + area.W/2, cfg.ScreenHeight - area.Y - area.H/2}, Align{AlignMiddle, AlignCenter})
 
 	var backVaoID, backVboID uint32
 	gl.GenVertexArrays(1, &backVaoID)
@@ -111,8 +110,7 @@ func NewButton(area *sdl.Rect, cfg *Config, text string, action func()) (*Button
 		backVboID:          backVboID,
 		textVaoID:          textVaoID,
 		textVboID:          textVboID,
-		fontTexID:          fontTexID,
-		runeMap:            runeMap,
+		font:               font,
 		text:               text,
 		cfg:                cfg,
 		pressed:            false,
@@ -187,7 +185,7 @@ func (b *Button) Render() {
 	gl.BindVertexArray(b.textVaoID)
 	gl.EnableVertexAttribArray(0)
 	gl.EnableVertexAttribArray(1)
-	gl.BindTexture(gl.TEXTURE_2D, b.fontTexID)
+	gl.BindTexture(gl.TEXTURE_2D, b.font.textureID)
 	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(b.strTriangles)/4))
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 	gl.DisableVertexAttribArray(0)
@@ -254,7 +252,7 @@ func (b *Button) OnResize(x, y int32) {
 	gl.Uniform2f(uniformID, float32(b.cfg.ScreenWidth), float32(b.cfg.ScreenHeight))
 	gl.UseProgram(0)
 
-	textTriangles := mapString(b.text, b.runeMap, coord{b.area.X + b.area.W/2, b.cfg.ScreenHeight - b.area.Y - b.area.H/2}, Align{AlignMiddle, AlignCenter})
+	textTriangles := mapString(b.text, b.font, coord{b.area.X + b.area.W/2, b.cfg.ScreenHeight - b.area.Y - b.area.H/2}, Align{AlignMiddle, AlignCenter})
 	gl.BindBuffer(gl.ARRAY_BUFFER, b.textVboID)
 	gl.BufferData(gl.ARRAY_BUFFER, 4*len(textTriangles), gl.Ptr(&textTriangles[0]), gl.STATIC_DRAW)
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)

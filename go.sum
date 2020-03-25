@@ -8,8 +8,6 @@ github.com/kroppt/Int32Set v0.0.0-20190617043009-95c3ce40003c h1:KTr+v7Wg4Fbg5Vz
 github.com/kroppt/Int32Set v0.0.0-20190617043009-95c3ce40003c/go.mod h1:i9SMG0UjmO1oXgiMgKXPUpfr+PP+Dp3DGs9zPuv4I7g=
 github.com/kroppt/winfileask v0.0.0-20190604203301-8c2224e10487 h1:04ujwK5vLrF5gT99dQIlM/jgGTYFXTO1jTTh8LQoNV4=
 github.com/kroppt/winfileask v0.0.0-20190604203301-8c2224e10487/go.mod h1:biYF1MwJ7dNUHE4F6GtL67wQu1sFJdMUxG+PbKQQyGU=
-github.com/kroppt/winmenu v0.0.0-20190611010410-1381bdf9f5a5 h1:3AIpjW/U5Z+XRaWrtawLVJIvj/AMRCTHiCy12WoP8rY=
-github.com/kroppt/winmenu v0.0.0-20190611010410-1381bdf9f5a5/go.mod h1:gGR54D2vnPZnl6QPGj/E021xXI/o35Ep/B2BOa6MvuA=
 github.com/veandco/go-sdl2 v0.3.3 h1:4/TirgB2MQ7oww3pM3Yfgf1YbChMlAQAmiCPe5koK0I=
 github.com/veandco/go-sdl2 v0.3.3/go.mod h1:FB+kTpX9YTE+urhYiClnRzpOXbiWgaU3+5F2AB78DPg=
 golang.org/x/image v0.0.0-20190523035834-f03afa92d3ff h1:+2zgJKVDVAz/BWSsuniCmU1kLCjL88Z8/kv39xCI9NQ=

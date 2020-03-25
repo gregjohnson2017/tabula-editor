@@ -153,7 +153,7 @@ func (ml *MenuList) SetChildren(offx int32, offy int32, childs []struct {
 		e.Destroy()
 	}
 	ml.entries = make([]MenuEntry, 0, len(childs))
-	_, runeMap, err := loadFontTexture("NotoMono-Regular.ttf", 14)
+	font, err := loadFontTexture("NotoMono-Regular.ttf", 14)
 	if err != nil {
 		return err
 	}
@@ -162,7 +162,7 @@ func (ml *MenuList) SetChildren(offx int32, offy int32, childs []struct {
 	// normalize height or width
 	var max int32
 	for _, c := range childs {
-		w, h := calcStringDims(c.str, runeMap)
+		w, h := calcStringDims(c.str, font)
 		w32 := int32(math.Ceil(w)) + 14
 		h32 := int32(math.Ceil(h)) + 10
 		if ml.horiz {
@@ -178,7 +178,7 @@ func (ml *MenuList) SetChildren(offx int32, offy int32, childs []struct {
 	// populate list of menu entries with appropriate boundaries
 	var off int32
 	for _, child := range childs {
-		w, h := calcStringDims(child.str, runeMap)
+		w, h := calcStringDims(child.str, font)
 		w32 := int32(math.Ceil(w)) + 14
 		h32 := int32(math.Ceil(h)) + 10
 		var area *sdl.Rect
