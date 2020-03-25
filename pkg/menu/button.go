@@ -1,16 +1,17 @@
-package tabula
+package menu
 
 import (
 	"github.com/go-gl/gl/v2.1/gl"
+	"github.com/gregjohnson2017/tabula-editor/pkg/config"
+	"github.com/gregjohnson2017/tabula-editor/pkg/font"
+	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/veandco/go-sdl2/sdl"
 )
-
-var _ UIComponent = UIComponent(&Button{})
 
 // Button defines an interactive button
 type Button struct {
 	area               *sdl.Rect
-	cfg                *Config
+	cfg                *config.Config
 	defaultBackColor   [4]float32
 	highlightBackColor [4]float32
 	defaultTextColor   [4]float32
@@ -22,27 +23,29 @@ type Button struct {
 	backVboID          uint32
 	textVaoID          uint32
 	textVboID          uint32
-	font               fontInfo
+	font               font.Info
 	text               string
 	pressed            bool
 	hovering           bool
 	action             func()
 }
 
+var _ ui.Component = ui.Component(&Button{})
+
 // NewButton returns a pointer to a Button struct
 // defaultColor and highlightColor default to light grey (0xD6CFCFFF) and blue (0X0046AFFF) respectively, if nil
-func NewButton(area *sdl.Rect, cfg *Config, text string, action func()) (*Button, error) {
+func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (*Button, error) {
 	var err error
 	var backProgramID uint32
-	if backProgramID, err = CreateShaderProgram(solidColorVertex, solidColorFragment); err != nil {
+	if backProgramID, err = ui.CreateShaderProgram(ui.SolidColorVertex, ui.SolidColorFragment); err != nil {
 		return nil, err
 	}
 	var textProgramID uint32
-	if textProgramID, err = CreateShaderProgram(glyphShaderVertex, glyphShaderFragment); err != nil {
+	if textProgramID, err = ui.CreateShaderProgram(ui.GlyphShaderVertex, ui.GlyphShaderFragment); err != nil {
 		return nil, err
 	}
 
-	font, err := loadFontTexture("NotoMono-Regular.ttf", 14)
+	fnt, err := font.LoadFontTexture("NotoMono-Regular.ttf", 14)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +62,7 @@ func NewButton(area *sdl.Rect, cfg *Config, text string, action func()) (*Button
 	textColorID := gl.GetUniformLocation(textProgramID, &[]byte("text_color\x00")[0])
 
 	var texSheetWidth, texSheetHeight int32
-	gl.BindTexture(gl.TEXTURE_2D, font.textureID)
+	gl.BindTexture(gl.TEXTURE_2D, fnt.TextureID)
 	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_WIDTH, &texSheetWidth)
 	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_HEIGHT, &texSheetHeight)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
@@ -77,12 +80,14 @@ func NewButton(area *sdl.Rect, cfg *Config, text string, action func()) (*Button
 		+1.0, +1.0, // top-right
 		+1.0, -1.0, // bottom-right
 	}
-	textTriangles := mapString(text, font, coord{area.X + area.W/2, cfg.ScreenHeight - area.Y - area.H/2}, Align{AlignMiddle, AlignCenter})
+	pos := sdl.Point{area.X + area.W/2, cfg.ScreenHeight - area.Y - area.H/2}
+	align := ui.Align{ui.AlignMiddle, ui.AlignCenter}
+	textTriangles := font.MapString(text, fnt, pos, align)
 
 	var backVaoID, backVboID uint32
 	gl.GenVertexArrays(1, &backVaoID)
 	gl.GenBuffers(1, &backVboID)
-	configureVAO(backVaoID, backVboID, []int32{2})
+	ui.ConfigureVAO(backVaoID, backVboID, []int32{2})
 	gl.BindBuffer(gl.ARRAY_BUFFER, backVboID)
 	gl.BufferData(gl.ARRAY_BUFFER, 4*len(backTriangles), gl.Ptr(&backTriangles[0]), gl.STATIC_DRAW)
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
@@ -90,7 +95,7 @@ func NewButton(area *sdl.Rect, cfg *Config, text string, action func()) (*Button
 	var textVaoID, textVboID uint32
 	gl.GenVertexArrays(1, &textVaoID)
 	gl.GenBuffers(1, &textVboID)
-	configureVAO(textVaoID, textVboID, []int32{2, 2})
+	ui.ConfigureVAO(textVaoID, textVboID, []int32{2, 2})
 	gl.BindBuffer(gl.ARRAY_BUFFER, textVboID)
 	gl.BufferData(gl.ARRAY_BUFFER, 4*len(textTriangles), gl.Ptr(&textTriangles[0]), gl.STATIC_DRAW)
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
@@ -110,7 +115,7 @@ func NewButton(area *sdl.Rect, cfg *Config, text string, action func()) (*Button
 		backVboID:          backVboID,
 		textVaoID:          textVaoID,
 		textVboID:          textVboID,
-		font:               font,
+		font:               fnt,
 		text:               text,
 		cfg:                cfg,
 		pressed:            false,
@@ -147,7 +152,7 @@ func (b *Button) SetHighlightTextColor(color [4]float32) {
 	b.highlightTextColor = color
 }
 
-// Destroy frees all assets obtained by the UIComponent
+// Destroy frees all assets obtained by the ui.Component
 func (b *Button) Destroy() {
 	gl.DeleteBuffers(1, &b.backVboID)
 	gl.DeleteBuffers(1, &b.textVboID)
@@ -155,17 +160,17 @@ func (b *Button) Destroy() {
 	gl.DeleteVertexArrays(1, &b.textVaoID)
 }
 
-// InBoundary returns whether a point is in this UIComponent's bounds
+// InBoundary returns whether a point is in this ui.Component's bounds
 func (b *Button) InBoundary(pt sdl.Point) bool {
-	return inBounds(b.area, pt.X, pt.Y)
+	return ui.InBounds(*b.area, pt)
 }
 
-// GetBoundary returns the clickable region of the UIComponent
+// GetBoundary returns the clickable region of the ui.Component
 func (b *Button) GetBoundary() *sdl.Rect {
 	return b.area
 }
 
-// Render draws the UIComponent
+// Render draws the ui.Component
 func (b *Button) Render() {
 	// render solid color background
 	gl.Viewport(b.area.X, b.cfg.ScreenHeight-b.area.Y-b.area.H, b.area.W, b.area.H)
@@ -185,7 +190,7 @@ func (b *Button) Render() {
 	gl.BindVertexArray(b.textVaoID)
 	gl.EnableVertexAttribArray(0)
 	gl.EnableVertexAttribArray(1)
-	gl.BindTexture(gl.TEXTURE_2D, b.font.textureID)
+	gl.BindTexture(gl.TEXTURE_2D, b.font.TextureID)
 	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(b.strTriangles)/4))
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 	gl.DisableVertexAttribArray(0)
@@ -196,7 +201,7 @@ func (b *Button) Render() {
 	gl.UseProgram(0)
 }
 
-// OnEnter is called when the cursor enters the UIComponent's region
+// OnEnter is called when the cursor enters the ui.Component's region
 func (b *Button) OnEnter() {
 	b.hovering = true
 
@@ -209,7 +214,7 @@ func (b *Button) OnEnter() {
 	gl.UseProgram(0)
 }
 
-// OnLeave is called when the cursor leaves the UIComponent's region
+// OnLeave is called when the cursor leaves the ui.Component's region
 func (b *Button) OnLeave() {
 	b.hovering = false
 	b.pressed = false
@@ -223,17 +228,17 @@ func (b *Button) OnLeave() {
 	gl.UseProgram(0)
 }
 
-// OnMotion is called when the cursor moves within the UIComponent's region
+// OnMotion is called when the cursor moves within the ui.Component's region
 func (b *Button) OnMotion(evt *sdl.MouseMotionEvent) bool {
 	return true
 }
 
-// OnScroll is called when the user scrolls within the UIComponent's region
+// OnScroll is called when the user scrolls within the ui.Component's region
 func (b *Button) OnScroll(evt *sdl.MouseWheelEvent) bool {
 	return true
 }
 
-// OnClick is called when the user clicks within the UIComponent's region
+// OnClick is called when the user clicks within the ui.Component's region
 func (b *Button) OnClick(evt *sdl.MouseButtonEvent) bool {
 	if evt.Button == sdl.BUTTON_LEFT && evt.State == sdl.PRESSED {
 		b.pressed = true
@@ -252,7 +257,9 @@ func (b *Button) OnResize(x, y int32) {
 	gl.Uniform2f(uniformID, float32(b.cfg.ScreenWidth), float32(b.cfg.ScreenHeight))
 	gl.UseProgram(0)
 
-	textTriangles := mapString(b.text, b.font, coord{b.area.X + b.area.W/2, b.cfg.ScreenHeight - b.area.Y - b.area.H/2}, Align{AlignMiddle, AlignCenter})
+	pos := sdl.Point{b.area.X + b.area.W/2, b.cfg.ScreenHeight - b.area.Y - b.area.H/2}
+	align := ui.Align{ui.AlignMiddle, ui.AlignCenter}
+	textTriangles := font.MapString(b.text, b.font, pos, align)
 	gl.BindBuffer(gl.ARRAY_BUFFER, b.textVboID)
 	gl.BufferData(gl.ARRAY_BUFFER, 4*len(textTriangles), gl.Ptr(&textTriangles[0]), gl.STATIC_DRAW)
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)

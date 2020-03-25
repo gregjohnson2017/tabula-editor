@@ -1,4 +1,4 @@
-package tabula
+package image
 
 import (
 	"fmt"
@@ -8,22 +8,26 @@ import (
 	"unsafe"
 
 	"github.com/go-gl/gl/v2.1/gl"
+	"github.com/gregjohnson2017/tabula-editor/pkg/comms"
+	"github.com/gregjohnson2017/tabula-editor/pkg/config"
+	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
+	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
 
 	set "github.com/kroppt/Int32Set"
 )
 
-var _ UIComponent = UIComponent(&ImageView{})
+var _ ui.Component = ui.Component(&View{})
 
-// ImageView defines an interactable image viewing pane
-type ImageView struct {
+// View defines an interactable image viewing pane
+type View struct {
 	area           *sdl.Rect
 	canvas         *sdl.Rect
 	origW, origH   int32
-	cfg            *Config
-	mouseLoc       coord
-	mousePix       coord
-	dragPoint      coord
+	cfg            *config.Config
+	mouseLoc       sdl.Point
+	mousePix       sdl.Point
+	dragPoint      sdl.Point
 	dragging       bool
 	mult           float64
 	programID      uint32
@@ -32,21 +36,15 @@ type ImageView struct {
 	glSquare       []float32
 	vaoID, vboID   uint32
 	selVao, selVbo uint32
-	bbComms        chan<- imageComm
+	bbComms        chan<- comms.Image
 	fileName       string
 	fullPath       string
-	toolComms      <-chan ImageTool
-	activeTool     ImageTool
+	toolComms      <-chan Tool
+	activeTool     Tool
 	selection      set.Set
 }
 
-type imageComm struct {
-	fileName string
-	mousePix coord
-	mult     float64
-}
-
-func (iv *ImageView) loadFromFile(fileName string) error {
+func (iv *View) LoadFromFile(fileName string) error {
 	surf, err := loadImage(fileName)
 	if err != nil {
 		return err
@@ -76,7 +74,7 @@ func (iv *ImageView) loadFromFile(fileName string) error {
 		W: surf.W,
 		H: surf.H,
 	}
-	iv.centerImage()
+	iv.CenterImage()
 	iv.mult = 1.0
 	uniformID = gl.GetUniformLocation(iv.selProgramID, &[]byte("mult\x00")[0])
 	gl.UseProgram(iv.selProgramID)
@@ -91,23 +89,23 @@ func (iv *ImageView) loadFromFile(fileName string) error {
 	return nil
 }
 
-// NewImageView returns a pointer to a new ImageView struct that implements UIComponent
-func NewImageView(area *sdl.Rect, fileName string, bbComms chan<- imageComm, toolComms <-chan ImageTool, cfg *Config) (*ImageView, error) {
+// NewView returns a pointer to a new View struct that implements ui.Component
+func NewView(area *sdl.Rect, fileName string, bbComms chan<- comms.Image, toolComms <-chan Tool, cfg *config.Config) (*View, error) {
 	var err error
-	var iv = &ImageView{}
+	var iv = &View{}
 	iv.cfg = cfg
 	iv.area = area
 	iv.bbComms = bbComms
 	iv.toolComms = toolComms
-	if err = iv.loadFromFile(fileName); err != nil {
+	if err = iv.LoadFromFile(fileName); err != nil {
 		return nil, err
 	}
 
-	if iv.programID, err = CreateShaderProgram(vertexShaderSource, checkerShaderFragment); err != nil {
+	if iv.programID, err = ui.CreateShaderProgram(ui.VertexShaderSource, ui.CheckerShaderFragment); err != nil {
 		return nil, err
 	}
 
-	if iv.selProgramID, err = CreateShaderProgram(outlineVsh, outlineFsh); err != nil {
+	if iv.selProgramID, err = ui.CreateShaderProgram(ui.OutlineVsh, ui.OutlineFsh); err != nil {
 		return nil, err
 	}
 
@@ -128,11 +126,11 @@ func NewImageView(area *sdl.Rect, fileName string, bbComms chan<- imageComm, too
 
 	gl.GenBuffers(1, &iv.vboID)
 	gl.GenVertexArrays(1, &iv.vaoID)
-	configureVAO(iv.vaoID, iv.vboID, []int32{2, 2})
+	ui.ConfigureVAO(iv.vaoID, iv.vboID, []int32{2, 2})
 
 	gl.GenBuffers(1, &iv.selVbo)
 	gl.GenVertexArrays(1, &iv.selVao)
-	configureVAO(iv.selVao, iv.selVbo, []int32{2})
+	ui.ConfigureVAO(iv.selVao, iv.selVbo, []int32{2})
 
 	iv.selection = set.NewSet()
 	iv.activeTool = EmptyTool{}
@@ -140,8 +138,8 @@ func NewImageView(area *sdl.Rect, fileName string, bbComms chan<- imageComm, too
 	return iv, nil
 }
 
-// Destroy frees all assets acquired by the UIComponent
-func (iv *ImageView) Destroy() {
+// Destroy frees all assets acquired by the ui.Component
+func (iv *View) Destroy() {
 	gl.DeleteTextures(1, &iv.textureID)
 	gl.DeleteBuffers(1, &iv.vboID)
 	gl.DeleteVertexArrays(1, &iv.vaoID)
@@ -151,20 +149,20 @@ func (iv *ImageView) Destroy() {
 	gl.DeleteProgram(iv.selProgramID)
 }
 
-// InBoundary returns whether a point is in this UIComponent's bounds
-func (iv *ImageView) InBoundary(pt sdl.Point) bool {
-	return inBounds(iv.area, pt.X, pt.Y)
+// InBoundary returns whether a point is in this ui.Component's bounds
+func (iv *View) InBoundary(pt sdl.Point) bool {
+	return ui.InBounds(*iv.area, pt)
 }
 
-// GetBoundary returns the clickable region of the UIComponent
-func (iv *ImageView) GetBoundary() *sdl.Rect {
+// GetBoundary returns the clickable region of the ui.Component
+func (iv *View) GetBoundary() *sdl.Rect {
 	return iv.area
 }
 
-// Render draws the UIComponent
-func (iv *ImageView) Render() {
+// Render draws the ui.Component
+func (iv *View) Render() {
 	go func() {
-		iv.bbComms <- imageComm{fileName: iv.fileName, mousePix: iv.mousePix, mult: iv.mult}
+		iv.bbComms <- comms.Image{FileName: iv.fileName, MousePix: iv.mousePix, Mult: iv.mult}
 	}()
 
 	// TODO optimize this (ex: move elsewhere, update as changes come in, use a better algorithm)
@@ -256,7 +254,7 @@ func (iv *ImageView) Render() {
 	}
 }
 
-func (iv *ImageView) zoomIn() {
+func (iv *View) zoomIn() {
 	iv.mult *= 2.0
 	iv.canvas.W = int32(float64(iv.origW) * iv.mult)
 	iv.canvas.H = int32(float64(iv.origH) * iv.mult)
@@ -268,7 +266,7 @@ func (iv *ImageView) zoomIn() {
 	gl.UseProgram(0)
 }
 
-func (iv *ImageView) zoomOut() {
+func (iv *View) zoomOut() {
 	iv.mult /= 2.0
 	iv.canvas.W = int32(float64(iv.origW) * iv.mult)
 	iv.canvas.H = int32(float64(iv.origH) * iv.mult)
@@ -280,12 +278,12 @@ func (iv *ImageView) zoomOut() {
 	gl.UseProgram(0)
 }
 
-func (iv *ImageView) centerImage() {
+func (iv *View) CenterImage() {
 	iv.canvas.X = int32(float64(iv.area.W)/2.0 - float64(iv.canvas.W)/2.0)
 	iv.canvas.Y = int32(float64(iv.area.H)/2.0 - float64(iv.canvas.H)/2.0)
 }
 
-func (iv *ImageView) setPixel(x, y int32, color []byte) {
+func (iv *View) setPixel(x, y int32, color []byte) {
 	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 4)
 	gl.TextureSubImage2D(iv.textureID, 0, x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, unsafe.Pointer(&color[0]))
 	// TODO update mipmap textures only when needed
@@ -296,43 +294,43 @@ func (iv *ImageView) setPixel(x, y int32, color []byte) {
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 }
 
-func (iv *ImageView) updateMousePos(x, y int32) {
-	iv.mouseLoc.x = x
-	iv.mouseLoc.y = y
-	relx := float64(iv.mouseLoc.x - iv.canvas.X)
-	rely := float64(iv.mouseLoc.y - iv.canvas.Y)
-	iv.mousePix.x = int32(math.Floor(relx / iv.mult))
-	iv.mousePix.y = int32(math.Floor(rely / iv.mult))
+func (iv *View) updateMousePos(x, y int32) {
+	iv.mouseLoc.X = x
+	iv.mouseLoc.Y = y
+	relx := float64(iv.mouseLoc.X - iv.canvas.X)
+	rely := float64(iv.mouseLoc.Y - iv.canvas.Y)
+	iv.mousePix.X = int32(math.Floor(relx / iv.mult))
+	iv.mousePix.Y = int32(math.Floor(rely / iv.mult))
 }
 
-// OnEnter is called when the cursor enters the UIComponent's region
-func (iv *ImageView) OnEnter() {}
+// OnEnter is called when the cursor enters the ui.Component's region
+func (iv *View) OnEnter() {}
 
-// OnLeave is called when the cursor leaves the UIComponent's region
-func (iv *ImageView) OnLeave() {
+// OnLeave is called when the cursor leaves the ui.Component's region
+func (iv *View) OnLeave() {
 	iv.dragging = false
 }
 
-// OnMotion is called when the cursor moves within the UIComponent's region
-func (iv *ImageView) OnMotion(evt *sdl.MouseMotionEvent) bool {
+// OnMotion is called when the cursor moves within the ui.Component's region
+func (iv *View) OnMotion(evt *sdl.MouseMotionEvent) bool {
 	if !iv.dragging {
 		iv.updateMousePos(evt.X, evt.Y)
 	}
-	if !iv.dragging && !inBounds(iv.canvas, evt.X, evt.Y) {
+	if !iv.dragging && !ui.InBounds(*iv.canvas, sdl.Point{evt.X, evt.Y}) {
 		return false
 	}
 	if evt.State == sdl.ButtonRMask() && iv.dragging {
-		iv.canvas.X += evt.X - iv.dragPoint.x
-		iv.canvas.Y += evt.Y - iv.dragPoint.y
-		iv.dragPoint.x = evt.X
-		iv.dragPoint.y = evt.Y
+		iv.canvas.X += evt.X - iv.dragPoint.X
+		iv.canvas.Y += evt.Y - iv.dragPoint.Y
+		iv.dragPoint.X = evt.X
+		iv.dragPoint.Y = evt.Y
 	}
 	iv.activeTool.OnMotion(evt, iv)
 	return true
 }
 
-// OnScroll is called when the user scrolls within the UIComponent's region
-func (iv *ImageView) OnScroll(evt *sdl.MouseWheelEvent) bool {
+// OnScroll is called when the user scrolls within the ui.Component's region
+func (iv *View) OnScroll(evt *sdl.MouseWheelEvent) bool {
 	if iv.dragging {
 		return true
 	}
@@ -349,18 +347,18 @@ func (iv *ImageView) OnScroll(evt *sdl.MouseWheelEvent) bool {
 }
 
 // SelectPixel adds the given x, y pixel to the
-func (iv *ImageView) SelectPixel(x, y int32) error {
+func (iv *View) SelectPixel(x, y int32) error {
 	if x < 0 || y < 0 || x > iv.area.W || y > iv.area.H {
 		return fmt.Errorf("x and y coordinates (%v, %v) are out of range", x, y)
 	}
-	iv.selection.Add(iv.mousePix.x + iv.mousePix.y*iv.origW)
+	iv.selection.Add(iv.mousePix.X + iv.mousePix.Y*iv.origW)
 	return nil
 }
 
-// OnClick is called when the user clicks within the UIComponent's region
-func (iv *ImageView) OnClick(evt *sdl.MouseButtonEvent) bool {
+// OnClick is called when the user clicks within the ui.Component's region
+func (iv *View) OnClick(evt *sdl.MouseButtonEvent) bool {
 	iv.updateMousePos(evt.X, evt.Y)
-	if !inBounds(iv.canvas, evt.X, evt.Y) {
+	if !ui.InBounds(*iv.canvas, sdl.Point{evt.X, evt.Y}) {
 		return true
 	}
 	if evt.Button == sdl.BUTTON_RIGHT {
@@ -369,15 +367,15 @@ func (iv *ImageView) OnClick(evt *sdl.MouseButtonEvent) bool {
 		} else if evt.State == sdl.RELEASED {
 			iv.dragging = false
 		}
-		iv.dragPoint.x = evt.X
-		iv.dragPoint.y = evt.Y
+		iv.dragPoint.X = evt.X
+		iv.dragPoint.Y = evt.Y
 	}
 	iv.activeTool.OnClick(evt, iv)
 	return true
 }
 
 // OnResize is called when the user resizes the window
-func (iv *ImageView) OnResize(x, y int32) {
+func (iv *View) OnResize(x, y int32) {
 	iv.area.W += x
 	iv.area.H += y
 
@@ -386,10 +384,30 @@ func (iv *ImageView) OnResize(x, y int32) {
 	gl.Uniform2f(uniformID, float32(iv.area.W), float32(iv.area.H))
 	gl.UseProgram(0)
 
-	iv.centerImage()
+	iv.CenterImage()
 }
 
 // String returns the name of the component type
-func (iv *ImageView) String() string {
-	return "ImageView"
+func (iv *View) String() string {
+	return "View"
+}
+
+func loadImage(fileName string) (*sdl.Surface, error) {
+	var surf *sdl.Surface
+	var err error
+	if surf, err = img.Load(fileName); err != nil {
+		return nil, err
+	}
+
+	// convert pixel format to RGBA32 if necessary
+	if surf.Format.Format != uint32(sdl.PIXELFORMAT_RGBA32) {
+		convertedSurf, err := surf.ConvertFormat(uint32(sdl.PIXELFORMAT_RGBA32), 0)
+		surf.Free()
+		if err != nil {
+			return nil, err
+		}
+		return convertedSurf, nil
+	}
+
+	return surf, err
 }

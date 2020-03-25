@@ -4,7 +4,8 @@ import (
 	"fmt"
 
 	"github.com/go-gl/gl/v2.1/gl"
-	"github.com/gregjohnson2017/tabula-editor/pkg/tabula"
+	"github.com/gregjohnson2017/tabula-editor/pkg/app"
+	"github.com/gregjohnson2017/tabula-editor/pkg/config"
 	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
 )
@@ -58,12 +59,12 @@ func initWindow(title string, width, height int32) (*sdl.Window, error) {
 }
 
 func main() {
-	cfg := tabula.Config{ScreenWidth: 960, ScreenHeight: 720, BottomBarHeight: 30}
+	cfg := config.New(960, 720, 30)
 	var err error
 	win, err := initWindow("Tabula Editor", cfg.ScreenWidth, cfg.ScreenHeight)
 	errCheck(err)
 
-	app := tabula.NewApplication(win, &cfg)
+	app := app.New(win, cfg)
 	app.Start()
 
 	for app.Running() {
