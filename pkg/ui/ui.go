@@ -2,9 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"image"
-	"image/png"
-	"os"
 	"strings"
 	"unsafe"
 
@@ -55,18 +52,6 @@ const (
 type Align struct {
 	V AlignV
 	H AlignH
-}
-
-func WriteRuneToFile(fileName string, mask image.Image, maskp image.Point, rec image.Rectangle) error {
-	if alpha, ok := mask.(*image.Alpha); ok {
-		diff := image.Point{rec.Dx(), rec.Dy()}
-		tofile := alpha.SubImage(image.Rectangle{maskp, maskp.Add(diff)})
-		if f, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0755); err != nil {
-			png.Encode(f, tofile)
-			return err
-		}
-	}
-	return nil
 }
 
 // ConfigureVAO configures a VAO & VBO pair with a specified vertex layout

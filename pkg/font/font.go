@@ -3,8 +3,10 @@ package font
 import (
 	"fmt"
 	"image"
+	"image/png"
 	"io/ioutil"
 	"math"
+	"os"
 	"time"
 	"unicode"
 	"unsafe"
@@ -256,4 +258,16 @@ func LoadFontTexture(fontName string, fontSize int32) (Info, error) {
 	InfoLoaded := Info{fontTextureID, runeMap[:], fontHeight}
 	fontMap[fontKey{fontName, fontSize}] = InfoLoaded
 	return InfoLoaded, nil
+}
+
+func WriteRuneToFile(fileName string, mask image.Image, maskp image.Point, rec image.Rectangle) error {
+	if alpha, ok := mask.(*image.Alpha); ok {
+		diff := image.Point{rec.Dx(), rec.Dy()}
+		tofile := alpha.SubImage(image.Rectangle{maskp, maskp.Add(diff)})
+		if f, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0755); err != nil {
+			png.Encode(f, tofile)
+			return err
+		}
+	}
+	return nil
 }
