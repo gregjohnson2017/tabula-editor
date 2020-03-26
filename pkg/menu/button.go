@@ -4,6 +4,7 @@ import (
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
 	"github.com/gregjohnson2017/tabula-editor/pkg/font"
+	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/veandco/go-sdl2/sdl"
 )
@@ -62,7 +63,7 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 	textColorID := gl.GetUniformLocation(textProgramID, &[]byte("text_color\x00")[0])
 
 	var texSheetWidth, texSheetHeight int32
-	gl.BindTexture(gl.TEXTURE_2D, fnt.TextureID)
+	fnt.Bind()
 	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_WIDTH, &texSheetWidth)
 	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_HEIGHT, &texSheetHeight)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
@@ -190,7 +191,7 @@ func (b *Button) Render() {
 	gl.BindVertexArray(b.textVaoID)
 	gl.EnableVertexAttribArray(0)
 	gl.EnableVertexAttribArray(1)
-	gl.BindTexture(gl.TEXTURE_2D, b.font.TextureID)
+	b.font.Bind()
 	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(b.strTriangles)/4))
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 	gl.DisableVertexAttribArray(0)

@@ -10,6 +10,7 @@ import (
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/comms"
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
+	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"

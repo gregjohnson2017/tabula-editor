@@ -161,9 +161,13 @@ type fontKey struct {
 }
 
 type Info struct {
-	TextureID  uint32     // OpenGL texture ID of cached glyph data
+	textureID  uint32     // OpenGL texture ID of cached glyph data
 	runeMap    []runeInfo // map of character-specific spacing info
 	textHeight float32    // how much space is between two lines of text in this font
+}
+
+func (i Info) Bind() {
+	gl.BindTexture(gl.TEXTURE_2D, i.textureID)
 }
 
 // TODO save cached fonts to local direct

@@ -7,6 +7,7 @@ import (
 	"github.com/gregjohnson2017/tabula-editor/pkg/comms"
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
 	"github.com/gregjohnson2017/tabula-editor/pkg/font"
+	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/veandco/go-sdl2/sdl"
 )
@@ -60,7 +61,7 @@ func NewBottomBar(area *sdl.Rect, comms <-chan comms.Image, cfg *config.Config) 
 	textColorID := gl.GetUniformLocation(textProgramID, &[]byte("text_color\x00")[0])
 
 	var texSheetWidth, texSheetHeight int32
-	gl.BindTexture(gl.TEXTURE_2D, fnt.TextureID)
+	fnt.Bind()
 	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_WIDTH, &texSheetWidth)
 	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_HEIGHT, &texSheetHeight)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
@@ -184,7 +185,7 @@ func (bb *BottomBar) Render() {
 	gl.BindVertexArray(bb.textVaoID)
 	gl.EnableVertexAttribArray(0)
 	gl.EnableVertexAttribArray(1)
-	gl.BindTexture(gl.TEXTURE_2D, bb.font.TextureID)
+	bb.font.Bind()
 
 	gl.BufferData(gl.ARRAY_BUFFER, 4*len(triangles), gl.Ptr(&triangles[0]), gl.STATIC_DRAW)
 	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(triangles)/4))
