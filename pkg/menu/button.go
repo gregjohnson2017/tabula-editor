@@ -37,11 +37,11 @@ var _ ui.Component = ui.Component(&Button{})
 func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (*Button, error) {
 	var err error
 	var backProgramID uint32
-	if backProgramID, err = ui.CreateShaderProgram(ui.SolidColorVertex, ui.SolidColorFragment); err != nil {
+	if backProgramID, err = gfx.CreateShaderProgram(gfx.SolidColorVertex, gfx.SolidColorFragment); err != nil {
 		return nil, err
 	}
 	var textProgramID uint32
-	if textProgramID, err = ui.CreateShaderProgram(ui.GlyphShaderVertex, ui.GlyphShaderFragment); err != nil {
+	if textProgramID, err = gfx.CreateShaderProgram(gfx.GlyphShaderVertex, gfx.GlyphShaderFragment); err != nil {
 		return nil, err
 	}
 
@@ -87,7 +87,7 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 	var backVaoID, backVboID uint32
 	gl.GenVertexArrays(1, &backVaoID)
 	gl.GenBuffers(1, &backVboID)
-	ui.ConfigureVAO(backVaoID, backVboID, []int32{2})
+	gfx.ConfigureVAO(backVaoID, backVboID, []int32{2})
 	gl.BindBuffer(gl.ARRAY_BUFFER, backVboID)
 	gl.BufferData(gl.ARRAY_BUFFER, 4*len(backTriangles), gl.Ptr(&backTriangles[0]), gl.STATIC_DRAW)
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
@@ -95,7 +95,7 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 	var textVaoID, textVboID uint32
 	gl.GenVertexArrays(1, &textVaoID)
 	gl.GenBuffers(1, &textVboID)
-	ui.ConfigureVAO(textVaoID, textVboID, []int32{2, 2})
+	gfx.ConfigureVAO(textVaoID, textVboID, []int32{2, 2})
 	gl.BindBuffer(gl.ARRAY_BUFFER, textVboID)
 	gl.BufferData(gl.ARRAY_BUFFER, 4*len(textTriangles), gl.Ptr(&textTriangles[0]), gl.STATIC_DRAW)
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)

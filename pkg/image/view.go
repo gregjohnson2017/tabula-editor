@@ -101,11 +101,11 @@ func NewView(area *sdl.Rect, fileName string, bbComms chan<- comms.Image, toolCo
 		return nil, err
 	}
 
-	if iv.programID, err = ui.CreateShaderProgram(ui.VertexShaderSource, ui.CheckerShaderFragment); err != nil {
+	if iv.programID, err = gfx.CreateShaderProgram(gfx.VertexShaderSource, gfx.CheckerShaderFragment); err != nil {
 		return nil, err
 	}
 
-	if iv.selProgramID, err = ui.CreateShaderProgram(ui.OutlineVsh, ui.OutlineFsh); err != nil {
+	if iv.selProgramID, err = gfx.CreateShaderProgram(gfx.OutlineVsh, gfx.OutlineFsh); err != nil {
 		return nil, err
 	}
 
@@ -126,11 +126,11 @@ func NewView(area *sdl.Rect, fileName string, bbComms chan<- comms.Image, toolCo
 
 	gl.GenBuffers(1, &iv.vboID)
 	gl.GenVertexArrays(1, &iv.vaoID)
-	ui.ConfigureVAO(iv.vaoID, iv.vboID, []int32{2, 2})
+	gfx.ConfigureVAO(iv.vaoID, iv.vboID, []int32{2, 2})
 
 	gl.GenBuffers(1, &iv.selVbo)
 	gl.GenVertexArrays(1, &iv.selVao)
-	ui.ConfigureVAO(iv.selVao, iv.selVbo, []int32{2})
+	gfx.ConfigureVAO(iv.selVao, iv.selVbo, []int32{2})
 
 	iv.selection = set.NewSet()
 	iv.activeTool = EmptyTool{}
