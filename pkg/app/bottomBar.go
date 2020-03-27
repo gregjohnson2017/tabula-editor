@@ -1,20 +1,25 @@
-package tabula
+package app
 
 import (
 	"fmt"
 
 	"github.com/go-gl/gl/v2.1/gl"
+	"github.com/gregjohnson2017/tabula-editor/pkg/comms"
+	"github.com/gregjohnson2017/tabula-editor/pkg/config"
+	"github.com/gregjohnson2017/tabula-editor/pkg/font"
+	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
+	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
-var _ UIComponent = UIComponent(&BottomBar{})
+var _ ui.Component = ui.Component(&BottomBar{})
 
 // BottomBar defines a solid color bar with text displays
 type BottomBar struct {
 	area          *sdl.Rect
-	comms         <-chan imageComm
+	comms         <-chan comms.Image
 	color         [4]float32
-	mousePix      coord
+	mousePix      sdl.Point
 	fontSize      int32
 	backProgramID uint32
 	textProgramID uint32
@@ -22,24 +27,24 @@ type BottomBar struct {
 	backVboID     uint32
 	textVaoID     uint32
 	textVboID     uint32
-	font          fontInfo
-	cfg           *Config
+	font          font.Info
+	cfg           *config.Config
 }
 
-// NewBottomBar returns a pointer to a new BottomBar struct that implements UIComponent
+// NewBottomBar returns a pointer to a new BottomBar struct that implements ui.Component
 // the background color defaults to grey (0x808080FF) and the text white
-func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, cfg *Config) (*BottomBar, error) {
+func NewBottomBar(area *sdl.Rect, comms <-chan comms.Image, cfg *config.Config) (*BottomBar, error) {
 	var err error
 	var backProgramID uint32
-	if backProgramID, err = CreateShaderProgram(solidColorVertex, solidColorFragment); err != nil {
+	if backProgramID, err = gfx.CreateShaderProgram(gfx.SolidColorVertex, gfx.SolidColorFragment); err != nil {
 		return nil, err
 	}
 	var textProgramID uint32
-	if textProgramID, err = CreateShaderProgram(glyphShaderVertex, glyphShaderFragment); err != nil {
+	if textProgramID, err = gfx.CreateShaderProgram(gfx.GlyphShaderVertex, gfx.GlyphShaderFragment); err != nil {
 		return nil, err
 	}
 
-	font, err := loadFontTexture("NotoMono-Regular.ttf", 24)
+	fnt, err := font.LoadFontTexture("NotoMono-Regular.ttf", 24)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +61,7 @@ func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, cfg *Config) (*BottomB
 	textColorID := gl.GetUniformLocation(textProgramID, &[]byte("text_color\x00")[0])
 
 	var texSheetWidth, texSheetHeight int32
-	gl.BindTexture(gl.TEXTURE_2D, font.textureID)
+	fnt.Bind()
 	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_WIDTH, &texSheetWidth)
 	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_HEIGHT, &texSheetHeight)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
@@ -78,7 +83,7 @@ func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, cfg *Config) (*BottomB
 	var backVaoID, backVboID uint32
 	gl.GenVertexArrays(1, &backVaoID)
 	gl.GenBuffers(1, &backVboID)
-	configureVAO(backVaoID, backVboID, []int32{2})
+	gfx.ConfigureVAO(backVaoID, backVboID, []int32{2})
 	gl.BindBuffer(gl.ARRAY_BUFFER, backVboID)
 	gl.BufferData(gl.ARRAY_BUFFER, 4*len(backTriangles), gl.Ptr(&backTriangles[0]), gl.STATIC_DRAW)
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
@@ -86,7 +91,7 @@ func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, cfg *Config) (*BottomB
 	var textVaoID, textVboID uint32
 	gl.GenVertexArrays(1, &textVaoID)
 	gl.GenBuffers(1, &textVboID)
-	configureVAO(textVaoID, textVboID, []int32{2, 2})
+	gfx.ConfigureVAO(textVaoID, textVboID, []int32{2, 2})
 
 	gl.UseProgram(0)
 
@@ -99,7 +104,7 @@ func NewBottomBar(area *sdl.Rect, comms <-chan imageComm, cfg *Config) (*BottomB
 		backVboID:     backVboID,
 		textVaoID:     textVaoID,
 		textVboID:     textVboID,
-		font:          font,
+		font:          fnt,
 		cfg:           cfg,
 	}, nil
 }
@@ -120,7 +125,7 @@ func (bb *BottomBar) SetTextColor(color []float32) {
 	gl.UseProgram(0)
 }
 
-// Destroy frees all assets obtained by the UIComponent
+// Destroy frees all assets obtained by the ui.Component
 func (bb *BottomBar) Destroy() {
 	gl.DeleteBuffers(1, &bb.backVboID)
 	gl.DeleteBuffers(1, &bb.textVboID)
@@ -128,17 +133,17 @@ func (bb *BottomBar) Destroy() {
 	gl.DeleteVertexArrays(1, &bb.textVaoID)
 }
 
-// InBoundary returns whether a point is in this UIComponent's bounds
+// InBoundary returns whether a point is in this ui.Component's bounds
 func (bb *BottomBar) InBoundary(pt sdl.Point) bool {
-	return inBounds(bb.area, pt.X, pt.Y)
+	return ui.InBounds(*bb.area, pt)
 }
 
-// GetBoundary returns the clickable region of the UIComponent
+// GetBoundary returns the clickable region of the ui.Component
 func (bb *BottomBar) GetBoundary() *sdl.Rect {
 	return bb.area
 }
 
-// Render draws the UIComponent
+// Render draws the ui.Component
 func (bb *BottomBar) Render() {
 	msg := <-bb.comms
 
@@ -154,14 +159,20 @@ func (bb *BottomBar) Render() {
 
 	// second render text on top
 	// TODO optimize rendering by no-oping if string hasn't changed (or window size)
-	fileNameMessage := msg.fileName
-	zoomMessage := fmt.Sprintf("%vx", msg.mult)
-	mousePixMessage := fmt.Sprintf("(%v, %v)", msg.mousePix.x, msg.mousePix.y)
-	maxBearingY := getMaxVerticalBearing(fileNameMessage+zoomMessage+mousePixMessage, bb.font)
+	fileNameMessage := msg.FileName
+	zoomMessage := fmt.Sprintf("%vx", msg.Mult)
+	mousePixMessage := fmt.Sprintf("(%v, %v)", msg.MousePix.X, msg.MousePix.Y)
+	maxBearingY := font.GetMaxVerticalBearing(fileNameMessage+zoomMessage+mousePixMessage, bb.font)
 
-	fileNameTriangles := mapStringWithBearing(fileNameMessage, bb.font, maxBearingY, coord{0, bb.cfg.BottomBarHeight / 2}, Align{AlignMiddle, AlignLeft})
-	zoomTriangles := mapStringWithBearing(zoomMessage, bb.font, maxBearingY, coord{bb.cfg.ScreenWidth / 2, bb.cfg.BottomBarHeight / 2}, Align{AlignMiddle, AlignCenter})
-	mousePixTriangles := mapStringWithBearing(mousePixMessage, bb.font, maxBearingY, coord{bb.cfg.ScreenWidth, bb.cfg.BottomBarHeight / 2}, Align{AlignMiddle, AlignRight})
+	pos := sdl.Point{0, bb.cfg.BottomBarHeight / 2}
+	align := ui.Align{ui.AlignMiddle, ui.AlignLeft}
+	fileNameTriangles := font.MapStringWithBearing(fileNameMessage, bb.font, maxBearingY, pos, align)
+	pos = sdl.Point{bb.cfg.ScreenWidth / 2, bb.cfg.BottomBarHeight / 2}
+	align = ui.Align{ui.AlignMiddle, ui.AlignCenter}
+	zoomTriangles := font.MapStringWithBearing(zoomMessage, bb.font, maxBearingY, pos, align)
+	pos = sdl.Point{bb.cfg.ScreenWidth, bb.cfg.BottomBarHeight / 2}
+	align = ui.Align{ui.AlignMiddle, ui.AlignRight}
+	mousePixTriangles := font.MapStringWithBearing(mousePixMessage, bb.font, maxBearingY, pos, align)
 	triangles := make([]float32, 0, len(fileNameTriangles)+len(zoomTriangles)+len(mousePixTriangles))
 	triangles = append(triangles, fileNameTriangles...)
 	triangles = append(triangles, zoomTriangles...)
@@ -174,7 +185,7 @@ func (bb *BottomBar) Render() {
 	gl.BindVertexArray(bb.textVaoID)
 	gl.EnableVertexAttribArray(0)
 	gl.EnableVertexAttribArray(1)
-	gl.BindTexture(gl.TEXTURE_2D, bb.font.textureID)
+	bb.font.Bind()
 
 	gl.BufferData(gl.ARRAY_BUFFER, 4*len(triangles), gl.Ptr(&triangles[0]), gl.STATIC_DRAW)
 	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(triangles)/4))
@@ -188,23 +199,23 @@ func (bb *BottomBar) Render() {
 	gl.UseProgram(0)
 }
 
-// OnEnter is called when the cursor enters the UIComponent's region
+// OnEnter is called when the cursor enters the ui.Component's region
 func (bb *BottomBar) OnEnter() {}
 
-// OnLeave is called when the cursor leaves the UIComponent's region
+// OnLeave is called when the cursor leaves the ui.Component's region
 func (bb *BottomBar) OnLeave() {}
 
-// OnMotion is called when the cursor moves within the UIComponent's region
+// OnMotion is called when the cursor moves within the ui.Component's region
 func (bb *BottomBar) OnMotion(evt *sdl.MouseMotionEvent) bool {
 	return true
 }
 
-// OnScroll is called when the user scrolls within the UIComponent's region
+// OnScroll is called when the user scrolls within the ui.Component's region
 func (bb *BottomBar) OnScroll(evt *sdl.MouseWheelEvent) bool {
 	return true
 }
 
-// OnClick is called when the user clicks within the UIComponent's region
+// OnClick is called when the user clicks within the ui.Component's region
 func (bb *BottomBar) OnClick(evt *sdl.MouseButtonEvent) bool {
 	return true
 }
