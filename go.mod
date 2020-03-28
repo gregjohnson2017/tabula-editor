@@ -9,5 +9,5 @@ require (
 	github.com/kroppt/Int32Set v0.0.0-20190617043009-95c3ce40003c
 	github.com/kroppt/winfileask v0.0.0-20190604203301-8c2224e10487
 	github.com/veandco/go-sdl2 v0.3.3
-	golang.org/x/image v0.0.0-20190523035834-f03afa92d3ff
+	golang.org/x/image v0.0.0-20200119044424-58c23975cae1
 )
