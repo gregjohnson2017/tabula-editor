@@ -45,8 +45,6 @@ func New(win *sdl.Window, cfg *config.Config) *Application {
 			os.Exit(1)
 		}
 	}
-	err = util.SetupMenuBar(win)
-	errCheck(err)
 
 	imageViewArea := &sdl.Rect{
 		X: 0,
