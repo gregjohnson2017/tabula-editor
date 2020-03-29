@@ -321,16 +321,16 @@ func (app *Application) Running() bool {
 func (app *Application) Quit() {
 	avgNs := int64(float64(imageTotalNs) / float64(iterations))
 	avg := time.Duration(int64(time.Nanosecond) * avgNs)
-	fmt.Printf("image.View avg:\t%v\n", avg)
+	fmt.Printf("image.View avg:\t %v\n", avg)
 	avgNs = int64(float64(bbTotalNs) / float64(iterations))
 	avg = time.Duration(int64(time.Nanosecond) * avgNs)
-	fmt.Printf("BottomBar avg:\t%v\n", avg)
+	fmt.Printf("BottomBar avg:\t %v\n", avg)
 	avgNs = int64(float64(bTotalNs) / float64(iterations))
 	avg = time.Duration(int64(time.Nanosecond) * avgNs)
-	fmt.Printf("Button avg:\t%v\n", avg)
+	fmt.Printf("menu.Button avg: %v\n", avg)
 	avgNs = int64(float64(mlTotalNs) / float64(iterations))
 	avg = time.Duration(int64(time.Nanosecond) * avgNs)
-	fmt.Printf("MenuList avg:\t%v\n", avg)
+	fmt.Printf("menu.Bar avg:\t %v\n", avg)
 
 	// free ui.Component assets
 	for _, comp := range app.comps {
