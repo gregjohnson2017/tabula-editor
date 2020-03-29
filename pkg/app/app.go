@@ -58,14 +58,8 @@ func New(win *sdl.Window, cfg *config.Config) *Application {
 		W: cfg.ScreenWidth,
 		H: cfg.BottomBarHeight,
 	}
-	buttonAreaOpen := &sdl.Rect{
-		X: 0,
-		Y: 30,
-		W: 125,
-		H: 20,
-	}
 	buttonAreaCenter := &sdl.Rect{
-		X: 125,
+		X: 0,
 		Y: 30,
 		W: 125,
 		H: 20,
@@ -79,20 +73,6 @@ func New(win *sdl.Window, cfg *config.Config) *Application {
 	errCheck(err)
 	bottomBar, err := NewBottomBar(bottomBarArea, bottomBarComms, cfg)
 	errCheck(err)
-	openButton, err := menu.NewButton(buttonAreaOpen, cfg, "Open File", func() {
-		// TODO fix spam click crash bug
-		newFileName, err := util.OpenFileDialog(win)
-		if err != nil {
-			fmt.Printf("No file chosen\n")
-			return
-		}
-		go func() {
-			actionComms <- func() {
-				err = iv.LoadFromFile(newFileName)
-				errCheck(err)
-			}
-		}()
-	})
 	centerButton, err := menu.NewButton(buttonAreaCenter, cfg, "Center Image", func() {
 		go func() {
 			actionComms <- func() {
@@ -105,11 +85,41 @@ func New(win *sdl.Window, cfg *config.Config) *Application {
 
 	menuBar, err := menu.NewBar(cfg, []menu.Definition{
 		menu.Definition{
-			Text: "cat",
+			Text: "File",
 			Children: []menu.Definition{
 				{
-					Text:   "kitty",
-					Action: func() { fmt.Println("kitty") },
+					Text: "Open",
+					Action: func() {
+						newFileName, err := util.OpenFileDialog(win)
+						if err != nil {
+							fmt.Printf("No file chosen\n")
+							return
+						}
+						go func() {
+							actionComms <- func() {
+								err = iv.LoadFromFile(newFileName)
+								errCheck(err)
+							}
+						}()
+					},
+				},
+				{
+					Text: "Save As",
+					Action: func() {
+						newFileName, err := util.SaveFileDialog(win)
+						if err != nil {
+							fmt.Printf("No file chosen\n")
+							return
+						}
+						go func() {
+							actionComms <- func() {
+								err := iv.WriteToFile(newFileName)
+								errCheck(err)
+								err = iv.LoadFromFile(newFileName)
+								errCheck(err)
+							}
+						}()
+					},
 				},
 				{
 					Text:   "kitten",
@@ -135,17 +145,24 @@ func New(win *sdl.Window, cfg *config.Config) *Application {
 			Text: "Tools",
 			Children: []menu.Definition{
 				{
-					Text: "No tool",
+					Text: "None",
 					Action: func() {
 						// clear the image view tool
 						go func() { toolComms <- image.EmptyTool{} }()
 					},
 				},
 				{
-					Text: "Pixel selection tool",
+					Text: "Pixel selector",
 					Action: func() {
 						// set the image view tool to the pixel selection tool
 						go func() { toolComms <- image.PixelSelectionTool{} }()
+					},
+				},
+				{
+					Text: "Pixel color changer",
+					Action: func() {
+						// set the image view tool to the pixel selection tool
+						go func() { toolComms <- image.PixelColorTool{} }()
 					},
 				},
 			},
@@ -163,7 +180,7 @@ func New(win *sdl.Window, cfg *config.Config) *Application {
 
 	return &Application{
 		running:     false,
-		comps:       []ui.Component{iv, bottomBar, openButton, centerButton, menuBar},
+		comps:       []ui.Component{iv, bottomBar, centerButton, menuBar},
 		cfg:         cfg,
 		postEvtActs: actionComms,
 		framerate:   framerate,

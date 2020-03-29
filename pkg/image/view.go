@@ -2,8 +2,12 @@ package image
 
 import (
 	"fmt"
+	"image"
+	"image/jpeg"
+	"image/png"
 	"math"
 	"os"
+	"path/filepath"
 	"strings"
 	"unsafe"
 
@@ -113,16 +117,6 @@ func NewView(area *sdl.Rect, fileName string, bbComms chan<- comms.Image, toolCo
 	uniformID := gl.GetUniformLocation(iv.programID, &[]byte("area\x00")[0])
 	gl.UseProgram(iv.programID)
 	gl.Uniform2f(uniformID, float32(iv.area.W), float32(iv.area.H))
-	gl.UseProgram(0)
-
-	uniformID = gl.GetUniformLocation(iv.selProgramID, &[]byte("origDims\x00")[0])
-	gl.UseProgram(iv.selProgramID)
-	gl.Uniform2f(uniformID, float32(iv.origW), float32(iv.origH))
-	gl.UseProgram(0)
-
-	uniformID = gl.GetUniformLocation(iv.selProgramID, &[]byte("mult\x00")[0])
-	gl.UseProgram(iv.selProgramID)
-	gl.Uniform1f(uniformID, float32(iv.mult))
 	gl.UseProgram(0)
 
 	gl.GenBuffers(1, &iv.vboID)
@@ -406,4 +400,44 @@ func loadImage(fileName string) (*sdl.Surface, error) {
 	}
 
 	return surf, err
+}
+
+// WriteToFile writes the image data stored in the OpenGL texture to a file specified by fileName
+func (iv *View) WriteToFile(fileName string) error {
+	var texWidth, texHeight int32
+	gl.BindTexture(gl.TEXTURE_2D, iv.textureID)
+	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_WIDTH, &texWidth)
+	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_HEIGHT, &texHeight)
+	// TODO do this in batches to avoid memory limitations
+	var data = make([]byte, texWidth*texHeight*4)
+	gl.GetTexImage(gl.TEXTURE_2D, 0, gl.RGBA, gl.UNSIGNED_BYTE, unsafe.Pointer(&data[0]))
+	gl.BindTexture(gl.TEXTURE_2D, 0)
+
+	img := image.NewNRGBA(image.Rect(0, 0, int(texWidth), int(texHeight)))
+	copy(img.Pix, data)
+	out, err := os.Create(fileName)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	switch ext := filepath.Ext(fileName); ext {
+	case ".png":
+		err = png.Encode(out, img)
+		if err != nil {
+			return err
+		}
+	case ".jpg", ".jpeg", ".jpe", ".jfif":
+		var opt jpeg.Options
+		opt.Quality = 100
+		err = jpeg.Encode(out, img, &opt)
+		if err != nil {
+			return err
+		}
+	default:
+		fmt.Printf(fileName)
+		return fmt.Errorf("%v is an unsupported file extension", ext)
+	}
+
+	return nil
 }
