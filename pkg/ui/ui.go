@@ -9,7 +9,6 @@ import (
 // Component describes which functions a UI component must implement
 type Component interface {
 	InBoundary(sdl.Point) bool
-	GetBoundary() *sdl.Rect
 	Render()
 	Destroy()
 	OnEnter()

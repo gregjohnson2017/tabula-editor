@@ -155,11 +155,6 @@ func (iv *View) InBoundary(pt sdl.Point) bool {
 	return ui.InBounds(*iv.area, pt)
 }
 
-// GetBoundary returns the clickable region of the ui.Component
-func (iv *View) GetBoundary() *sdl.Rect {
-	return iv.area
-}
-
 // Render draws the ui.Component
 func (iv *View) Render() {
 	go func() {

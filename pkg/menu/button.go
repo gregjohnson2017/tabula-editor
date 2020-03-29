@@ -166,11 +166,6 @@ func (b *Button) InBoundary(pt sdl.Point) bool {
 	return ui.InBounds(*b.area, pt)
 }
 
-// GetBoundary returns the clickable region of the ui.Component
-func (b *Button) GetBoundary() *sdl.Rect {
-	return b.area
-}
-
 // Render draws the ui.Component
 func (b *Button) Render() {
 	// render solid color background
