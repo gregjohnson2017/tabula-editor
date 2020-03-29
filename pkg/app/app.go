@@ -13,7 +13,6 @@ import (
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/gregjohnson2017/tabula-editor/pkg/util"
 	"github.com/veandco/go-sdl2/gfx"
-	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -354,7 +353,6 @@ func (app *Application) Quit() {
 
 	app.win.Destroy()
 	sdl.Quit()
-	img.Quit()
 }
 
 func errCheck(err error) {
