@@ -138,11 +138,6 @@ func (bb *BottomBar) InBoundary(pt sdl.Point) bool {
 	return ui.InBounds(*bb.area, pt)
 }
 
-// GetBoundary returns the clickable region of the ui.Component
-func (bb *BottomBar) GetBoundary() *sdl.Rect {
-	return bb.area
-}
-
 // Render draws the ui.Component
 func (bb *BottomBar) Render() {
 	msg := <-bb.comms

@@ -105,47 +105,55 @@ func New(win *sdl.Window, cfg *config.Config) *Application {
 	centerButton.SetHighlightBackgroundColor([4]float32{1.0, 0.0, 0.0, 1.0})
 	centerButton.SetDefaultTextColor([4]float32{0.0, 0.0, 1.0, 1.0})
 
-	catMenuList := menu.NewMenuList(cfg, false)
-	toolsMenuList := menu.NewMenuList(cfg, false)
-
-	menuBar := menu.NewMenuList(cfg, true)
-	menuItems := []menu.Definition{
-		{"cat", catMenuList, func() { fmt.Println("cat") }},
-		{"Tools", toolsMenuList, func() {}},
-	}
-	if err = menuBar.SetChildren(0, 0, menuItems); err != nil {
-		panic(err)
-	}
-
-	kittenMenuList := menu.NewMenuList(cfg, false)
-	catSubmenuItems := []menu.Definition{
-		{"kitty", &menu.MenuList{}, func() { fmt.Println("kitty") }},
-		{"kitten", kittenMenuList, func() { fmt.Println("kitten") }},
-	}
-	if err = catMenuList.SetChildren(0, menuBar.GetBoundary().H, catSubmenuItems); err != nil {
-		panic(err)
-	}
-
-	kittenSubmenuItems := []menu.Definition{
-		{"Mooney", &menu.MenuList{}, func() { fmt.Println("Mooney") }},
-		{"Buttercup", &menu.MenuList{}, func() { fmt.Println("Buttercup") }},
-		{"Sunny", &menu.MenuList{}, func() { fmt.Println("Sunny") }},
-	}
-	if err = kittenMenuList.SetChildren(catMenuList.GetBoundary().W, menuBar.GetBoundary().H+catMenuList.GetBoundary().H/2, kittenSubmenuItems); err != nil {
-		panic(err)
-	}
-
-	toolsSubmenuItems := []menu.Definition{
-		{"No tool", &menu.MenuList{}, func() {
-			// clear the image view tool
-			go func() { toolComms <- image.EmptyTool{} }()
-		}},
-		{"Pixel selection tool", &menu.MenuList{}, func() {
-			// set the image view tool to the pixel selection tool
-			go func() { toolComms <- image.PixelSelectionTool{} }()
-		}},
-	}
-	if err = toolsMenuList.SetChildren(0, menuBar.GetBoundary().H, toolsSubmenuItems); err != nil {
+	menuBar, err := menu.NewBar(cfg, []menu.Definition{
+		menu.Definition{
+			Text: "cat",
+			Children: []menu.Definition{
+				{
+					Text:   "kitty",
+					Action: func() { fmt.Println("kitty") },
+				},
+				{
+					Text:   "kitten",
+					Action: func() { fmt.Println("kitten") },
+					Children: []menu.Definition{
+						{
+							Text:   "Mooney",
+							Action: func() { fmt.Println("Mooney") },
+						},
+						{
+							Text:   "Buttercup",
+							Action: func() { fmt.Println("Buttercup") },
+						},
+						{
+							Text:   "Sunny",
+							Action: func() { fmt.Println("Sunny") },
+						},
+					},
+				},
+			},
+		},
+		menu.Definition{
+			Text: "Tools",
+			Children: []menu.Definition{
+				{
+					Text: "No tool",
+					Action: func() {
+						// clear the image view tool
+						go func() { toolComms <- image.EmptyTool{} }()
+					},
+				},
+				{
+					Text: "Pixel selection tool",
+					Action: func() {
+						// set the image view tool to the pixel selection tool
+						go func() { toolComms <- image.PixelSelectionTool{} }()
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
 		panic(err)
 	}
 
@@ -215,7 +223,7 @@ func (app *Application) PostEventActions() {
 			bbTotalNs += ns
 		case *menu.Button:
 			bTotalNs += ns
-		case *menu.MenuList:
+		case *menu.Bar:
 			mlTotalNs += ns
 		}
 	}
@@ -313,16 +321,16 @@ func (app *Application) Running() bool {
 func (app *Application) Quit() {
 	avgNs := int64(float64(imageTotalNs) / float64(iterations))
 	avg := time.Duration(int64(time.Nanosecond) * avgNs)
-	fmt.Printf("image.View avg:\t%v\n", avg)
+	fmt.Printf("image.View avg:\t %v\n", avg)
 	avgNs = int64(float64(bbTotalNs) / float64(iterations))
 	avg = time.Duration(int64(time.Nanosecond) * avgNs)
-	fmt.Printf("BottomBar avg:\t%v\n", avg)
+	fmt.Printf("BottomBar avg:\t %v\n", avg)
 	avgNs = int64(float64(bTotalNs) / float64(iterations))
 	avg = time.Duration(int64(time.Nanosecond) * avgNs)
-	fmt.Printf("Button avg:\t%v\n", avg)
+	fmt.Printf("menu.Button avg: %v\n", avg)
 	avgNs = int64(float64(mlTotalNs) / float64(iterations))
 	avg = time.Duration(int64(time.Nanosecond) * avgNs)
-	fmt.Printf("MenuList avg:\t%v\n", avg)
+	fmt.Printf("menu.Bar avg:\t %v\n", avg)
 
 	// free ui.Component assets
 	for _, comp := range app.comps {

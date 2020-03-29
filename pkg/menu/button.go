@@ -103,6 +103,10 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 
 	gl.UseProgram(0)
 
+	if action == nil {
+		action = func() {}
+	}
+
 	return &Button{
 		area:               area,
 		defaultBackColor:   backColor,
@@ -164,11 +168,6 @@ func (b *Button) Destroy() {
 // InBoundary returns whether a point is in this ui.Component's bounds
 func (b *Button) InBoundary(pt sdl.Point) bool {
 	return ui.InBounds(*b.area, pt)
-}
-
-// GetBoundary returns the clickable region of the ui.Component
-func (b *Button) GetBoundary() *sdl.Rect {
-	return b.area
 }
 
 // Render draws the ui.Component
@@ -270,4 +269,21 @@ func (b *Button) OnResize(x, y int32) {
 // String  returns the name of the component type
 func (b *Button) String() string {
 	return "Button"
+}
+
+// listButton defines an interactive button, but redefines OnClick to perform action on press, not release
+type listButton struct {
+	Button
+}
+
+// OnClick is called when the user clicks within the ui.Component's region
+func (mbb *listButton) OnClick(evt *sdl.MouseButtonEvent) bool {
+	if evt.Button == sdl.BUTTON_LEFT && evt.State == sdl.PRESSED {
+		mbb.pressed = true
+		mbb.action()
+	} else if evt.Button == sdl.BUTTON_LEFT && evt.State == sdl.RELEASED && mbb.pressed {
+		mbb.pressed = false
+		// TODO add release action
+	}
+	return true
 }
