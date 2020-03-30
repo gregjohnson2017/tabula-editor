@@ -27,7 +27,7 @@ type BottomBar struct {
 	backVboID     uint32
 	textVaoID     uint32
 	textVboID     uint32
-	font          font.Info
+	fontInfo      font.Info
 	cfg           *config.Config
 }
 
@@ -61,7 +61,7 @@ func NewBottomBar(area *sdl.Rect, comms <-chan comms.Image, cfg *config.Config) 
 	textColorID := gl.GetUniformLocation(textProgramID, &[]byte("text_color\x00")[0])
 
 	var texSheetWidth, texSheetHeight int32
-	fnt.Bind()
+	gl.BindTexture(gl.TEXTURE_2D, fnt.TextureID())
 	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_WIDTH, &texSheetWidth)
 	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_HEIGHT, &texSheetHeight)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
@@ -104,7 +104,7 @@ func NewBottomBar(area *sdl.Rect, comms <-chan comms.Image, cfg *config.Config) 
 		backVboID:     backVboID,
 		textVaoID:     textVaoID,
 		textVboID:     textVboID,
-		font:          fnt,
+		fontInfo:      fnt,
 		cfg:           cfg,
 	}, nil
 }
@@ -157,17 +157,16 @@ func (bb *BottomBar) Render() {
 	fileNameMessage := msg.FileName
 	zoomMessage := fmt.Sprintf("%vx", msg.Mult)
 	mousePixMessage := fmt.Sprintf("(%v, %v)", msg.MousePix.X, msg.MousePix.Y)
-	maxBearingY := font.GetMaxVerticalBearing(fileNameMessage+zoomMessage+mousePixMessage, bb.font)
 
 	pos := sdl.Point{0, bb.cfg.BottomBarHeight / 2}
 	align := ui.Align{ui.AlignMiddle, ui.AlignLeft}
-	fileNameTriangles := font.MapStringWithBearing(fileNameMessage, bb.font, maxBearingY, pos, align)
+	fileNameTriangles := font.MapString(fileNameMessage, bb.fontInfo, pos, align)
 	pos = sdl.Point{bb.cfg.ScreenWidth / 2, bb.cfg.BottomBarHeight / 2}
 	align = ui.Align{ui.AlignMiddle, ui.AlignCenter}
-	zoomTriangles := font.MapStringWithBearing(zoomMessage, bb.font, maxBearingY, pos, align)
+	zoomTriangles := font.MapString(zoomMessage, bb.fontInfo, pos, align)
 	pos = sdl.Point{bb.cfg.ScreenWidth, bb.cfg.BottomBarHeight / 2}
 	align = ui.Align{ui.AlignMiddle, ui.AlignRight}
-	mousePixTriangles := font.MapStringWithBearing(mousePixMessage, bb.font, maxBearingY, pos, align)
+	mousePixTriangles := font.MapString(mousePixMessage, bb.fontInfo, pos, align)
 	triangles := make([]float32, 0, len(fileNameTriangles)+len(zoomTriangles)+len(mousePixTriangles))
 	triangles = append(triangles, fileNameTriangles...)
 	triangles = append(triangles, zoomTriangles...)
@@ -180,7 +179,7 @@ func (bb *BottomBar) Render() {
 	gl.BindVertexArray(bb.textVaoID)
 	gl.EnableVertexAttribArray(0)
 	gl.EnableVertexAttribArray(1)
-	bb.font.Bind()
+	gl.BindTexture(gl.TEXTURE_2D, bb.fontInfo.TextureID())
 
 	gl.BufferData(gl.ARRAY_BUFFER, 4*len(triangles), gl.Ptr(&triangles[0]), gl.STATIC_DRAW)
 	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(triangles)/4))

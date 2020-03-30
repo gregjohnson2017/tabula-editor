@@ -24,7 +24,7 @@ type Button struct {
 	backVboID          uint32
 	textVaoID          uint32
 	textVboID          uint32
-	font               font.Info
+	fontInfo           font.Info
 	text               string
 	pressed            bool
 	hovering           bool
@@ -63,7 +63,7 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 	textColorID := gl.GetUniformLocation(textProgramID, &[]byte("text_color\x00")[0])
 
 	var texSheetWidth, texSheetHeight int32
-	fnt.Bind()
+	gl.BindTexture(gl.TEXTURE_2D, fnt.TextureID())
 	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_WIDTH, &texSheetWidth)
 	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_HEIGHT, &texSheetHeight)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
@@ -120,7 +120,7 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 		backVboID:          backVboID,
 		textVaoID:          textVaoID,
 		textVboID:          textVboID,
-		font:               fnt,
+		fontInfo:           fnt,
 		text:               text,
 		cfg:                cfg,
 		pressed:            false,
@@ -178,20 +178,23 @@ func (b *Button) Render() {
 
 	gl.BindVertexArray(b.backVaoID)
 	gl.EnableVertexAttribArray(0)
+
 	gl.DrawArrays(gl.TRIANGLES, 0, 6) // always 6 vertices for background rectangle
+
 	gl.DisableVertexAttribArray(0)
 	gl.BindVertexArray(0)
 
 	// render text on top
 	gl.Viewport(0, 0, b.cfg.ScreenWidth, b.cfg.ScreenHeight)
 	gl.UseProgram(b.textProgramID)
-
 	gl.BindBuffer(gl.ARRAY_BUFFER, b.textVboID)
 	gl.BindVertexArray(b.textVaoID)
 	gl.EnableVertexAttribArray(0)
 	gl.EnableVertexAttribArray(1)
-	b.font.Bind()
+	gl.BindTexture(gl.TEXTURE_2D, b.fontInfo.TextureID())
+
 	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(b.strTriangles)/4))
+
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 	gl.DisableVertexAttribArray(0)
 	gl.DisableVertexAttribArray(1)
@@ -259,7 +262,7 @@ func (b *Button) OnResize(x, y int32) {
 
 	pos := sdl.Point{b.area.X + b.area.W/2, b.cfg.ScreenHeight - b.area.Y - b.area.H/2}
 	align := ui.Align{ui.AlignMiddle, ui.AlignCenter}
-	textTriangles := font.MapString(b.text, b.font, pos, align)
+	textTriangles := font.MapString(b.text, b.fontInfo, pos, align)
 	gl.BindBuffer(gl.ARRAY_BUFFER, b.textVboID)
 	gl.BufferData(gl.ARRAY_BUFFER, 4*len(textTriangles), gl.Ptr(&textTriangles[0]), gl.STATIC_DRAW)
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
