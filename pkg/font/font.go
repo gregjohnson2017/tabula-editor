@@ -3,10 +3,12 @@ package font
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"image/png"
 	"io/ioutil"
 	"math"
 	"os"
+	"strconv"
 	"time"
 	"unicode"
 	"unsafe"
@@ -189,9 +191,26 @@ func printMetrics(metrics font.Metrics) {
 	fmt.Printf("height: %v, ascent: %v, descent: %v, xheight: %v, capheight: %v, caretslope: %v\n", int26_6ToFloat32(metrics.Height), int26_6ToFloat32(metrics.Ascent), int26_6ToFloat32(metrics.Descent), int26_6ToFloat32(metrics.XHeight), int26_6ToFloat32(metrics.CapHeight), metrics.CaretSlope)
 }
 
-// loadFontTexture caches all of the glyph pixel data in an OpenGL texture for
-// a given font at a given size. It returns the OpenGL ID for this texture,
-// along with a runeInfo array for indexing into the texture per rune at runtime
+func writeFontToFile(fileName string, glyphBytes []byte, width, height int) {
+	alphaImg := image.NewAlpha(image.Rect(0, 0, width, height))
+	outImg := image.NewNRGBA(image.Rect(0, 0, width, height))
+	alphaImg.Pix = glyphBytes
+	for j := 0; j < height; j++ {
+		for i := 0; i < width; i++ {
+			col := color.NRGBAModel.Convert(alphaImg.At(i, j))
+			alpha := col.(color.NRGBA).A
+			newCol := color.NRGBA{alpha, alpha, alpha, 255}
+			outImg.Set(i, j, newCol)
+		}
+	}
+	file, _ := os.OpenFile(fileName, os.O_CREATE|os.O_RDWR, 0755)
+	png.Encode(file, outImg)
+	file.Close()
+}
+
+// LoadFontTexture caches all of the glyph pixel data in an OpenGL texture for
+// a given font at a given size. It returns an Info struct populated with the
+// OpenGL ID for this texture, metrics, and an array containing glyph spacing info
 func LoadFontTexture(fontName string, fontSize int32) (Info, error) {
 	if fontMap == nil {
 		fontMap = make(map[fontKey]Info)
@@ -259,15 +278,12 @@ func LoadFontTexture(fontName string, fontSize int32) (Info, error) {
 		return Info{}, fmt.Errorf("Failed to get glyph for 'A'")
 	}
 
-	// writeme, _ := mask.(*image.Alpha)
-	// writeme.Pix = glyphBytes
-	// writeme.Rect = image.Rectangle{Min: image.Point{0, 0}, Max: image.Point{int(writeme.Stride), int(len(glyphBytes) / writeme.Stride)}}
-	// file, _ := os.OpenFile("glyphBytes.png", os.O_CREATE|os.O_RDWR, 0755)
-	// png.Encode(file, writeme)
-
 	glyph, _ := mask.(*image.Alpha)
 	texWidth := int32(glyph.Stride)
 	texHeight := int32(len(glyphBytes) / glyph.Stride)
+
+	// Un-comment this line to save loaded fonts to a file for viewing
+	writeFontToFile(fontName+"-"+strconv.Itoa(int(fontSize))+"-texture.png", glyphBytes, int(texWidth), int(texHeight))
 
 	// pass glyphBytes to OpenGL texture
 	var fontTextureID uint32
