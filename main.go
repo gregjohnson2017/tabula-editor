@@ -17,8 +17,8 @@ func initWindow(title string, width, height int32) (*sdl.Window, error) {
 	if err = sdl.Init(sdl.INIT_VIDEO | sdl.INIT_EVENTS); err != nil {
 		return nil, err
 	}
-	sdl.GLSetAttribute(sdl.GL_CONTEXT_MAJOR_VERSION, 4)
-	sdl.GLSetAttribute(sdl.GL_CONTEXT_MINOR_VERSION, 6)
+	sdl.GLSetAttribute(sdl.GL_CONTEXT_MAJOR_VERSION, 3)
+	sdl.GLSetAttribute(sdl.GL_CONTEXT_MINOR_VERSION, 3)
 	sdl.GLSetAttribute(sdl.GL_DOUBLEBUFFER, 1)
 	sdl.GLSetAttribute(sdl.GL_CONTEXT_PROFILE_MASK, sdl.GL_CONTEXT_PROFILE_CORE)
 	//sdl.EventState(sdl.SYSWMEVENT, sdl.ENABLE)

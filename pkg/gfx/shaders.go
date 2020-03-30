@@ -2,7 +2,7 @@ package gfx
 
 const (
 	OutlineVsh = `
-	#version 460
+	#version 330
 	uniform vec4 uni_color;
 	uniform vec2 origDims;
 	uniform float mult;
@@ -18,7 +18,7 @@ const (
 ` + "\x00"
 
 	OutlineFsh = `
-	#version 460
+	#version 330
 	in vec4 color;
 	out vec4 frag_color;
 	void main() {
@@ -33,7 +33,7 @@ const (
 ` + "\x00"
 
 	SolidColorVertex = `
-	#version 460
+	#version 330
 	uniform vec4 uni_color;
 	in vec2 position_in;
 	out vec4 color;
@@ -44,7 +44,7 @@ const (
 ` + "\x00"
 
 	SolidColorFragment = `
-	#version 460
+	#version 330
 	in vec4 color;
 	out vec4 frag_color;
 	void main() {
@@ -53,7 +53,7 @@ const (
 ` + "\x00"
 
 	VertexShaderSource = `
-	#version 460
+	#version 330
 	uniform vec2 area;
 	layout(location = 0) in vec2 position_in;
 	layout(location = 1) in vec2 tex_coords_in;
@@ -66,7 +66,7 @@ const (
 ` + "\x00"
 
 	FragmentShaderSource = `
-	#version 460
+	#version 330
 	uniform sampler2D frag_tex;
 	in vec2 tex_coords;
 	out vec4 frag_color;
@@ -76,7 +76,7 @@ const (
 ` + "\x00"
 
 	VshTexturePassthrough = `
-	#version 460
+	#version 330
 	layout(location = 0) in vec2 position_in;
 	layout(location = 1) in vec2 tex_coords_in;
 	out vec2 tex_coords;
@@ -92,7 +92,7 @@ const (
 	// at (left, top).
 	// Output `tex_coords` is typical texture coordinates for fragment shader.
 	GlyphShaderVertex = `
-	#version 460
+	#version 330
 	uniform vec2 tex_size;
 	uniform vec2 screen_size;
 	layout(location = 0) in vec2 position_in;
@@ -106,7 +106,7 @@ const (
 ` + "\x00"
 
 	GlyphShaderFragment = `
-	#version 460
+	#version 330
 	uniform sampler2D frag_tex;
 	uniform vec4 text_color;
 	in vec2 tex_coords;
@@ -117,7 +117,7 @@ const (
 ` + "\x00"
 
 	CheckerShaderFragment = `
-	#version 460
+	#version 330
 	uniform sampler2D frag_tex;
 	in vec2 tex_coords;
 	out vec4 frag_color;
