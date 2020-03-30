@@ -392,7 +392,21 @@ func loadImage(fileName string) (width, height int, data []byte, err error) {
 	if err != nil {
 		return 0, 0, nil, err
 	}
-
+	// TODO load from underlying arrays directly and correctly format in OpenGL
+	// switch img.(type) {
+	// case *image.Alpha:
+	// case *image.Alpha16:
+	// case *image.CMYK:
+	// case *image.Gray:
+	// case *image.Gray16:
+	// case *image.NRGBA:
+	// case *image.NRGBA64:
+	// case *image.Paletted:
+	// case *image.RGBA:
+	// case *image.RGBA64:
+	// case *image.YCbCr, *image.NYCbCrA, *image.Uniform:
+	// 	// no Pix array
+	// }
 	width = img.Bounds().Dx()
 	height = img.Bounds().Dy()
 	data = make([]byte, 0, width*height*4)
@@ -433,6 +447,7 @@ func (iv *View) WriteToFile(fileName string) error {
 			return err
 		}
 	case ".jpg", ".jpeg", ".jpe", ".jfif":
+		// TODO add dialog to choose quality
 		var opt jpeg.Options
 		opt.Quality = 100
 		err = jpeg.Encode(out, img, &opt)
