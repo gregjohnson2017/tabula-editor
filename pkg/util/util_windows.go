@@ -34,7 +34,16 @@ func SaveFileDialog(win *sdl.Window) (string, error) {
 		return "", err
 	}
 	info := wm.GetWindowsInfo()
-	filter := winfileask.FileFilter{winfileask.Filter{"JPEG (*.jpeg;*.jpg;*.jpe;*.jfif)", "*.jpeg;*.jpg;*.jpe;*.jfif"}, winfileask.Filter{"PNG (*.png)", "*.png"}}
+	filter := winfileask.FileFilter{
+		winfileask.Filter{
+			"JPEG (*.jpeg;*.jpg;*.jpe;*.jfif)",
+			"*.jpeg;*.jpg;*.jpe;*.jfif",
+		},
+		winfileask.Filter{
+			"PNG (*.png)",
+			"*.png",
+		},
+	}
 	str, ok, err := winfileask.GetSaveFileName(info.Window, "Save an Image", filter, "")
 	if !ok {
 		err = fmt.Errorf("no image chosen")
