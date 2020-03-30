@@ -13,15 +13,3 @@ func OpenFileDialog(win *sdl.Window) (string, error) {
 	}
 	return files[0], nil
 }
-
-// SetupMenuBar sets up system window menu bars
-func SetupMenuBar(win *sdl.Window) error {
-	// fmt.Fprintln(os.Stderr, "setupMenuBar not implemented")
-	return nil
-}
-
-// GetMenuAction returns the type of action that has been detected
-func GetMenuAction(evt *sdl.SysWMEvent) MenuAction {
-	// fmt.Fprintln(os.Stderr, "handleWMEvent not implemented")
-	return MenuNone
-}

@@ -6,7 +6,6 @@ import (
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/app"
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
-	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -17,10 +16,6 @@ func initWindow(title string, width, height int32) (*sdl.Window, error) {
 	var err error
 	if err = sdl.Init(sdl.INIT_VIDEO | sdl.INIT_EVENTS); err != nil {
 		return nil, err
-	}
-	// other libraries
-	if img.Init(img.INIT_PNG) != img.INIT_PNG {
-		return nil, fmt.Errorf("could not initialize PNG")
 	}
 	sdl.GLSetAttribute(sdl.GL_CONTEXT_MAJOR_VERSION, 4)
 	sdl.GLSetAttribute(sdl.GL_CONTEXT_MINOR_VERSION, 6)

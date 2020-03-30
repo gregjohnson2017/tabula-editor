@@ -2,8 +2,13 @@ package image
 
 import (
 	"fmt"
+	"image"
+	"image/color"
+	"image/jpeg"
+	"image/png"
 	"math"
 	"os"
+	"path/filepath"
 	"strings"
 	"unsafe"
 
@@ -12,7 +17,6 @@ import (
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
 	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
-	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
 
 	set "github.com/kroppt/Int32Set"
@@ -46,12 +50,12 @@ type View struct {
 }
 
 func (iv *View) LoadFromFile(fileName string) error {
-	surf, err := loadImage(fileName)
+	width, height, data, err := loadImage(fileName)
 	if err != nil {
 		return err
 	}
-	iv.origW = surf.W
-	iv.origH = surf.H
+	iv.origW = int32(width)
+	iv.origH = int32(height)
 	uniformID := gl.GetUniformLocation(iv.selProgramID, &[]byte("origDims\x00")[0])
 	gl.UseProgram(iv.selProgramID)
 	gl.Uniform2f(uniformID, float32(iv.origW), float32(iv.origH))
@@ -62,18 +66,17 @@ func (iv *View) LoadFromFile(fileName string) error {
 	gl.GenTextures(1, &iv.textureID)
 	gl.BindTexture(gl.TEXTURE_2D, iv.textureID)
 	// copy pixels to texture
-	gl.TexImage2D(gl.TEXTURE_2D, 0, format, surf.W, surf.H, 0, uint32(format), gl.UNSIGNED_BYTE, unsafe.Pointer(&surf.Pixels()[0]))
+	gl.TexImage2D(gl.TEXTURE_2D, 0, format, iv.origW, iv.origH, 0, uint32(format), gl.UNSIGNED_BYTE, unsafe.Pointer(&data[0]))
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
 	gl.GenerateMipmap(gl.TEXTURE_2D)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
-	surf.Free()
 
 	iv.canvas = &sdl.Rect{
 		X: 0,
 		Y: 0,
-		W: surf.W,
-		H: surf.H,
+		W: iv.origW,
+		H: iv.origH,
 	}
 	iv.CenterImage()
 	iv.mult = 1.0
@@ -113,16 +116,6 @@ func NewView(area *sdl.Rect, fileName string, bbComms chan<- comms.Image, toolCo
 	uniformID := gl.GetUniformLocation(iv.programID, &[]byte("area\x00")[0])
 	gl.UseProgram(iv.programID)
 	gl.Uniform2f(uniformID, float32(iv.area.W), float32(iv.area.H))
-	gl.UseProgram(0)
-
-	uniformID = gl.GetUniformLocation(iv.selProgramID, &[]byte("origDims\x00")[0])
-	gl.UseProgram(iv.selProgramID)
-	gl.Uniform2f(uniformID, float32(iv.origW), float32(iv.origH))
-	gl.UseProgram(0)
-
-	uniformID = gl.GetUniformLocation(iv.selProgramID, &[]byte("mult\x00")[0])
-	gl.UseProgram(iv.selProgramID)
-	gl.Uniform1f(uniformID, float32(iv.mult))
 	gl.UseProgram(0)
 
 	gl.GenBuffers(1, &iv.vboID)
@@ -388,22 +381,82 @@ func (iv *View) String() string {
 	return "View"
 }
 
-func loadImage(fileName string) (*sdl.Surface, error) {
-	var surf *sdl.Surface
-	var err error
-	if surf, err = img.Load(fileName); err != nil {
-		return nil, err
+func loadImage(fileName string) (width, height int, data []byte, err error) {
+	in, err := os.Open(fileName)
+	if err != nil {
+		return 0, 0, nil, err
 	}
+	defer in.Close()
 
-	// convert pixel format to RGBA32 if necessary
-	if surf.Format.Format != uint32(sdl.PIXELFORMAT_RGBA32) {
-		convertedSurf, err := surf.ConvertFormat(uint32(sdl.PIXELFORMAT_RGBA32), 0)
-		surf.Free()
-		if err != nil {
-			return nil, err
+	img, _, err := image.Decode(in)
+	if err != nil {
+		return 0, 0, nil, err
+	}
+	// TODO load from underlying arrays directly and correctly format in OpenGL
+	// switch img.(type) {
+	// case *image.Alpha:
+	// case *image.Alpha16:
+	// case *image.CMYK:
+	// case *image.Gray:
+	// case *image.Gray16:
+	// case *image.NRGBA:
+	// case *image.NRGBA64:
+	// case *image.Paletted:
+	// case *image.RGBA:
+	// case *image.RGBA64:
+	// case *image.YCbCr, *image.NYCbCrA, *image.Uniform:
+	// 	// no Pix array
+	// }
+	width = img.Bounds().Dx()
+	height = img.Bounds().Dy()
+	data = make([]byte, 0, width*height*4)
+	for j := 0; j < height; j++ {
+		for i := 0; i < width; i++ {
+			col := color.NRGBAModel.Convert(img.At(i, j))
+			nrgba := col.(color.NRGBA)
+			r, g, b, a := nrgba.R, nrgba.G, nrgba.B, nrgba.A
+			data = append(data, r, g, b, a)
 		}
-		return convertedSurf, nil
+	}
+	return width, height, data, nil
+}
+
+// WriteToFile writes the image data stored in the OpenGL texture to a file specified by fileName
+func (iv *View) WriteToFile(fileName string) error {
+	var texWidth, texHeight int32
+	gl.BindTexture(gl.TEXTURE_2D, iv.textureID)
+	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_WIDTH, &texWidth)
+	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_HEIGHT, &texHeight)
+	// TODO do this in batches to avoid memory limitations
+	var data = make([]byte, texWidth*texHeight*4)
+	gl.GetTexImage(gl.TEXTURE_2D, 0, gl.RGBA, gl.UNSIGNED_BYTE, unsafe.Pointer(&data[0]))
+	gl.BindTexture(gl.TEXTURE_2D, 0)
+
+	img := image.NewNRGBA(image.Rect(0, 0, int(texWidth), int(texHeight)))
+	copy(img.Pix, data)
+	out, err := os.Create(fileName)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	switch ext := filepath.Ext(fileName); ext {
+	case ".png":
+		err = png.Encode(out, img)
+		if err != nil {
+			return err
+		}
+	case ".jpg", ".jpeg", ".jpe", ".jfif":
+		// TODO add dialog to choose quality
+		var opt jpeg.Options
+		opt.Quality = 100
+		err = jpeg.Encode(out, img, &opt)
+		if err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("%v is an unsupported file extension", ext)
 	}
 
-	return surf, err
+	return nil
 }
