@@ -101,15 +101,16 @@ func NewView(area *sdl.Rect, fileName string, bbComms chan<- comms.Image, toolCo
 	iv.area = area
 	iv.bbComms = bbComms
 	iv.toolComms = toolComms
-	if err = iv.LoadFromFile(fileName); err != nil {
-		return nil, err
-	}
 
 	if iv.programID, err = gfx.CreateShaderProgram(gfx.VertexShaderSource, gfx.CheckerShaderFragment); err != nil {
 		return nil, err
 	}
 
 	if iv.selProgramID, err = gfx.CreateShaderProgram(gfx.OutlineVsh, gfx.OutlineFsh); err != nil {
+		return nil, err
+	}
+
+	if err = iv.LoadFromFile(fileName); err != nil {
 		return nil, err
 	}
 
