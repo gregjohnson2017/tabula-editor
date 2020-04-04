@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
-	"strconv"
 	"time"
 	"unicode"
 	"unsafe"
@@ -203,9 +202,17 @@ func writeFontToFile(fileName string, glyphBytes []byte, width, height int) {
 			outImg.Set(i, j, newCol)
 		}
 	}
-	file, _ := os.OpenFile(fileName, os.O_CREATE|os.O_RDWR, 0755)
-	png.Encode(file, outImg)
-	file.Close()
+	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_RDWR, 0755)
+	if err != nil {
+		panic(err)
+	}
+	if err = png.Encode(file, outImg); err != nil {
+		panic(err)
+	}
+	if err = file.Close(); err != nil {
+		panic(err)
+	}
+
 }
 
 // LoadFontTexture caches all of the glyph pixel data in an OpenGL texture for
@@ -283,7 +290,7 @@ func LoadFontTexture(fontName string, fontSize int32) (Info, error) {
 	texHeight := int32(len(glyphBytes) / glyph.Stride)
 
 	// Un-comment this line to save loaded fonts to a file for viewing
-	writeFontToFile(fontName+"-"+strconv.Itoa(int(fontSize))+"-texture.png", glyphBytes, int(texWidth), int(texHeight))
+	// writeFontToFile(fontName+"-"+strconv.Itoa(int(fontSize))+"-texture.png", glyphBytes, int(texWidth), int(texHeight))
 
 	// pass glyphBytes to OpenGL texture
 	var fontTextureID uint32
