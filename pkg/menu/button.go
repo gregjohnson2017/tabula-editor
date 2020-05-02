@@ -273,20 +273,3 @@ func (b *Button) OnResize(x, y int32) {
 func (b *Button) String() string {
 	return "Button"
 }
-
-// listButton defines an interactive button, but redefines OnClick to perform action on press, not release
-type listButton struct {
-	Button
-}
-
-// OnClick is called when the user clicks within the ui.Component's region
-func (mbb *listButton) OnClick(evt *sdl.MouseButtonEvent) bool {
-	if evt.Button == sdl.BUTTON_LEFT && evt.State == sdl.PRESSED {
-		mbb.pressed = true
-		mbb.action()
-	} else if evt.Button == sdl.BUTTON_LEFT && evt.State == sdl.RELEASED && mbb.pressed {
-		mbb.pressed = false
-		// TODO add release action
-	}
-	return true
-}
