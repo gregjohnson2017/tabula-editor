@@ -9,7 +9,7 @@ import (
 // entry is the clickable entry which opens a list
 type entry struct {
 	enabled bool
-	button  *listButton
+	button  *Button
 	list    *list
 }
 
@@ -34,7 +34,7 @@ func newEntry(cfg *config.Config, area *sdl.Rect, label string, align ui.Align, 
 
 	return &entry{
 		enabled: false,
-		button:  &listButton{*btn},
+		button:  btn,
 		list:    list,
 	}, nil
 }
@@ -69,12 +69,14 @@ func (e *entry) OnLeave() {
 
 // OnClick calls the underlying button's OnClick method
 func (e *entry) OnClick(evt *sdl.MouseButtonEvent) bool {
-	if evt.Button != sdl.BUTTON_LEFT || evt.State != sdl.PRESSED {
+	if evt.Button != sdl.BUTTON_LEFT {
 		return true
 	}
 	if e.button.InBoundary(sdl.Point{X: evt.X, Y: evt.Y}) {
 		e.button.OnClick(evt)
-		e.enabled = !e.enabled
+		if evt.State == sdl.RELEASED {
+			e.enabled = !e.enabled
+		}
 		return true
 	}
 	if e, err := e.list.GetEntryAt(evt.X, evt.Y); err == nil {
