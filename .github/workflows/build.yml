@@ -17,10 +17,10 @@ jobs:
     - name: Install C Dependencies
       run: apt update && apt install libsdl2-gfx-dev
 
-    - name: Check out code into the Go module directory
+    - name: Checkout Repository
       uses: actions/checkout@v2
 
-    - name: Get dependencies
+    - name: Download Go Dependencies
       run: go get -v -t -d ./...
 
     - name: Build
@@ -29,5 +29,5 @@ jobs:
     - name: Upload Build Artifact
       uses: actions/upload-artifact@v2
       with:
-        name: tabula-editor
+        name: tabula-editor_linux
         path: ./tabula-editor
