@@ -9,7 +9,10 @@ import (
 
 // OpenFileDialog uses a system file picker to get a filename from the user
 func OpenFileDialog(win *sdl.Window) (string, error) {
-	files, err := gozenity.FileSelection("Choose a picture to open", nil)
+	files, err := gozenity.FileSelection("Choose a picture to open", map[string][]string{
+		"PNG":  []string{"*.png"},
+		"JPEG": []string{"*.jpg", "*.jpeg", "*.jpe", "*.jfif"},
+	})
 	if err != nil {
 		return "", fmt.Errorf("OpenFileDialog: %w", err)
 	}
