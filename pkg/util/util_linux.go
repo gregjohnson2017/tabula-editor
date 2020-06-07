@@ -11,7 +11,7 @@ import (
 func OpenFileDialog(win *sdl.Window) (string, error) {
 	files, err := gozenity.FileSelection("Choose a picture to open", nil)
 	if err != nil {
-		panic(err)
+		return "", fmt.Errorf("OpenFileDialog: %w", err)
 	}
 	return files[0], nil
 }
