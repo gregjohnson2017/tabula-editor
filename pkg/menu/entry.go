@@ -65,6 +65,7 @@ func (e *entry) OnEnter() {
 func (e *entry) OnLeave() {
 	e.button.OnLeave()
 	e.list.OnLeave()
+	e.enabled = false
 }
 
 // OnClick calls the underlying button's OnClick method
