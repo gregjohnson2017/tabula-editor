@@ -21,7 +21,7 @@ func OpenFileDialog(win *sdl.Window) (string, error) {
 		err = fmt.Errorf("no image chosen")
 	}
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("OpenFileDialog: %w", err)
 	}
 	return str, nil
 }
@@ -36,12 +36,12 @@ func SaveFileDialog(win *sdl.Window) (string, error) {
 	info := wm.GetWindowsInfo()
 	filter := winfileask.FileFilter{
 		winfileask.Filter{
-			"JPEG (*.jpeg;*.jpg;*.jpe;*.jfif)",
-			"*.jpeg;*.jpg;*.jpe;*.jfif",
+			Name:    "JPEG (*.jpeg;*.jpg;*.jpe;*.jfif)",
+			Pattern: "*.jpeg;*.jpg;*.jpe;*.jfif",
 		},
 		winfileask.Filter{
-			"PNG (*.png)",
-			"*.png",
+			Name:    "PNG (*.png)",
+			Pattern: "*.png",
 		},
 	}
 	str, ok, err := winfileask.GetSaveFileName(info.Window, "Save an Image", filter, "")
@@ -49,7 +49,7 @@ func SaveFileDialog(win *sdl.Window) (string, error) {
 		err = fmt.Errorf("no image chosen")
 	}
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("SaveFileDialog: %w", err)
 	}
 	return str, nil
 }

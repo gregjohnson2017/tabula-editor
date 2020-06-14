@@ -91,7 +91,7 @@ func New(win *sdl.Window, cfg *config.Config) *Application {
 					Action: func() {
 						newFileName, err := util.OpenFileDialog(win)
 						if err != nil {
-							fmt.Printf("No file chosen\n")
+							fmt.Printf("%v\n", err)
 							return
 						}
 						go func() {
@@ -107,7 +107,7 @@ func New(win *sdl.Window, cfg *config.Config) *Application {
 					Action: func() {
 						newFileName, err := util.SaveFileDialog(win)
 						if err != nil {
-							fmt.Printf("No file chosen\n")
+							fmt.Printf("%v\n", err)
 							return
 						}
 						go func() {
