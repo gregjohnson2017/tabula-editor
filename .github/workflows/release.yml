@@ -1,0 +1,37 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    container: golang:latest
+    steps:
+
+    - name: Install C Dependencies
+      run: apt-get update && apt-get install -y libsdl2-gfx-dev
+
+    - name: Checkout Repository
+      uses: actions/checkout@v2
+
+    # So GoReleaser can generate the changelog properly
+    - name: Unshallowify the Clone
+      run: git fetch --prune --unshallow
+
+    - name: Save Git Tag
+      id: git_tag
+      run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+
+    - name: Create Release and Upload Asset
+      uses: goreleaser/goreleaser-action@v2
+      with:
+        args: release --rm-dist
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        TAG: ${{ steps.git_tag.outputs.VERSION }}
+

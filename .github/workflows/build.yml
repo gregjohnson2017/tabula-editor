@@ -1,0 +1,33 @@
+name: Build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    container: golang:latest
+    steps:
+
+    - name: Install C Dependencies
+      run: apt-get update && apt-get install -y libsdl2-gfx-dev
+
+    - name: Checkout Repository
+      uses: actions/checkout@v2
+
+    - name: Download Go Dependencies
+      run: go get -v -t -d ./...
+
+    - name: Build
+      run: go build -v .
+
+    - name: Upload Build Artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: tabula-editor_linux
+        path: ./tabula-editor
