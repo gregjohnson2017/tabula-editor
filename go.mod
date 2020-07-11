@@ -8,6 +8,6 @@ require (
 	github.com/jcmuller/gozenity v0.0.1
 	github.com/kroppt/Int32Set v0.0.0-20190617043009-95c3ce40003c
 	github.com/kroppt/winfileask v0.0.0-20200406172824-13c3807ac64f
-	github.com/veandco/go-sdl2 v0.3.3
+	github.com/veandco/go-sdl2 v0.4.4
 	golang.org/x/image v0.0.0-20200119044424-58c23975cae1
 )
