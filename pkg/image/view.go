@@ -38,7 +38,6 @@ type View struct {
 	programID      uint32
 	selProgramID   uint32
 	textureID      uint32
-	glSquare       []float32
 	vaoID, vboID   uint32
 	selVao, selVbo uint32
 	bbComms        chan<- comms.Image
@@ -306,7 +305,7 @@ func (iv *View) OnMotion(evt *sdl.MouseMotionEvent) bool {
 	if !iv.dragging {
 		iv.updateMousePos(evt.X, evt.Y)
 	}
-	if !iv.dragging && !ui.InBounds(*iv.canvas, sdl.Point{evt.X, evt.Y}) {
+	if !iv.dragging && !ui.InBounds(*iv.canvas, sdl.Point{X: evt.X, Y: evt.Y}) {
 		return false
 	}
 	if evt.State == sdl.ButtonRMask() && iv.dragging {
@@ -348,7 +347,7 @@ func (iv *View) SelectPixel(x, y int32) error {
 // OnClick is called when the user clicks within the ui.Component's region
 func (iv *View) OnClick(evt *sdl.MouseButtonEvent) bool {
 	iv.updateMousePos(evt.X, evt.Y)
-	if !ui.InBounds(*iv.canvas, sdl.Point{evt.X, evt.Y}) {
+	if !ui.InBounds(*iv.canvas, sdl.Point{X: evt.X, Y: evt.Y}) {
 		return true
 	}
 	if evt.Button == sdl.BUTTON_RIGHT {

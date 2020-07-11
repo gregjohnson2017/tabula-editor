@@ -35,14 +35,17 @@ type PixelSelectionTool struct {
 // currently active for the image view.
 func (t PixelSelectionTool) OnClick(evt *sdl.MouseButtonEvent, iv *View) {
 	if evt.Button == sdl.BUTTON_LEFT && evt.State == sdl.PRESSED {
-		iv.SelectPixel(iv.mousePix.X, iv.mousePix.Y)
+		err := iv.SelectPixel(iv.mousePix.X, iv.mousePix.Y)
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 
 // OnMotion is called when the user clicks within the Image View's region and the tool is
 // currently active for the image view.
 func (t PixelSelectionTool) OnMotion(evt *sdl.MouseMotionEvent, iv *View) {
-	if evt.State == sdl.ButtonLMask() && ui.InBounds(*iv.canvas, sdl.Point{evt.X, evt.Y}) {
+	if evt.State == sdl.ButtonLMask() && ui.InBounds(*iv.canvas, sdl.Point{X: evt.X, Y: evt.Y}) {
 		iv.selection.Add(iv.mousePix.X + iv.mousePix.Y*iv.origW)
 	}
 }
@@ -62,7 +65,7 @@ func (t PixelColorTool) OnClick(evt *sdl.MouseButtonEvent, iv *View) {
 // OnMotion is called when the user clicks within the Image View's region and the tool is
 // currently active for the image view.
 func (t PixelColorTool) OnMotion(evt *sdl.MouseMotionEvent, iv *View) {
-	if evt.State == sdl.ButtonLMask() && ui.InBounds(*iv.canvas, sdl.Point{evt.X, evt.Y}) {
+	if evt.State == sdl.ButtonLMask() && ui.InBounds(*iv.canvas, sdl.Point{X: evt.X, Y: evt.Y}) {
 		iv.setPixel(iv.mousePix.X, iv.mousePix.Y, []byte{0xff, 0x00, 0xff, 0xff})
 	}
 }

@@ -186,11 +186,11 @@ func (i Info) TextureID() uint32 {
 // fontMap caches previously loaded fonts
 var fontMap map[fontKey]Info
 
-func printMetrics(metrics font.Metrics) {
+func printMetrics(metrics font.Metrics) { //nolint:unused,deadcode
 	fmt.Printf("height: %v, ascent: %v, descent: %v, xheight: %v, capheight: %v, caretslope: %v\n", int26_6ToFloat32(metrics.Height), int26_6ToFloat32(metrics.Ascent), int26_6ToFloat32(metrics.Descent), int26_6ToFloat32(metrics.XHeight), int26_6ToFloat32(metrics.CapHeight), metrics.CaretSlope)
 }
 
-func writeFontToFile(fileName string, glyphBytes []byte, width, height int) {
+func writeFontToFile(fileName string, glyphBytes []byte, width, height int) { //nolint:unused,deadcode
 	alphaImg := image.NewAlpha(image.Rect(0, 0, width, height))
 	outImg := image.NewNRGBA(image.Rect(0, 0, width, height))
 	alphaImg.Pix = glyphBytes
@@ -331,7 +331,7 @@ func WriteRuneToFile(fileName string, mask image.Image, maskp image.Point, rec i
 		diff := image.Point{rec.Dx(), rec.Dy()}
 		tofile := alpha.SubImage(image.Rectangle{maskp, maskp.Add(diff)})
 		if f, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0755); err != nil {
-			png.Encode(f, tofile)
+			err = png.Encode(f, tofile)
 			return err
 		}
 	}

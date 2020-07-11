@@ -48,8 +48,7 @@ func NewBar(cfg *config.Config, menus []Definition) (*Bar, error) {
 	for _, child := range menus {
 		w, _ := font.CalcStringDims(child.Text, fnt)
 		w32 := int32(math.Ceil(w)) + 14
-		var area *sdl.Rect
-		area = &sdl.Rect{X: b.area.X + off, Y: b.area.Y, W: w32, H: max}
+		area := &sdl.Rect{X: b.area.X + off, Y: b.area.Y, W: w32, H: max}
 		entry, err := newEntry(b.cfg, area, child.Text, ui.Align{V: ui.AlignBelow}, child.Children, child.Action)
 		if err != nil {
 			return nil, err

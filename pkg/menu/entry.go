@@ -20,7 +20,7 @@ func newEntry(cfg *config.Config, area *sdl.Rect, label string, align ui.Align, 
 		return nil, err
 	}
 
-	pos := sdl.Point{area.X, area.Y}
+	pos := sdl.Point{X: area.X, Y: area.Y}
 	if align.H == ui.AlignRight {
 		pos.X += area.W
 	}
