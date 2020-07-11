@@ -12,7 +12,6 @@ import (
 	"github.com/gregjohnson2017/tabula-editor/pkg/menu"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/gregjohnson2017/tabula-editor/pkg/util"
-	"github.com/veandco/go-sdl2/gfx"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -24,11 +23,11 @@ type Application struct {
 	cfg         *config.Config
 	comps       []ui.Component
 	currHover   ui.Component
-	framerate   *gfx.FPSmanager
 	lastHover   ui.Component
 	moved       bool
 	postEvtActs chan func()
 	running     bool
+	ticker      *time.Ticker
 	win         *sdl.Window
 }
 
@@ -172,18 +171,14 @@ func New(win *sdl.Window, cfg *config.Config) *Application {
 		panic(err)
 	}
 
-	var framerate = &gfx.FPSmanager{}
-	gfx.InitFramerate(framerate)
-	if !gfx.SetFramerate(framerate, 144) {
-		panic(fmt.Errorf("could not set framerate: %v", sdl.GetError()))
-	}
+	ticker := time.NewTicker(time.Second / 144)
 
 	return &Application{
 		running:     false,
 		comps:       []ui.Component{iv, bottomBar, centerButton, menuBar},
 		cfg:         cfg,
 		postEvtActs: actionComms,
-		framerate:   framerate,
+		ticker:      ticker,
 		win:         win,
 	}
 }
@@ -245,7 +240,7 @@ func (app *Application) PostEventActions() {
 	iterations++
 
 	app.win.GLSwap()
-	gfx.FramerateDelay(app.framerate)
+	<-app.ticker.C
 }
 
 func (app *Application) handleQuitEvent(evt *sdl.QuitEvent) {
