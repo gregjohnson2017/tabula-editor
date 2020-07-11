@@ -1,0 +1,7 @@
+{
+    "go.lintTool": "golangci-lint",
+    "go.useLanguageServer": false,
+    "go.vetFlags": [
+        "-unsafeptr=false"
+    ]
+}
