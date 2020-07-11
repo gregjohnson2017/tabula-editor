@@ -79,11 +79,12 @@ func New(win *sdl.Window, cfg *config.Config) *Application {
 			}
 		}()
 	})
+	errCheck(err)
 	centerButton.SetHighlightBackgroundColor([4]float32{1.0, 0.0, 0.0, 1.0})
 	centerButton.SetDefaultTextColor([4]float32{0.0, 0.0, 1.0, 1.0})
 
 	menuBar, err := menu.NewBar(cfg, []menu.Definition{
-		menu.Definition{
+		{
 			Text: "File",
 			Children: []menu.Definition{
 				{
@@ -140,7 +141,7 @@ func New(win *sdl.Window, cfg *config.Config) *Application {
 				},
 			},
 		},
-		menu.Definition{
+		{
 			Text: "Tools",
 			Children: []menu.Definition{
 				{
@@ -173,7 +174,7 @@ func New(win *sdl.Window, cfg *config.Config) *Application {
 
 	var framerate = &gfx.FPSmanager{}
 	gfx.InitFramerate(framerate)
-	if gfx.SetFramerate(framerate, 144) != true {
+	if !gfx.SetFramerate(framerate, 144) {
 		panic(fmt.Errorf("could not set framerate: %v", sdl.GetError()))
 	}
 
@@ -351,7 +352,8 @@ func (app *Application) Quit() {
 		comp.Destroy()
 	}
 
-	app.win.Destroy()
+	err := app.win.Destroy()
+	errCheck(err)
 	sdl.Quit()
 }
 

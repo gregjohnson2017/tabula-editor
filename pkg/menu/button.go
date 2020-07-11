@@ -81,8 +81,8 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 		+1.0, +1.0, // top-right
 		+1.0, -1.0, // bottom-right
 	}
-	pos := sdl.Point{area.X + area.W/2, cfg.ScreenHeight - area.Y - area.H/2}
-	align := ui.Align{ui.AlignMiddle, ui.AlignCenter}
+	pos := sdl.Point{X: area.X + area.W/2, Y: cfg.ScreenHeight - area.Y - area.H/2}
+	align := ui.Align{V: ui.AlignMiddle, H: ui.AlignCenter}
 	textTriangles := font.MapString(text, fnt, pos, align)
 
 	var backVaoID, backVboID uint32
@@ -260,8 +260,8 @@ func (b *Button) OnResize(x, y int32) {
 	gl.Uniform2f(uniformID, float32(b.cfg.ScreenWidth), float32(b.cfg.ScreenHeight))
 	gl.UseProgram(0)
 
-	pos := sdl.Point{b.area.X + b.area.W/2, b.cfg.ScreenHeight - b.area.Y - b.area.H/2}
-	align := ui.Align{ui.AlignMiddle, ui.AlignCenter}
+	pos := sdl.Point{X: b.area.X + b.area.W/2, Y: b.cfg.ScreenHeight - b.area.Y - b.area.H/2}
+	align := ui.Align{V: ui.AlignMiddle, H: ui.AlignCenter}
 	textTriangles := font.MapString(b.text, b.fontInfo, pos, align)
 	gl.BindBuffer(gl.ARRAY_BUFFER, b.textVboID)
 	gl.BufferData(gl.ARRAY_BUFFER, 4*len(textTriangles), gl.Ptr(&textTriangles[0]), gl.STATIC_DRAW)

@@ -18,9 +18,6 @@ var _ ui.Component = ui.Component(&BottomBar{})
 type BottomBar struct {
 	area          *sdl.Rect
 	comms         <-chan comms.Image
-	color         [4]float32
-	mousePix      sdl.Point
-	fontSize      int32
 	backProgramID uint32
 	textProgramID uint32
 	backVaoID     uint32
@@ -158,14 +155,14 @@ func (bb *BottomBar) Render() {
 	zoomMessage := fmt.Sprintf("%vx", msg.Mult)
 	mousePixMessage := fmt.Sprintf("(%v, %v)", msg.MousePix.X, msg.MousePix.Y)
 
-	pos := sdl.Point{0, bb.cfg.BottomBarHeight / 2}
-	align := ui.Align{ui.AlignMiddle, ui.AlignLeft}
+	pos := sdl.Point{X: 0, Y: bb.cfg.BottomBarHeight / 2}
+	align := ui.Align{V: ui.AlignMiddle, H: ui.AlignLeft}
 	fileNameTriangles := font.MapString(fileNameMessage, bb.fontInfo, pos, align)
-	pos = sdl.Point{bb.cfg.ScreenWidth / 2, bb.cfg.BottomBarHeight / 2}
-	align = ui.Align{ui.AlignMiddle, ui.AlignCenter}
+	pos = sdl.Point{X: bb.cfg.ScreenWidth / 2, Y: bb.cfg.BottomBarHeight / 2}
+	align = ui.Align{V: ui.AlignMiddle, H: ui.AlignCenter}
 	zoomTriangles := font.MapString(zoomMessage, bb.fontInfo, pos, align)
-	pos = sdl.Point{bb.cfg.ScreenWidth, bb.cfg.BottomBarHeight / 2}
-	align = ui.Align{ui.AlignMiddle, ui.AlignRight}
+	pos = sdl.Point{X: bb.cfg.ScreenWidth, Y: bb.cfg.BottomBarHeight / 2}
+	align = ui.Align{V: ui.AlignMiddle, H: ui.AlignRight}
 	mousePixTriangles := font.MapString(mousePixMessage, bb.fontInfo, pos, align)
 	triangles := make([]float32, 0, len(fileNameTriangles)+len(zoomTriangles)+len(mousePixTriangles))
 	triangles = append(triangles, fileNameTriangles...)
