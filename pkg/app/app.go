@@ -171,7 +171,8 @@ func New(win *sdl.Window, cfg *config.Config) *Application {
 		panic(err)
 	}
 
-	ticker := time.NewTicker(time.Second / 144)
+	frametime := time.Second / time.Duration(cfg.FramesPerSecond)
+	ticker := time.NewTicker(frametime)
 
 	return &Application{
 		running:     false,
