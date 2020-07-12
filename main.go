@@ -10,17 +10,25 @@ import (
 )
 
 func initWindow(title string, width, height int32) (*sdl.Window, error) {
-	if sdl.SetHint(sdl.HINT_RENDER_DRIVER, "opengl") != true {
+	if !sdl.SetHint(sdl.HINT_RENDER_DRIVER, "opengl") {
 		return nil, fmt.Errorf("failed to set opengl render driver hint")
 	}
 	var err error
 	if err = sdl.Init(sdl.INIT_VIDEO | sdl.INIT_EVENTS); err != nil {
 		return nil, err
 	}
-	sdl.GLSetAttribute(sdl.GL_CONTEXT_MAJOR_VERSION, 3)
-	sdl.GLSetAttribute(sdl.GL_CONTEXT_MINOR_VERSION, 3)
-	sdl.GLSetAttribute(sdl.GL_DOUBLEBUFFER, 1)
-	sdl.GLSetAttribute(sdl.GL_CONTEXT_PROFILE_MASK, sdl.GL_CONTEXT_PROFILE_CORE)
+	if err = sdl.GLSetAttribute(sdl.GL_CONTEXT_MAJOR_VERSION, 3); err != nil {
+		return nil, err
+	}
+	if err = sdl.GLSetAttribute(sdl.GL_CONTEXT_MINOR_VERSION, 3); err != nil {
+		return nil, err
+	}
+	if err = sdl.GLSetAttribute(sdl.GL_DOUBLEBUFFER, 1); err != nil {
+		return nil, err
+	}
+	if err = sdl.GLSetAttribute(sdl.GL_CONTEXT_PROFILE_MASK, sdl.GL_CONTEXT_PROFILE_CORE); err != nil {
+		return nil, err
+	}
 	//sdl.EventState(sdl.SYSWMEVENT, sdl.ENABLE)
 
 	var window *sdl.Window
@@ -54,7 +62,7 @@ func initWindow(title string, width, height int32) (*sdl.Window, error) {
 }
 
 func main() {
-	cfg := config.New(960, 720, 30)
+	cfg := config.New(960, 720, 30, 144)
 	var err error
 	win, err := initWindow("Tabula Editor", cfg.ScreenWidth, cfg.ScreenHeight)
 	errCheck(err)

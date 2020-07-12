@@ -14,7 +14,7 @@ jobs:
     steps:
 
     - name: Install C Dependencies
-      run: apt-get update && apt-get install -y libsdl2-gfx-dev
+      run: apt-get update && apt-get install -y libsdl2-dev
 
     - name: Checkout Repository
       uses: actions/checkout@v2
