@@ -1,7 +1,10 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/app"
@@ -62,12 +65,29 @@ func initWindow(title string, width, height int32) (*sdl.Window, error) {
 }
 
 func main() {
-	cfg := config.New(960, 720, 30, 144)
+	var fps int
+	var width int
+	var height int
+	flag.Usage = func() {
+		fmt.Fprintln(flag.CommandLine.Output(), "Usage:")
+		fmt.Fprintf(flag.CommandLine.Output(), "  %v [options] [filename]\n", filepath.Base(os.Args[0]))
+		fmt.Fprintln(flag.CommandLine.Output(), "  Opens filename in the editor as an image if provided.")
+		fmt.Fprintln(flag.CommandLine.Output(), "  Otherwise, an open file dialog will be used, if supported.")
+		fmt.Fprintln(flag.CommandLine.Output(), "\nOptions:")
+		flag.PrintDefaults()
+	}
+	flag.IntVar(&fps, "fps", 144, "the frames per second to render at")
+	flag.IntVar(&width, "width", 960, "the initial width of the window")
+	flag.IntVar(&height, "height", 720, "the initial height of the window")
+	flag.Parse()
+	fileName := flag.Arg(0)
+
+	cfg := config.New(int32(width), int32(height), 30, fps)
 	var err error
 	win, err := initWindow("Tabula Editor", cfg.ScreenWidth, cfg.ScreenHeight)
 	errCheck(err)
 
-	app := app.New(win, cfg)
+	app := app.New(fileName, win, cfg)
 	app.Start()
 
 	for app.Running() {

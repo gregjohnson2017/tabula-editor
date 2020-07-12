@@ -32,12 +32,9 @@ type Application struct {
 }
 
 // New returns a newly instantiated application state struct
-func New(win *sdl.Window, cfg *config.Config) *Application {
-	var fileName string
+func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 	var err error
-	if len(os.Args) == 2 {
-		fileName = os.Args[1]
-	} else {
+	if fileName == "" {
 		if fileName, err = util.OpenFileDialog(win); err != nil {
 			fmt.Printf("%v\n", err)
 			os.Exit(1)
