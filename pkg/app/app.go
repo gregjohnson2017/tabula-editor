@@ -1,9 +1,9 @@
 package app
 
 import (
-	"fmt"
-	"os"
 	"time"
+
+	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/comms"
@@ -35,9 +35,9 @@ type Application struct {
 func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 	var err error
 	if fileName == "" {
+		log.Info("Using file dialog to get file name")
 		if fileName, err = util.OpenFileDialog(win); err != nil {
-			fmt.Printf("%v\n", err)
-			os.Exit(1)
+			log.Fatal(err)
 		}
 	}
 
@@ -88,7 +88,7 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 					Action: func() {
 						newFileName, err := util.OpenFileDialog(win)
 						if err != nil {
-							fmt.Printf("%v\n", err)
+							log.Warn(err)
 							return
 						}
 						go func() {
@@ -104,7 +104,7 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 					Action: func() {
 						newFileName, err := util.SaveFileDialog(win)
 						if err != nil {
-							fmt.Printf("%v\n", err)
+							log.Warn(err)
 							return
 						}
 						go func() {
@@ -119,19 +119,19 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 				},
 				{
 					Text:   "kitten",
-					Action: func() { fmt.Println("kitten") },
+					Action: func() { log.Info("kitten") },
 					Children: []menu.Definition{
 						{
 							Text:   "Mooney",
-							Action: func() { fmt.Println("Mooney") },
+							Action: func() { log.Info("Mooney") },
 						},
 						{
 							Text:   "Buttercup",
-							Action: func() { fmt.Println("Buttercup") },
+							Action: func() { log.Info("Buttercup") },
 						},
 						{
 							Text:   "Sunny",
-							Action: func() { fmt.Println("Sunny") },
+							Action: func() { log.Info("Sunny") },
 						},
 					},
 				},
@@ -329,16 +329,16 @@ func (app *Application) Running() bool {
 func (app *Application) Quit() {
 	avgNs := int64(float64(imageTotalNs) / float64(iterations))
 	avg := time.Duration(int64(time.Nanosecond) * avgNs)
-	fmt.Printf("image.View avg:\t %v\n", avg)
+	log.Perff("image.View avg:\t %v\n", avg)
 	avgNs = int64(float64(bbTotalNs) / float64(iterations))
 	avg = time.Duration(int64(time.Nanosecond) * avgNs)
-	fmt.Printf("BottomBar avg:\t %v\n", avg)
+	log.Perff("BottomBar avg:\t %v\n", avg)
 	avgNs = int64(float64(bTotalNs) / float64(iterations))
 	avg = time.Duration(int64(time.Nanosecond) * avgNs)
-	fmt.Printf("menu.Button avg: %v\n", avg)
+	log.Perff("menu.Button avg: %v\n", avg)
 	avgNs = int64(float64(mlTotalNs) / float64(iterations))
 	avg = time.Duration(int64(time.Nanosecond) * avgNs)
-	fmt.Printf("menu.Bar avg:\t %v\n", avg)
+	log.Perff("menu.Bar avg:\t %v\n", avg)
 
 	// free ui.Component assets
 	for _, comp := range app.comps {

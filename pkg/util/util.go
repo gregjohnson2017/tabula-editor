@@ -1,8 +1,9 @@
 package util
 
 import (
-	"fmt"
 	"time"
+
+	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 )
 
 // MenuAction is an identifier for the event handling to know which menu button
@@ -27,7 +28,7 @@ func Start() StopWatch {
 
 // Stop prints the time duration since the stopwatch start
 func (sw StopWatch) Stop(str string) {
-	fmt.Printf("%v=%v\n", str, time.Since(sw.t))
+	log.Perff("%v=%v\n", str, time.Since(sw.t))
 }
 
 // StopGetNano returns the nanoseconds from the stopwatch start

@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/app"
@@ -59,8 +62,8 @@ func initWindow(title string, width, height int32) (*sdl.Window, error) {
 	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 	gl.Hint(gl.LINE_SMOOTH_HINT, gl.NICEST)
 
-	// version := gl.GoStr(gl.GetString(gl.VERSION))
-	// log.Println("OpenGL version", version)
+	version := gl.GoStr(gl.GetString(gl.VERSION))
+	log.Debug("OpenGL version", version)
 	return window, nil
 }
 
@@ -68,6 +71,12 @@ func main() {
 	var fps int
 	var width int
 	var height int
+	var color bool
+	var info bool
+	var warn bool
+	var debug bool
+	var perf bool
+	var quiet bool
 	flag.Usage = func() {
 		fmt.Fprintln(flag.CommandLine.Output(), "Usage:")
 		fmt.Fprintf(flag.CommandLine.Output(), "  %v [options] [filename]\n", filepath.Base(os.Args[0]))
@@ -79,13 +88,49 @@ func main() {
 	flag.IntVar(&fps, "fps", 144, "the frames per second to render at")
 	flag.IntVar(&width, "width", 960, "the initial width of the window")
 	flag.IntVar(&height, "height", 720, "the initial height of the window")
+	flag.BoolVar(&color, "color", true, "colorize the output logs")
+	flag.BoolVar(&info, "info", true, "show info logging")
+	flag.BoolVar(&warn, "warn", true, "show warning logging")
+	flag.BoolVar(&debug, "debug", false, "show debug logging")
+	flag.BoolVar(&perf, "perf", false, "show performance logging")
+	flag.BoolVar(&quiet, "quiet", false, "hide all output, overrides other logging options")
 	flag.Parse()
 	fileName := flag.Arg(0)
 
+	var loggers []string
+	// loggers are discarded by default
+	if !quiet {
+		if info {
+			log.SetInfoOutput(os.Stderr)
+			loggers = append(loggers, "info")
+		}
+		if warn {
+			log.SetWarnOutput(os.Stderr)
+			loggers = append(loggers, "warn")
+		}
+		if debug {
+			log.SetDebugOutput(os.Stderr)
+			loggers = append(loggers, "debug")
+		}
+		if perf {
+			log.SetPerfOutput(os.Stderr)
+			loggers = append(loggers, "perf")
+		}
+		log.SetFatalOutput(os.Stderr)
+		loggers = append(loggers, "fatal")
+	}
+	log.SetColorized(color)
+
+	log.Debugf("args: [ %v ]", strings.Join(flag.Args(), ", "))
+	log.Debugf("fileName argument: \"%v\"", fileName)
+	log.Debugf("enabled loggers: %v", strings.Join(loggers, ", "))
+	log.Debugf("output colorized: %v", color)
+
 	cfg := config.New(int32(width), int32(height), 30, fps)
-	var err error
 	win, err := initWindow("Tabula Editor", cfg.ScreenWidth, cfg.ScreenHeight)
-	errCheck(err)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	app := app.New(fileName, win, cfg)
 	app.Start()
@@ -99,10 +144,4 @@ func main() {
 	}
 
 	app.Quit()
-}
-
-func errCheck(err error) {
-	if err != nil {
-		panic(err)
-	}
 }

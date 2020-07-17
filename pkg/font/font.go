@@ -12,6 +12,8 @@ import (
 	"unicode"
 	"unsafe"
 
+	"github.com/gregjohnson2017/tabula-editor/pkg/log"
+
 	"github.com/veandco/go-sdl2/sdl"
 
 	"github.com/go-gl/gl/v2.1/gl"
@@ -30,19 +32,21 @@ func PrintRune(mask image.Image, maskp image.Point, rec image.Rectangle) {
 	var alpha *image.Alpha
 	var ok bool
 	if alpha, ok = mask.(*image.Alpha); !ok {
-		fmt.Println("printRune image not Alpha")
+		log.Warn("printRune image not Alpha")
 		return
 	}
+	out := "PrintRune\n"
 	for y := maskp.Y; y < maskp.Y+rec.Dy(); y++ {
 		for x := maskp.X; x < maskp.X+rec.Dx(); x++ {
 			if _, _, _, a := alpha.At(x, y).RGBA(); a > 0 {
-				fmt.Printf("%02x ", byte(a))
+				out += fmt.Sprintf("%02x ", byte(a))
 			} else {
-				fmt.Printf(".  ")
+				out += ".  "
 			}
 		}
-		fmt.Printf("\n")
+		out += "\n"
 	}
+	log.Debug(out)
 }
 
 func int26_6ToFloat32(x fixed.Int26_6) float32 {
@@ -187,7 +191,7 @@ func (i Info) TextureID() uint32 {
 var fontMap map[fontKey]Info
 
 func printMetrics(metrics font.Metrics) { //nolint:unused,deadcode
-	fmt.Printf("height: %v, ascent: %v, descent: %v, xheight: %v, capheight: %v, caretslope: %v\n", int26_6ToFloat32(metrics.Height), int26_6ToFloat32(metrics.Ascent), int26_6ToFloat32(metrics.Descent), int26_6ToFloat32(metrics.XHeight), int26_6ToFloat32(metrics.CapHeight), metrics.CaretSlope)
+	log.Debugf("height: %v, ascent: %v, descent: %v, xheight: %v, capheight: %v, caretslope: %v", int26_6ToFloat32(metrics.Height), int26_6ToFloat32(metrics.Ascent), int26_6ToFloat32(metrics.Descent), int26_6ToFloat32(metrics.XHeight), int26_6ToFloat32(metrics.CapHeight), metrics.CaretSlope)
 }
 
 func writeFontToFile(fileName string, glyphBytes []byte, width, height int) { //nolint:unused,deadcode
@@ -320,7 +324,7 @@ func LoadFontTexture(fontName string, fontSize int32) (Info, error) {
 		CaretSlope: otfMetrics.CaretSlope,
 	}
 
-	fmt.Printf("Loaded %v at size %v:\t%v\n", fontName, fontSize, time.Duration(int64(time.Nanosecond)*sw.StopGetNano()))
+	log.Perff("Loaded %v at size %v:\t%v", fontName, fontSize, time.Duration(int64(time.Nanosecond)*sw.StopGetNano()))
 	InfoLoaded := Info{fontTextureID, runeMap[:], metrics}
 	fontMap[fontKey{fontName, fontSize}] = InfoLoaded
 	return InfoLoaded, nil
