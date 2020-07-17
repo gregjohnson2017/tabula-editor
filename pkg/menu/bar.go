@@ -105,7 +105,7 @@ func (b *Bar) GetEntryAt(x int32, y int32) (*entry, error) {
 			return e, nil
 		}
 	}
-	return nil, fmt.Errorf("no entry at given position")
+	return nil, fmt.Errorf("GetEntryAt(%v, %v): %w", x, y, ErrNoEntryAtPosition)
 }
 
 // OnMotion updates the menubar for when the mouse moves within its boundary

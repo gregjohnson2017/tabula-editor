@@ -6,6 +6,7 @@ import (
 	"unsafe"
 
 	"github.com/go-gl/gl/v2.1/gl"
+	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 )
 
 // ConfigureVAO configures a VAO & VBO pair with a specified vertex layout
@@ -29,6 +30,9 @@ func ConfigureVAO(vaoID uint32, vboID uint32, layout []int32) {
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 	gl.BindVertexArray(0)
 }
+
+// ErrProgramLink indicates that a program failed to link
+const ErrProgramLink log.ConstErr = "failed to compile shader"
 
 // CreateShaderProgram compiles a vertex and fragment shader,
 // attaches them to a new shader program and returns its ID.
@@ -55,11 +59,14 @@ func CreateShaderProgram(vshStr, fshStr string) (uint32, error) {
 		log := strings.Repeat("\x00", int(logLength+1))
 		gl.GetProgramInfoLog(prog, logLength, nil, gl.Str(log))
 
-		return 0, fmt.Errorf("failed to compile program: %v", log)
+		return 0, fmt.Errorf("%w: %v", ErrProgramLink, log)
 	}
 
 	return prog, nil
 }
+
+// ErrCompileShader indicates that a shader failed to compile
+const ErrCompileShader log.ConstErr = "failed to compile shader"
 
 func compileShader(source string, shaderType uint32) (uint32, error) {
 	shader := gl.CreateShader(shaderType)
@@ -78,7 +85,7 @@ func compileShader(source string, shaderType uint32) (uint32, error) {
 		log := strings.Repeat("\x00", int(logLength+1))
 		gl.GetShaderInfoLog(shader, logLength, nil, gl.Str(log))
 
-		return 0, fmt.Errorf("failed to compile %v: %v", source, log)
+		return 0, fmt.Errorf("%w: %v", ErrCompileShader, log)
 	}
 
 	return shader, nil

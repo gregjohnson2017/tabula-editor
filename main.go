@@ -7,17 +7,19 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gregjohnson2017/tabula-editor/pkg/log"
-
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/app"
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
+	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
+// ErrRenderDriver indicates that SDL failed to enable the OpenGL render driver
+const ErrRenderDriver log.ConstErr = "failed to set opengl render driver hint"
+
 func initWindow(title string, width, height int32) (*sdl.Window, error) {
 	if !sdl.SetHint(sdl.HINT_RENDER_DRIVER, "opengl") {
-		return nil, fmt.Errorf("failed to set opengl render driver hint")
+		return nil, ErrRenderDriver
 	}
 	var err error
 	if err = sdl.Init(sdl.INIT_VIDEO | sdl.INIT_EVENTS); err != nil {

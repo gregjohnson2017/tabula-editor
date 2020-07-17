@@ -12,14 +12,12 @@ import (
 	"unicode"
 	"unsafe"
 
-	"github.com/gregjohnson2017/tabula-editor/pkg/log"
-
-	"github.com/veandco/go-sdl2/sdl"
-
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/golang/freetype/truetype"
+	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/gregjohnson2017/tabula-editor/pkg/util"
+	"github.com/veandco/go-sdl2/sdl"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/font/sfnt"
@@ -219,6 +217,9 @@ func writeFontToFile(fileName string, glyphBytes []byte, width, height int) { //
 
 }
 
+// ErrNoFontGlyph indicates the given font does not contain the given glyph
+const ErrNoFontGlyph log.ConstErr = "font does not contain given glyph"
+
 // LoadFontTexture caches all of the glyph pixel data in an OpenGL texture for
 // a given font at a given size. It returns an Info struct populated with the
 // OpenGL ID for this texture, metrics, and an array containing glyph spacing info
@@ -258,12 +259,12 @@ func LoadFontTexture(fontName string, fontSize int32) (Info, error) {
 
 		roundedRect, mask, maskp, advance, okGlyph := face.Glyph(fixed.Point26_6{X: 0, Y: 0}, c)
 		if !okGlyph {
-			return Info{}, fmt.Errorf("%v does not contain glyph for '%c'", fontName, c)
+			return Info{}, fmt.Errorf("LoadFontTexture(\"%v\", %v) glyph '%v': %w", fontName, fontSize, c, ErrNoFontGlyph)
 		}
 		accurateRect, _, okBounds := face.GlyphBounds(c)
 		glyph, okCast := mask.(*image.Alpha)
 		if !okBounds || !okCast {
-			return Info{}, fmt.Errorf("%v does not contain glyph for '%c'", fontName, c)
+			return Info{}, fmt.Errorf("LoadFontTexture(\"%v\", %v) glyph '%v': %w", fontName, fontSize, c, ErrNoFontGlyph)
 		}
 
 		runeMap[i-minASCII] = runeInfo{
@@ -286,7 +287,7 @@ func LoadFontTexture(fontName string, fontSize int32) (Info, error) {
 
 	_, mask, _, _, aOK := face.Glyph(fixed.Point26_6{X: 0, Y: 0}, 'A')
 	if !aOK {
-		return Info{}, fmt.Errorf("Failed to get glyph for 'A'")
+		return Info{}, fmt.Errorf("LoadFontTexture(\"%v\", %v) glyph 'A': %w", fontName, fontSize, ErrNoFontGlyph)
 	}
 
 	glyph, _ := mask.(*image.Alpha)

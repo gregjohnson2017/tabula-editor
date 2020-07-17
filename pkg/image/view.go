@@ -16,10 +16,10 @@ import (
 	"github.com/gregjohnson2017/tabula-editor/pkg/comms"
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
 	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
+	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
-	"github.com/veandco/go-sdl2/sdl"
-
 	set "github.com/kroppt/Int32Set"
+	"github.com/veandco/go-sdl2/sdl"
 )
 
 var _ ui.Component = ui.Component(&View{})
@@ -335,10 +335,13 @@ func (iv *View) OnScroll(evt *sdl.MouseWheelEvent) bool {
 	return true
 }
 
+// ErrCoordOutOfRange indicates that given coordinates are out of range
+const ErrCoordOutOfRange log.ConstErr = "coordinates out of range"
+
 // SelectPixel adds the given x, y pixel to the
 func (iv *View) SelectPixel(x, y int32) error {
 	if x < 0 || y < 0 || x > iv.area.W || y > iv.area.H {
-		return fmt.Errorf("x and y coordinates (%v, %v) are out of range", x, y)
+		return fmt.Errorf("SelectPixel(%v, %v): %w", x, y, ErrCoordOutOfRange)
 	}
 	iv.selection.Add(iv.mousePix.X + iv.mousePix.Y*iv.origW)
 	return nil
@@ -421,6 +424,9 @@ func loadImage(fileName string) (width, height int, data []byte, err error) {
 	return width, height, data, nil
 }
 
+// ErrWriteFormat indicates that an unsupported image format was trying to be written to
+const ErrWriteFormat log.ConstErr = "unsupported image format"
+
 // WriteToFile writes the image data stored in the OpenGL texture to a file specified by fileName
 func (iv *View) WriteToFile(fileName string) error {
 	var texWidth, texHeight int32
@@ -455,7 +461,7 @@ func (iv *View) WriteToFile(fileName string) error {
 			return err
 		}
 	default:
-		return fmt.Errorf("%v is an unsupported file extension", ext)
+		return fmt.Errorf("writing to file extension %v: %w", ext, ErrWriteFormat)
 	}
 
 	return nil

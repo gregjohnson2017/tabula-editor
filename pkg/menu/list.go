@@ -109,7 +109,7 @@ func (l *list) GetEntryAt(x int32, y int32) (*entry, error) {
 			}
 		}
 	}
-	return nil, fmt.Errorf("no entry at given position")
+	return nil, fmt.Errorf("GetEntryAt(%v, %v): %w", x, y, ErrNoEntryAtPosition)
 }
 
 // OnMotion is called when the cursor moves within the ui.Component's region - bad comment
