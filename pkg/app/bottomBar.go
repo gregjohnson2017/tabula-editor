@@ -224,5 +224,5 @@ func (bb *BottomBar) OnResize(x, y int32) {
 
 // String returns the name of the component type
 func (bb *BottomBar) String() string {
-	return "BottomBar"
+	return "app.BottomBar"
 }

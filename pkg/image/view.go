@@ -381,7 +381,7 @@ func (iv *View) OnResize(x, y int32) {
 
 // String returns the name of the component type
 func (iv *View) String() string {
-	return "View"
+	return "image.View"
 }
 
 func loadImage(fileName string) (width, height int, data []byte, err error) {

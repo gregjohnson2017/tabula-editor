@@ -169,5 +169,5 @@ func (l *list) OnResize(x, y int32) {
 }
 
 func (l *list) String() string {
-	return "list"
+	return "menu.list"
 }

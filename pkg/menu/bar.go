@@ -167,5 +167,5 @@ func (b *Bar) OnResize(x, y int32) {
 
 // String returns the name of the component type
 func (b *Bar) String() string {
-	return "Bar"
+	return "menu.Bar"
 }
