@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/log"
+	"github.com/gregjohnson2017/tabula-editor/pkg/util"
 )
 
 // ConfigureVAO configures a VAO & VBO pair with a specified vertex layout
@@ -68,6 +69,8 @@ func CreateShaderProgram(vshStr, fshStr string) (uint32, error) {
 const ErrCompileShader log.ConstErr = "failed to compile shader"
 
 func compileShader(source string, shaderType uint32) (uint32, error) {
+	sw := util.Start()
+	defer sw.StopRecordAverage("gfx.compileShader")
 	shader := gl.CreateShader(shaderType)
 
 	csources, free := gl.Strs(source)
