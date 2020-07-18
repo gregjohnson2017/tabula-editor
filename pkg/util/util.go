@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gregjohnson2017/tabula-editor/pkg/log"
+	"github.com/gregjohnson2017/tabula-editor/pkg/perf"
 )
 
 // MenuAction is an identifier for the event handling to know which menu button
@@ -37,4 +38,8 @@ func (sw StopWatch) Stop(str string) {
 // StopGetNano returns the nanoseconds from the stopwatch start
 func (sw StopWatch) StopGetNano() int64 {
 	return time.Since(sw.t).Nanoseconds()
+}
+
+func (sw StopWatch) StopRecordAverage(key string) {
+	perf.RecordAverageTime(key, time.Since(sw.t).Nanoseconds())
 }

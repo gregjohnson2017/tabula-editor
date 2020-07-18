@@ -9,13 +9,11 @@ import (
 	"github.com/gregjohnson2017/tabula-editor/pkg/image"
 	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/gregjohnson2017/tabula-editor/pkg/menu"
+	"github.com/gregjohnson2017/tabula-editor/pkg/perf"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/gregjohnson2017/tabula-editor/pkg/util"
 	"github.com/veandco/go-sdl2/sdl"
 )
-
-// performance debugging metrics
-var imageTotalNs, bbTotalNs, bTotalNs, mlTotalNs, iterations int64
 
 // Application holds state for the tabula application
 type Application struct {
@@ -232,18 +230,8 @@ func (app *Application) PostEventActions() {
 		sw := util.Start()
 		comp.Render()
 		ns := sw.StopGetNano()
-		switch comp.(type) {
-		case *image.View:
-			imageTotalNs += ns
-		case *BottomBar:
-			bbTotalNs += ns
-		case *menu.Button:
-			bTotalNs += ns
-		case *menu.Bar:
-			mlTotalNs += ns
-		}
+		perf.RecordAverageTime(comp.String()+".Render", ns)
 	}
-	iterations++
 
 	app.win.GLSwap()
 	<-app.ticker.C
@@ -254,6 +242,8 @@ func (app *Application) handleQuitEvent(evt *sdl.QuitEvent) {
 }
 
 func (app *Application) handleMouseButtonEvent(evt *sdl.MouseButtonEvent) {
+	sw := util.Start()
+	defer sw.StopRecordAverage("app.handleMouseButtonEvent")
 	for i := range app.comps {
 		comp := app.comps[len(app.comps)-i-1]
 		if comp.InBoundary(sdl.Point{X: evt.X, Y: evt.Y}) {
@@ -264,6 +254,8 @@ func (app *Application) handleMouseButtonEvent(evt *sdl.MouseButtonEvent) {
 }
 
 func (app *Application) handleMouseMotionEvent(evt *sdl.MouseMotionEvent) {
+	sw := util.Start()
+	defer sw.StopRecordAverage("app.handleMouseMotionEvent")
 	// search top down through components until exhausted or one absorbs the event
 	for i := range app.comps {
 		comp := app.comps[len(app.comps)-i-1]
@@ -287,6 +279,8 @@ func (app *Application) handleMouseMotionEvent(evt *sdl.MouseMotionEvent) {
 }
 
 func (app *Application) handleMouseWheelEvent(evt *sdl.MouseWheelEvent) {
+	sw := util.Start()
+	defer sw.StopRecordAverage("app.handleMouseWheelEvent")
 	for i := range app.comps {
 		comp := app.comps[len(app.comps)-i-1]
 		x, y, _ := sdl.GetMouseState()
@@ -299,6 +293,8 @@ func (app *Application) handleMouseWheelEvent(evt *sdl.MouseWheelEvent) {
 }
 
 func (app *Application) handleWindowEvent(evt *sdl.WindowEvent) {
+	sw := util.Start()
+	defer sw.StopRecordAverage("app.handleWindowEvent")
 	if evt.Event == sdl.WINDOWEVENT_LEAVE || evt.Event == sdl.WINDOWEVENT_FOCUS_LOST || evt.Event == sdl.WINDOWEVENT_MINIMIZED {
 		if app.currHover != nil {
 			app.currHover.OnLeave()
@@ -335,19 +331,6 @@ func (app *Application) Running() bool {
 
 // Quit cleans up resources
 func (app *Application) Quit() {
-	avgNs := int64(float64(imageTotalNs) / float64(iterations))
-	avg := time.Duration(int64(time.Nanosecond) * avgNs)
-	log.Perff("image.View avg:\t %v\n", avg)
-	avgNs = int64(float64(bbTotalNs) / float64(iterations))
-	avg = time.Duration(int64(time.Nanosecond) * avgNs)
-	log.Perff("BottomBar avg:\t %v\n", avg)
-	avgNs = int64(float64(bTotalNs) / float64(iterations))
-	avg = time.Duration(int64(time.Nanosecond) * avgNs)
-	log.Perff("menu.Button avg: %v\n", avg)
-	avgNs = int64(float64(mlTotalNs) / float64(iterations))
-	avg = time.Duration(int64(time.Nanosecond) * avgNs)
-	log.Perff("menu.Bar avg:\t %v\n", avg)
-
 	// free ui.Component assets
 	for _, comp := range app.comps {
 		comp.Destroy()

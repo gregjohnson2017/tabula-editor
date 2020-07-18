@@ -11,6 +11,7 @@ import (
 	"github.com/gregjohnson2017/tabula-editor/pkg/app"
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
 	"github.com/gregjohnson2017/tabula-editor/pkg/log"
+	"github.com/gregjohnson2017/tabula-editor/pkg/perf"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -77,7 +78,7 @@ func main() {
 	var info bool
 	var warn bool
 	var debug bool
-	var perf bool
+	var perform bool
 	var quiet bool
 	flag.Usage = func() {
 		fmt.Fprintln(flag.CommandLine.Output(), "Usage:")
@@ -94,7 +95,7 @@ func main() {
 	flag.BoolVar(&info, "info", true, "show info logging")
 	flag.BoolVar(&warn, "warn", true, "show warning logging")
 	flag.BoolVar(&debug, "debug", false, "show debug logging")
-	flag.BoolVar(&perf, "perf", false, "show performance logging")
+	flag.BoolVar(&perform, "perf", false, "show performormance logging")
 	flag.BoolVar(&quiet, "quiet", false, "hide all output, overrides other logging options")
 	flag.Parse()
 	fileName := flag.Arg(0)
@@ -114,9 +115,11 @@ func main() {
 			log.SetDebugOutput(os.Stderr)
 			loggers = append(loggers, "debug")
 		}
-		if perf {
+		if perform {
 			log.SetPerfOutput(os.Stderr)
-			loggers = append(loggers, "perf")
+			loggers = append(loggers, "perform")
+			perf.SetMetricsEnabled(true)
+			defer perf.LogMetrics()
 		}
 		log.SetFatalOutput(os.Stderr)
 		loggers = append(loggers, "fatal")
