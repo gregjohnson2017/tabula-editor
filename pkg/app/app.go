@@ -9,7 +9,6 @@ import (
 	"github.com/gregjohnson2017/tabula-editor/pkg/image"
 	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/gregjohnson2017/tabula-editor/pkg/menu"
-	"github.com/gregjohnson2017/tabula-editor/pkg/perf"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/gregjohnson2017/tabula-editor/pkg/util"
 	"github.com/veandco/go-sdl2/sdl"
@@ -218,8 +217,9 @@ func (app *Application) PostEventActions() {
 	hasEvents := true
 	for hasEvents {
 		select {
-		case closure := <-app.postEvtActs:
-			closure()
+		case action := <-app.postEvtActs:
+			log.Debug("handling post event action")
+			action()
 		default:
 			// no more in pipe
 			hasEvents = false
@@ -230,8 +230,7 @@ func (app *Application) PostEventActions() {
 	for _, comp := range app.comps {
 		sw := util.Start()
 		comp.Render()
-		ns := sw.StopGetNano()
-		perf.RecordAverageTime(comp.String()+".Render", ns)
+		sw.StopRecordAverage(comp.String() + ".Render")
 	}
 
 	app.win.GLSwap()
@@ -250,6 +249,7 @@ func (app *Application) handleMouseButtonEvent(evt *sdl.MouseButtonEvent) {
 		comp := app.comps[len(app.comps)-i-1]
 		if comp.InBoundary(sdl.Point{X: evt.X, Y: evt.Y}) {
 			comp.OnClick(evt)
+			log.Debugln("mouse button event on", comp.String())
 			break
 		}
 	}
@@ -298,6 +298,7 @@ func (app *Application) handleWindowEvent(evt *sdl.WindowEvent) {
 	sw := util.Start()
 	defer sw.StopRecordAverage("app.handleWindowEvent")
 	if evt.Event == sdl.WINDOWEVENT_LEAVE || evt.Event == sdl.WINDOWEVENT_FOCUS_LOST || evt.Event == sdl.WINDOWEVENT_MINIMIZED {
+		log.Debug("window focus lost")
 		if app.currHover != nil {
 			app.currHover.OnLeave()
 			app.lastHover = app.currHover
@@ -335,6 +336,7 @@ func (app *Application) Running() bool {
 func (app *Application) Quit() {
 	// free ui.Component assets
 	for _, comp := range app.comps {
+		log.Debugln("destroying", comp.String())
 		comp.Destroy()
 	}
 

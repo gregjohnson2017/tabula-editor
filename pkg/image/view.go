@@ -18,6 +18,7 @@ import (
 	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
 	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
+	"github.com/gregjohnson2017/tabula-editor/pkg/util"
 	set "github.com/kroppt/Int32Set"
 	"github.com/veandco/go-sdl2/sdl"
 )
@@ -240,6 +241,7 @@ func (iv *View) Render() {
 
 	select {
 	case tool := <-iv.toolComms:
+		log.Debugln("image.View switching tool to", tool.String())
 		iv.activeTool = tool
 	default:
 	}
