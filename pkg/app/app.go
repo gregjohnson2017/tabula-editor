@@ -64,9 +64,13 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 	actionComms := make(chan func())
 
 	iv, err := image.NewView(imageViewArea, fileName, bottomBarComms, toolComms, cfg)
-	errCheck(err)
+	if err != nil {
+		log.Fatal(err)
+	}
 	bottomBar, err := NewBottomBar(bottomBarArea, bottomBarComms, cfg)
-	errCheck(err)
+	if err != nil {
+		log.Fatal(err)
+	}
 	centerButton, err := menu.NewButton(buttonAreaCenter, cfg, "Center Image", func() {
 		go func() {
 			actionComms <- func() {
@@ -74,7 +78,9 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 			}
 		}()
 	})
-	errCheck(err)
+	if err != nil {
+		log.Fatal(err)
+	}
 	centerButton.SetHighlightBackgroundColor([4]float32{1.0, 0.0, 0.0, 1.0})
 	centerButton.SetDefaultTextColor([4]float32{0.0, 0.0, 1.0, 1.0})
 
@@ -92,8 +98,9 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 						}
 						go func() {
 							actionComms <- func() {
-								err = iv.LoadFromFile(newFileName)
-								errCheck(err)
+								if err := iv.LoadFromFile(newFileName); err != nil {
+									log.Fatal(err)
+								}
 							}
 						}()
 					},
@@ -108,10 +115,12 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 						}
 						go func() {
 							actionComms <- func() {
-								err := iv.WriteToFile(newFileName)
-								errCheck(err)
-								err = iv.LoadFromFile(newFileName)
-								errCheck(err)
+								if err := iv.WriteToFile(newFileName); err != nil {
+									log.Fatal(err)
+								}
+								if err := iv.LoadFromFile(newFileName); err != nil {
+									log.Fatal(err)
+								}
 							}
 						}()
 					},
@@ -164,7 +173,7 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 		},
 	})
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	frametime := time.Second / time.Duration(cfg.FramesPerSecond)
@@ -344,13 +353,8 @@ func (app *Application) Quit() {
 		comp.Destroy()
 	}
 
-	err := app.win.Destroy()
-	errCheck(err)
-	sdl.Quit()
-}
-
-func errCheck(err error) {
-	if err != nil {
-		panic(err)
+	if err := app.win.Destroy(); err != nil {
+		log.Fatal(err)
 	}
+	sdl.Quit()
 }

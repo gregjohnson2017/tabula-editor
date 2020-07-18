@@ -206,13 +206,13 @@ func writeFontToFile(fileName string, glyphBytes []byte, width, height int) { //
 	}
 	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_RDWR, 0755)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	if err = png.Encode(file, outImg); err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	if err = file.Close(); err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 }

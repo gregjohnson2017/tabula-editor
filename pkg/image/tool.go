@@ -1,6 +1,7 @@
 package image
 
 import (
+	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/veandco/go-sdl2/sdl"
 )
@@ -37,7 +38,7 @@ func (t PixelSelectionTool) OnClick(evt *sdl.MouseButtonEvent, iv *View) {
 	if evt.Button == sdl.BUTTON_LEFT && evt.State == sdl.PRESSED {
 		err := iv.SelectPixel(iv.mousePix.X, iv.mousePix.Y)
 		if err != nil {
-			panic(err)
+			log.Fatal(err)
 		}
 	}
 }
