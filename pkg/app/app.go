@@ -176,6 +176,7 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 
 	frametime := time.Second / time.Duration(cfg.FramesPerSecond)
 	ticker := time.NewTicker(frametime)
+	log.Debugf("set framerate %v with frametime %v", cfg.FramesPerSecond, frametime)
 
 	return &Application{
 		running:     false,
@@ -234,6 +235,7 @@ func (app *Application) PostEventActions() {
 	}
 
 	app.win.GLSwap()
+	// wait until frametime has passed
 	<-app.ticker.C
 }
 

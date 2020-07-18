@@ -12,6 +12,7 @@ import (
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
 	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/gregjohnson2017/tabula-editor/pkg/perf"
+	"github.com/gregjohnson2017/tabula-editor/pkg/util"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -141,11 +142,13 @@ func main() {
 	app.Start()
 
 	for app.Running() {
+		sw := util.Start()
 		for evt := sdl.PollEvent(); evt != nil; evt = sdl.PollEvent() {
 			app.HandleSdlEvent(evt)
 		}
 
 		app.PostEventActions()
+		sw.StopRecordAverage("main.frametime")
 	}
 
 	app.Quit()
