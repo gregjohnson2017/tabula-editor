@@ -102,6 +102,8 @@ func GetMaxVerticalBearing(str string, font Info) float32 {
 // (x,y,s,t)-vertex triangles using glyph information from a
 // pre-loaded font. The vertex info is returned as []float32
 func MapString(str string, font Info, pos sdl.Point, align ui.Align) []float32 {
+	sw := util.Start()
+	defer sw.StopRecordAverage("font.MapString")
 	// 2 triangles per rune, 3 vertices per triangle, 4 float32's per vertex (x,y,s,t)
 	buffer := make([]float32, 0, len(str)*24)
 	// get glyph information for alignment
