@@ -72,6 +72,35 @@ func initWindow(title string, width, height int32) (*sdl.Window, error) {
 	return window, nil
 }
 
+func getWindowRefreshRateRange() (low int32, high int32, _ error) {
+	n, err := sdl.GetNumVideoDisplays()
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to get number of video displays: %w", err)
+	}
+	if n >= 1 {
+		mode, err := sdl.GetCurrentDisplayMode(0)
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to get display mode for display 0: %w", err)
+		}
+		hz := mode.RefreshRate
+		low, high = hz, hz
+	}
+	for i := 1; i < n; i++ {
+		mode, err := sdl.GetCurrentDisplayMode(i)
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to get display mode for display %v: %w", i, err)
+		}
+		hz := mode.RefreshRate
+		if hz < low {
+			low = hz
+		}
+		if hz > high {
+			high = hz
+		}
+	}
+	return low, high, nil
+}
+
 func main() {
 	var fps int
 	var width int
@@ -147,6 +176,14 @@ func main() {
 	win, err := initWindow("Tabula Editor", cfg.ScreenWidth, cfg.ScreenHeight)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	lowHz, highHz, err := getWindowRefreshRateRange()
+	if err != nil {
+		log.Fatal(err)
+	}
+	if fps > int(highHz) || fps < int(lowHz) {
+		log.Warnf("framerate %v not within set refresh rate range %v-%v", fps, lowHz, highHz)
 	}
 
 	app := app.New(fileName, win, cfg)
