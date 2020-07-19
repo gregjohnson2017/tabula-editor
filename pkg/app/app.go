@@ -9,6 +9,7 @@ import (
 	"github.com/gregjohnson2017/tabula-editor/pkg/image"
 	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/gregjohnson2017/tabula-editor/pkg/menu"
+	"github.com/gregjohnson2017/tabula-editor/pkg/perf"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/gregjohnson2017/tabula-editor/pkg/util"
 	"github.com/veandco/go-sdl2/sdl"
@@ -234,6 +235,7 @@ func (app *Application) PostEventActions() {
 	}
 
 	app.win.GLSwap()
+	perf.EndFrame()
 	// wait until frametime has passed
 	<-app.ticker.C
 }

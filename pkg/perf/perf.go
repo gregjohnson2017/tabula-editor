@@ -16,6 +16,15 @@ type average struct {
 
 var enabled bool
 var averages = make(map[string]average)
+var frames int64
+
+func SetMetricsEnabled(enable bool) {
+	enabled = enable
+}
+
+func EndFrame() {
+	frames++
+}
 
 func RecordAverageTime(key string, nanos int64) {
 	if !enabled {
@@ -32,10 +41,6 @@ func RecordAverageTime(key string, nanos int64) {
 	averages[key] = avg
 }
 
-func SetMetricsEnabled(enable bool) {
-	enabled = enable
-}
-
 func LogMetrics() {
 	if !enabled || len(averages) == 0 {
 		return
@@ -50,8 +55,9 @@ func LogMetrics() {
 	log.Perf("average metrics")
 	for _, k := range keys {
 		if v, ok := averages[k]; ok {
-			avg := time.Duration(v.total / v.count)
-			log.Perff("- %v = %v", k, avg)
+			callAvg := time.Duration(v.total / v.count)
+			frameAvg := time.Duration(v.total / frames)
+			log.Perff("- %v = %v / call, %v / frame", k, callAvg, frameAvg)
 		}
 	}
 }
