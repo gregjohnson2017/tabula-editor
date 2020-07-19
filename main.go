@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/app"
@@ -158,7 +159,13 @@ func main() {
 		}
 
 		app.PostEventActions()
-		sw.StopRecordAverage("main.frametime")
+		nanos := sw.StopGetNano()
+		perf.RecordAverageTime("main.frametime", nanos)
+		frametime := time.Second / time.Duration(cfg.FramesPerSecond)
+		limit := int64(float32(frametime) * 1.1)
+		if nanos > limit {
+			log.Perff("degredation: took %v out of expected %v", time.Duration(nanos), frametime)
+		}
 	}
 
 	app.Quit()
