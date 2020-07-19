@@ -18,7 +18,7 @@ func OpenFileDialog(win *sdl.Window) (string, error) {
 	filter := winfileask.FileFilter{winfileask.Filter{}}
 	str, ok, err := winfileask.GetOpenFileName(info.Window, "Open an Image", filter, "")
 	if !ok {
-		err = NoImageChosen
+		err = ErrNoImageChosen
 	}
 	if err != nil {
 		return "", fmt.Errorf("OpenFileDialog: %w", err)
@@ -46,7 +46,7 @@ func SaveFileDialog(win *sdl.Window) (string, error) {
 	}
 	str, ok, err := winfileask.GetSaveFileName(info.Window, "Save an Image", filter, "")
 	if !ok {
-		err = NoImageChosen
+		err = ErrNoImageChosen
 	}
 	if err != nil {
 		return "", fmt.Errorf("SaveFileDialog: %w", err)

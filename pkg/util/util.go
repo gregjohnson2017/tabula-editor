@@ -17,8 +17,8 @@ const (
 	MenuExit
 )
 
-// NoImageChosen indicates that an image selection was cancelled
-const NoImageChosen log.ConstErr = "no image chosen"
+// ErrNoImageChosen indicates that an image selection was cancelled
+const ErrNoImageChosen log.ConstErr = "no image chosen"
 
 // StopWatch is a time.Time with a stopping methods
 type StopWatch struct {
