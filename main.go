@@ -132,6 +132,16 @@ func main() {
 	log.Debugf("enabled loggers: %v", strings.Join(loggers, ", "))
 	log.Debugf("output colorized: %v", color)
 
+	if fps <= 0 {
+		log.Fatal("fps must be >= 0")
+	}
+	if width <= 0 {
+		log.Fatal("width must be >= 0")
+	}
+	if height <= 0 {
+		log.Fatal("height must be >= 0")
+	}
+
 	cfg := config.New(int32(width), int32(height), 30, fps)
 	win, err := initWindow("Tabula Editor", cfg.ScreenWidth, cfg.ScreenHeight)
 	if err != nil {
