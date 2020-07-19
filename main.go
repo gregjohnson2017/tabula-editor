@@ -120,16 +120,16 @@ func main() {
 		fmt.Fprintln(flag.CommandLine.Output(), "\nOptions:")
 		flag.PrintDefaults()
 	}
-	flag.IntVar(&fps, "fps", 144, "the frames per second to render at")
-	flag.IntVar(&width, "width", 960, "the initial width of the window")
-	flag.IntVar(&height, "height", 720, "the initial height of the window")
 	flag.BoolVar(&color, "color", true, "colorize the output logs")
-	flag.BoolVar(&info, "info", true, "show info logging")
-	flag.BoolVar(&warn, "warn", true, "show warning logging")
 	flag.BoolVar(&debug, "debug", false, "show debug logging")
+	flag.StringVar(&file, "file", "", "name of the file to open without prompt")
+	flag.IntVar(&fps, "fps", 144, "the frames per second to render at")
+	flag.IntVar(&height, "height", 720, "the initial height of the window")
+	flag.BoolVar(&info, "info", true, "show info logging")
 	flag.BoolVar(&perform, "perf", false, "show performormance logging")
 	flag.BoolVar(&quiet, "quiet", false, "hide all output, overrides other logging options")
-	flag.StringVar(&file, "file", "", "name of the file to open without prompt")
+	flag.BoolVar(&warn, "warn", true, "show warning logging")
+	flag.IntVar(&width, "width", 960, "the initial width of the window")
 	flag.Parse()
 
 	var loggers []string
