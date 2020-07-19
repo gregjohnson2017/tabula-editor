@@ -229,9 +229,7 @@ func (app *Application) PostEventActions() {
 	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
 	for _, comp := range app.comps {
-		sw := util.Start()
 		comp.Render()
-		sw.StopRecordAverage(comp.String() + ".Render")
 	}
 
 	app.win.GLSwap()

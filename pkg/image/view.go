@@ -151,13 +151,14 @@ func (iv *View) InBoundary(pt sdl.Point) bool {
 
 // Render draws the ui.Component
 func (iv *View) Render() {
+	sw := util.Start()
 	go func() {
 		iv.bbComms <- comms.Image{FileName: iv.fileName, MousePix: iv.mousePix, Mult: iv.mult}
 	}()
 
 	// TODO optimize this (ex: move elsewhere, update as changes come in, use a better algorithm)
 	// make array of 2d-vertex pairs representing texel selection outlines
-	sw := util.Start()
+	swl := util.Start()
 	lines := []float32{}
 	iv.selection.Range(func(i int32) bool {
 		// i is every y*width+x index
@@ -185,7 +186,7 @@ func (iv *View) Render() {
 		}
 		return true
 	})
-	sw.StopRecordAverage("image.View.SelLines")
+	swl.StopRecordAverage(iv.String() + ".SelLines")
 
 	if len(lines) > 0 {
 		gl.BindBuffer(gl.ARRAY_BUFFER, iv.selVbo)
@@ -245,6 +246,7 @@ func (iv *View) Render() {
 		iv.activeTool = tool
 	default:
 	}
+	sw.StopRecordAverage(iv.String() + ".Render")
 }
 
 func (iv *View) zoomIn() {

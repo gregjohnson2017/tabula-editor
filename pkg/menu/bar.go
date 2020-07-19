@@ -7,6 +7,7 @@ import (
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
 	"github.com/gregjohnson2017/tabula-editor/pkg/font"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
+	"github.com/gregjohnson2017/tabula-editor/pkg/util"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -74,9 +75,11 @@ func (b *Bar) InBoundary(pt sdl.Point) bool {
 
 // Render renders the menubar and all its components
 func (b *Bar) Render() {
+	sw := util.Start()
 	for _, e := range b.entries {
 		e.Render()
 	}
+	sw.StopRecordAverage(b.String() + ".Render")
 }
 
 // Destroy tears down the menubar's state

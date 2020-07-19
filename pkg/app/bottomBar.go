@@ -9,6 +9,7 @@ import (
 	"github.com/gregjohnson2017/tabula-editor/pkg/font"
 	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
+	"github.com/gregjohnson2017/tabula-editor/pkg/util"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -137,6 +138,7 @@ func (bb *BottomBar) InBoundary(pt sdl.Point) bool {
 
 // Render draws the ui.Component
 func (bb *BottomBar) Render() {
+	sw := util.Start()
 	msg := <-bb.comms
 
 	// first render solid color background
@@ -188,6 +190,7 @@ func (bb *BottomBar) Render() {
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 
 	gl.UseProgram(0)
+	sw.StopRecordAverage(bb.String() + ".Render")
 }
 
 // OnEnter is called when the cursor enters the ui.Component's region
