@@ -111,10 +111,11 @@ func main() {
 	var debug bool
 	var perform bool
 	var quiet bool
+	var file string
 	flag.Usage = func() {
 		fmt.Fprintln(flag.CommandLine.Output(), "Usage:")
-		fmt.Fprintf(flag.CommandLine.Output(), "  %v [options] [filename]\n", filepath.Base(os.Args[0]))
-		fmt.Fprintln(flag.CommandLine.Output(), "  Opens filename in the editor as an image if provided.")
+		fmt.Fprintf(flag.CommandLine.Output(), "  %v [OPTIONS]\n", filepath.Base(os.Args[0]))
+		fmt.Fprintln(flag.CommandLine.Output(), "  Specify a file name with -file to open immediately.")
 		fmt.Fprintln(flag.CommandLine.Output(), "  Otherwise, an open file dialog will be used, if supported.")
 		fmt.Fprintln(flag.CommandLine.Output(), "\nOptions:")
 		flag.PrintDefaults()
@@ -128,8 +129,8 @@ func main() {
 	flag.BoolVar(&debug, "debug", false, "show debug logging")
 	flag.BoolVar(&perform, "perf", false, "show performormance logging")
 	flag.BoolVar(&quiet, "quiet", false, "hide all output, overrides other logging options")
+	flag.StringVar(&file, "file", "", "name of the file to open without prompt")
 	flag.Parse()
-	fileName := flag.Arg(0)
 
 	var loggers []string
 	// loggers are discarded by default
@@ -158,7 +159,7 @@ func main() {
 	log.SetColorized(color)
 
 	log.Debugf("args: [ %v ]", strings.Join(flag.Args(), ", "))
-	log.Debugf("fileName argument: \"%v\"", fileName)
+	log.Debugf("file option: \"%v\"", file)
 	log.Debugf("enabled loggers: %v", strings.Join(loggers, ", "))
 	log.Debugf("output colorized: %v", color)
 
@@ -186,7 +187,7 @@ func main() {
 		log.Warnf("framerate %v not within set refresh rate range %v-%v", fps, lowHz, highHz)
 	}
 
-	app := app.New(fileName, win, cfg)
+	app := app.New(file, win, cfg)
 	app.Start()
 
 	for app.Running() {
