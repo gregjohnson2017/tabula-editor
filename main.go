@@ -202,7 +202,7 @@ func main() {
 		frametime := time.Second / time.Duration(cfg.FramesPerSecond)
 		limit := int64(float32(frametime) * 1.1)
 		if nanos > limit {
-			log.Perff("degredation: took %v out of expected %v", time.Duration(nanos), frametime)
+			log.Perff("degredation: %.1f%% frametime", 100*float64(time.Duration(nanos))/float64(frametime))
 		}
 	}
 
