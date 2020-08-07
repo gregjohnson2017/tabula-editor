@@ -1,5 +1,5 @@
 # tabula-editor
-Greg and Tyler's editor
+An image editor built from scratch with OpenGL in Go.
 
 ### Installation:
 
