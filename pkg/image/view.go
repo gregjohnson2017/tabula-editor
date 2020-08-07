@@ -337,7 +337,7 @@ func (iv *View) OnScroll(evt *sdl.MouseWheelEvent) bool {
 
 // SelectPixel adds the given x, y pixel to the
 func (iv *View) SelectPixel(x, y int32) error {
-	if x < 0 || y < 0 || x > iv.area.W || y > iv.area.H {
+	if x < 0 || y < 0 || x > iv.origW || y > iv.origH {
 		return fmt.Errorf("x and y coordinates (%v, %v) are out of range", x, y)
 	}
 	iv.selection.Add(iv.mousePix.X + iv.mousePix.Y*iv.origW)
