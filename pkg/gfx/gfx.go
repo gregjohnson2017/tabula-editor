@@ -101,7 +101,7 @@ func compileShader(source string, shaderType uint32) (uint32, error) {
 func UploadUniform(programID uint32, uniformName string, data ...float32) {
 	uniformID := gl.GetUniformLocation(programID, &[]byte(uniformName + "\x00")[0])
 	if uniformID == -1 {
-		panic(fmt.Sprintf("\"%s\" is an invalid uniform name", uniformName))
+		log.Fatalf("\"%s\" is an invalid uniform name", uniformName)
 	}
 	gl.UseProgram(programID)
 	switch len(data) {
@@ -114,7 +114,7 @@ func UploadUniform(programID uint32, uniformName string, data ...float32) {
 	case 4:
 		gl.Uniform4f(uniformID, data[0], data[1], data[2], data[3])
 	default:
-		panic("Invalid number of arguments to uploadUniform")
+		log.Fatal("Invalid number of arguments to uploadUniform")
 	}
 	gl.UseProgram(0)
 }
