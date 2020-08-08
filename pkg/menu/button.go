@@ -6,6 +6,7 @@ import (
 	"github.com/gregjohnson2017/tabula-editor/pkg/font"
 	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
+	"github.com/gregjohnson2017/tabula-editor/pkg/util"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -172,6 +173,7 @@ func (b *Button) InBoundary(pt sdl.Point) bool {
 
 // Render draws the ui.Component
 func (b *Button) Render() {
+	sw := util.Start()
 	// render solid color background
 	gl.Viewport(b.area.X, b.cfg.ScreenHeight-b.area.Y-b.area.H, b.area.W, b.area.H)
 	gl.UseProgram(b.backProgramID)
@@ -202,6 +204,7 @@ func (b *Button) Render() {
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 
 	gl.UseProgram(0)
+	sw.StopRecordAverage(b.String() + ".Render")
 }
 
 // OnEnter is called when the cursor enters the ui.Component's region
@@ -271,5 +274,5 @@ func (b *Button) OnResize(x, y int32) {
 
 // String  returns the name of the component type
 func (b *Button) String() string {
-	return "Button"
+	return "menu.Button"
 }

@@ -12,12 +12,12 @@ import (
 	"unicode"
 	"unsafe"
 
-	"github.com/veandco/go-sdl2/sdl"
-
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/golang/freetype/truetype"
+	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/gregjohnson2017/tabula-editor/pkg/util"
+	"github.com/veandco/go-sdl2/sdl"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/font/sfnt"
@@ -30,19 +30,21 @@ func PrintRune(mask image.Image, maskp image.Point, rec image.Rectangle) {
 	var alpha *image.Alpha
 	var ok bool
 	if alpha, ok = mask.(*image.Alpha); !ok {
-		fmt.Println("printRune image not Alpha")
+		log.Warn("printRune image not Alpha")
 		return
 	}
+	out := "PrintRune\n"
 	for y := maskp.Y; y < maskp.Y+rec.Dy(); y++ {
 		for x := maskp.X; x < maskp.X+rec.Dx(); x++ {
 			if _, _, _, a := alpha.At(x, y).RGBA(); a > 0 {
-				fmt.Printf("%02x ", byte(a))
+				out += fmt.Sprintf("%02x ", byte(a))
 			} else {
-				fmt.Printf(".  ")
+				out += ".  "
 			}
 		}
-		fmt.Printf("\n")
+		out += "\n"
 	}
+	log.Debug(out)
 }
 
 func int26_6ToFloat32(x fixed.Int26_6) float32 {
@@ -100,6 +102,8 @@ func GetMaxVerticalBearing(str string, font Info) float32 {
 // (x,y,s,t)-vertex triangles using glyph information from a
 // pre-loaded font. The vertex info is returned as []float32
 func MapString(str string, font Info, pos sdl.Point, align ui.Align) []float32 {
+	sw := util.Start()
+	defer sw.StopRecordAverage("font.MapString")
 	// 2 triangles per rune, 3 vertices per triangle, 4 float32's per vertex (x,y,s,t)
 	buffer := make([]float32, 0, len(str)*24)
 	// get glyph information for alignment
@@ -187,7 +191,7 @@ func (i Info) TextureID() uint32 {
 var fontMap map[fontKey]Info
 
 func printMetrics(metrics font.Metrics) { //nolint:unused,deadcode
-	fmt.Printf("height: %v, ascent: %v, descent: %v, xheight: %v, capheight: %v, caretslope: %v\n", int26_6ToFloat32(metrics.Height), int26_6ToFloat32(metrics.Ascent), int26_6ToFloat32(metrics.Descent), int26_6ToFloat32(metrics.XHeight), int26_6ToFloat32(metrics.CapHeight), metrics.CaretSlope)
+	log.Debugf("height: %v, ascent: %v, descent: %v, xheight: %v, capheight: %v, caretslope: %v", int26_6ToFloat32(metrics.Height), int26_6ToFloat32(metrics.Ascent), int26_6ToFloat32(metrics.Descent), int26_6ToFloat32(metrics.XHeight), int26_6ToFloat32(metrics.CapHeight), metrics.CaretSlope)
 }
 
 func writeFontToFile(fileName string, glyphBytes []byte, width, height int) { //nolint:unused,deadcode
@@ -204,16 +208,19 @@ func writeFontToFile(fileName string, glyphBytes []byte, width, height int) { //
 	}
 	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_RDWR, 0755)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	if err = png.Encode(file, outImg); err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	if err = file.Close(); err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 }
+
+// ErrNoFontGlyph indicates the given font does not contain the given glyph
+const ErrNoFontGlyph log.ConstErr = "font does not contain given glyph"
 
 // LoadFontTexture caches all of the glyph pixel data in an OpenGL texture for
 // a given font at a given size. It returns an Info struct populated with the
@@ -254,12 +261,12 @@ func LoadFontTexture(fontName string, fontSize int32) (Info, error) {
 
 		roundedRect, mask, maskp, advance, okGlyph := face.Glyph(fixed.Point26_6{X: 0, Y: 0}, c)
 		if !okGlyph {
-			return Info{}, fmt.Errorf("%v does not contain glyph for '%c'", fontName, c)
+			return Info{}, fmt.Errorf("LoadFontTexture(\"%v\", %v) glyph '%v': %w", fontName, fontSize, c, ErrNoFontGlyph)
 		}
 		accurateRect, _, okBounds := face.GlyphBounds(c)
 		glyph, okCast := mask.(*image.Alpha)
 		if !okBounds || !okCast {
-			return Info{}, fmt.Errorf("%v does not contain glyph for '%c'", fontName, c)
+			return Info{}, fmt.Errorf("LoadFontTexture(\"%v\", %v) glyph '%v': %w", fontName, fontSize, c, ErrNoFontGlyph)
 		}
 
 		runeMap[i-minASCII] = runeInfo{
@@ -282,7 +289,7 @@ func LoadFontTexture(fontName string, fontSize int32) (Info, error) {
 
 	_, mask, _, _, aOK := face.Glyph(fixed.Point26_6{X: 0, Y: 0}, 'A')
 	if !aOK {
-		return Info{}, fmt.Errorf("Failed to get glyph for 'A'")
+		return Info{}, fmt.Errorf("LoadFontTexture(\"%v\", %v) glyph 'A': %w", fontName, fontSize, ErrNoFontGlyph)
 	}
 
 	glyph, _ := mask.(*image.Alpha)
@@ -320,7 +327,7 @@ func LoadFontTexture(fontName string, fontSize int32) (Info, error) {
 		CaretSlope: otfMetrics.CaretSlope,
 	}
 
-	fmt.Printf("Loaded %v at size %v:\t%v\n", fontName, fontSize, time.Duration(int64(time.Nanosecond)*sw.StopGetNano()))
+	log.Perff("Loaded %v at size %v:\t%v", fontName, fontSize, time.Duration(int64(time.Nanosecond)*sw.StopGetNano()))
 	InfoLoaded := Info{fontTextureID, runeMap[:], metrics}
 	fontMap[fontKey{fontName, fontSize}] = InfoLoaded
 	return InfoLoaded, nil

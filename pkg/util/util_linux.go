@@ -3,6 +3,7 @@ package util
 import (
 	"fmt"
 
+	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/jcmuller/gozenity"
 	"github.com/veandco/go-sdl2/sdl"
 )
@@ -29,6 +30,6 @@ func SaveFileDialog(*sdl.Window) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("SaveFileDialog: %w", err)
 	}
-	fmt.Printf("SaveFileDialog got back with %v folders and \"%v\" file name", folders, file)
+	log.Debugf("SaveFileDialog got back with %v folders and \"%v\" file name", folders, file)
 	return folders[0] + "/" + file, nil
 }

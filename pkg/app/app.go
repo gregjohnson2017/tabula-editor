@@ -1,22 +1,19 @@
 package app
 
 import (
-	"fmt"
-	"os"
 	"time"
 
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/comms"
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
 	"github.com/gregjohnson2017/tabula-editor/pkg/image"
+	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/gregjohnson2017/tabula-editor/pkg/menu"
+	"github.com/gregjohnson2017/tabula-editor/pkg/perf"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/gregjohnson2017/tabula-editor/pkg/util"
 	"github.com/veandco/go-sdl2/sdl"
 )
-
-// performance debugging metrics
-var imageTotalNs, bbTotalNs, bTotalNs, mlTotalNs, iterations int64
 
 // Application holds state for the tabula application
 type Application struct {
@@ -32,15 +29,12 @@ type Application struct {
 }
 
 // New returns a newly instantiated application state struct
-func New(win *sdl.Window, cfg *config.Config) *Application {
-	var fileName string
+func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 	var err error
-	if len(os.Args) == 2 {
-		fileName = os.Args[1]
-	} else {
+	if fileName == "" {
+		log.Info("Using file dialog to get file name")
 		if fileName, err = util.OpenFileDialog(win); err != nil {
-			fmt.Printf("%v\n", err)
-			os.Exit(1)
+			log.Fatal(err)
 		}
 	}
 
@@ -68,9 +62,13 @@ func New(win *sdl.Window, cfg *config.Config) *Application {
 	actionComms := make(chan func())
 
 	iv, err := image.NewView(imageViewArea, fileName, bottomBarComms, toolComms, cfg)
-	errCheck(err)
+	if err != nil {
+		log.Fatal(err)
+	}
 	bottomBar, err := NewBottomBar(bottomBarArea, bottomBarComms, cfg)
-	errCheck(err)
+	if err != nil {
+		log.Fatal(err)
+	}
 	centerButton, err := menu.NewButton(buttonAreaCenter, cfg, "Center Image", func() {
 		go func() {
 			actionComms <- func() {
@@ -78,7 +76,9 @@ func New(win *sdl.Window, cfg *config.Config) *Application {
 			}
 		}()
 	})
-	errCheck(err)
+	if err != nil {
+		log.Fatal(err)
+	}
 	centerButton.SetHighlightBackgroundColor([4]float32{1.0, 0.0, 0.0, 1.0})
 	centerButton.SetDefaultTextColor([4]float32{0.0, 0.0, 1.0, 1.0})
 
@@ -91,13 +91,14 @@ func New(win *sdl.Window, cfg *config.Config) *Application {
 					Action: func() {
 						newFileName, err := util.OpenFileDialog(win)
 						if err != nil {
-							fmt.Printf("%v\n", err)
+							log.Warn(err)
 							return
 						}
 						go func() {
 							actionComms <- func() {
-								err = iv.LoadFromFile(newFileName)
-								errCheck(err)
+								if err := iv.LoadFromFile(newFileName); err != nil {
+									log.Fatal(err)
+								}
 							}
 						}()
 					},
@@ -107,34 +108,36 @@ func New(win *sdl.Window, cfg *config.Config) *Application {
 					Action: func() {
 						newFileName, err := util.SaveFileDialog(win)
 						if err != nil {
-							fmt.Printf("%v\n", err)
+							log.Warn(err)
 							return
 						}
 						go func() {
 							actionComms <- func() {
-								err := iv.WriteToFile(newFileName)
-								errCheck(err)
-								err = iv.LoadFromFile(newFileName)
-								errCheck(err)
+								if err := iv.WriteToFile(newFileName); err != nil {
+									log.Fatal(err)
+								}
+								if err := iv.LoadFromFile(newFileName); err != nil {
+									log.Fatal(err)
+								}
 							}
 						}()
 					},
 				},
 				{
 					Text:   "kitten",
-					Action: func() { fmt.Println("kitten") },
+					Action: func() { log.Info("kitten") },
 					Children: []menu.Definition{
 						{
 							Text:   "Mooney",
-							Action: func() { fmt.Println("Mooney") },
+							Action: func() { log.Info("Mooney") },
 						},
 						{
 							Text:   "Buttercup",
-							Action: func() { fmt.Println("Buttercup") },
+							Action: func() { log.Info("Buttercup") },
 						},
 						{
 							Text:   "Sunny",
-							Action: func() { fmt.Println("Sunny") },
+							Action: func() { log.Info("Sunny") },
 						},
 					},
 				},
@@ -168,11 +171,12 @@ func New(win *sdl.Window, cfg *config.Config) *Application {
 		},
 	})
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	frametime := time.Second / time.Duration(cfg.FramesPerSecond)
 	ticker := time.NewTicker(frametime)
+	log.Debugf("set framerate %v with frametime %v", cfg.FramesPerSecond, frametime)
 
 	return &Application{
 		running:     false,
@@ -214,8 +218,9 @@ func (app *Application) PostEventActions() {
 	hasEvents := true
 	for hasEvents {
 		select {
-		case closure := <-app.postEvtActs:
-			closure()
+		case action := <-app.postEvtActs:
+			log.Debug("handling post event action")
+			action()
 		default:
 			// no more in pipe
 			hasEvents = false
@@ -224,23 +229,12 @@ func (app *Application) PostEventActions() {
 	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
 	for _, comp := range app.comps {
-		sw := util.Start()
 		comp.Render()
-		ns := sw.StopGetNano()
-		switch comp.(type) {
-		case *image.View:
-			imageTotalNs += ns
-		case *BottomBar:
-			bbTotalNs += ns
-		case *menu.Button:
-			bTotalNs += ns
-		case *menu.Bar:
-			mlTotalNs += ns
-		}
 	}
-	iterations++
 
 	app.win.GLSwap()
+	perf.EndFrame()
+	// wait until frametime has passed
 	<-app.ticker.C
 }
 
@@ -249,16 +243,21 @@ func (app *Application) handleQuitEvent(evt *sdl.QuitEvent) {
 }
 
 func (app *Application) handleMouseButtonEvent(evt *sdl.MouseButtonEvent) {
+	sw := util.Start()
+	defer sw.StopRecordAverage("app.handleMouseButtonEvent")
 	for i := range app.comps {
 		comp := app.comps[len(app.comps)-i-1]
 		if comp.InBoundary(sdl.Point{X: evt.X, Y: evt.Y}) {
 			comp.OnClick(evt)
+			log.Debugln("mouse button event on", comp.String())
 			break
 		}
 	}
 }
 
 func (app *Application) handleMouseMotionEvent(evt *sdl.MouseMotionEvent) {
+	sw := util.Start()
+	defer sw.StopRecordAverage("app.handleMouseMotionEvent")
 	// search top down through components until exhausted or one absorbs the event
 	for i := range app.comps {
 		comp := app.comps[len(app.comps)-i-1]
@@ -282,6 +281,8 @@ func (app *Application) handleMouseMotionEvent(evt *sdl.MouseMotionEvent) {
 }
 
 func (app *Application) handleMouseWheelEvent(evt *sdl.MouseWheelEvent) {
+	sw := util.Start()
+	defer sw.StopRecordAverage("app.handleMouseWheelEvent")
 	for i := range app.comps {
 		comp := app.comps[len(app.comps)-i-1]
 		x, y, _ := sdl.GetMouseState()
@@ -294,7 +295,10 @@ func (app *Application) handleMouseWheelEvent(evt *sdl.MouseWheelEvent) {
 }
 
 func (app *Application) handleWindowEvent(evt *sdl.WindowEvent) {
+	sw := util.Start()
+	defer sw.StopRecordAverage("app.handleWindowEvent")
 	if evt.Event == sdl.WINDOWEVENT_LEAVE || evt.Event == sdl.WINDOWEVENT_FOCUS_LOST || evt.Event == sdl.WINDOWEVENT_MINIMIZED {
+		log.Debug("window focus lost")
 		if app.currHover != nil {
 			app.currHover.OnLeave()
 			app.lastHover = app.currHover
@@ -330,31 +334,14 @@ func (app *Application) Running() bool {
 
 // Quit cleans up resources
 func (app *Application) Quit() {
-	avgNs := int64(float64(imageTotalNs) / float64(iterations))
-	avg := time.Duration(int64(time.Nanosecond) * avgNs)
-	fmt.Printf("image.View avg:\t %v\n", avg)
-	avgNs = int64(float64(bbTotalNs) / float64(iterations))
-	avg = time.Duration(int64(time.Nanosecond) * avgNs)
-	fmt.Printf("BottomBar avg:\t %v\n", avg)
-	avgNs = int64(float64(bTotalNs) / float64(iterations))
-	avg = time.Duration(int64(time.Nanosecond) * avgNs)
-	fmt.Printf("menu.Button avg: %v\n", avg)
-	avgNs = int64(float64(mlTotalNs) / float64(iterations))
-	avg = time.Duration(int64(time.Nanosecond) * avgNs)
-	fmt.Printf("menu.Bar avg:\t %v\n", avg)
-
 	// free ui.Component assets
 	for _, comp := range app.comps {
+		log.Debugln("destroying", comp.String())
 		comp.Destroy()
 	}
 
-	err := app.win.Destroy()
-	errCheck(err)
-	sdl.Quit()
-}
-
-func errCheck(err error) {
-	if err != nil {
-		panic(err)
+	if err := app.win.Destroy(); err != nil {
+		log.Fatal(err)
 	}
+	sdl.Quit()
 }

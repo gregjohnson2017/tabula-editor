@@ -7,6 +7,7 @@ import (
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
 	"github.com/gregjohnson2017/tabula-editor/pkg/font"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
+	"github.com/gregjohnson2017/tabula-editor/pkg/util"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -74,9 +75,11 @@ func (l *list) InBoundary(pt sdl.Point) bool {
 
 // Render draws the ui.Component
 func (l *list) Render() {
+	sw := util.Start()
 	for _, e := range l.entries {
 		e.Render()
 	}
+	sw.StopRecordAverage(l.String() + ".Render")
 }
 
 // Destroy frees all assets acquired by the ui.Component
@@ -109,7 +112,7 @@ func (l *list) GetEntryAt(x int32, y int32) (*entry, error) {
 			}
 		}
 	}
-	return nil, fmt.Errorf("no entry at given position")
+	return nil, fmt.Errorf("GetEntryAt(%v, %v): %w", x, y, ErrNoEntryAtPosition)
 }
 
 // OnMotion is called when the cursor moves within the ui.Component's region - bad comment
@@ -169,5 +172,5 @@ func (l *list) OnResize(x, y int32) {
 }
 
 func (l *list) String() string {
-	return "list"
+	return "menu.list"
 }

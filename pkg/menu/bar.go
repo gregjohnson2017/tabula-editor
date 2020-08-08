@@ -7,6 +7,7 @@ import (
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
 	"github.com/gregjohnson2017/tabula-editor/pkg/font"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
+	"github.com/gregjohnson2017/tabula-editor/pkg/util"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -74,9 +75,11 @@ func (b *Bar) InBoundary(pt sdl.Point) bool {
 
 // Render renders the menubar and all its components
 func (b *Bar) Render() {
+	sw := util.Start()
 	for _, e := range b.entries {
 		e.Render()
 	}
+	sw.StopRecordAverage(b.String() + ".Render")
 }
 
 // Destroy tears down the menubar's state
@@ -105,7 +108,7 @@ func (b *Bar) GetEntryAt(x int32, y int32) (*entry, error) {
 			return e, nil
 		}
 	}
-	return nil, fmt.Errorf("no entry at given position")
+	return nil, fmt.Errorf("GetEntryAt(%v, %v): %w", x, y, ErrNoEntryAtPosition)
 }
 
 // OnMotion updates the menubar for when the mouse moves within its boundary
@@ -167,5 +170,5 @@ func (b *Bar) OnResize(x, y int32) {
 
 // String returns the name of the component type
 func (b *Bar) String() string {
-	return "Bar"
+	return "menu.Bar"
 }

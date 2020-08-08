@@ -16,10 +16,11 @@ import (
 	"github.com/gregjohnson2017/tabula-editor/pkg/comms"
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
 	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
+	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
-	"github.com/veandco/go-sdl2/sdl"
-
+	"github.com/gregjohnson2017/tabula-editor/pkg/util"
 	set "github.com/kroppt/Int32Set"
+	"github.com/veandco/go-sdl2/sdl"
 )
 
 var _ ui.Component = ui.Component(&View{})
@@ -150,12 +151,14 @@ func (iv *View) InBoundary(pt sdl.Point) bool {
 
 // Render draws the ui.Component
 func (iv *View) Render() {
+	sw := util.Start()
 	go func() {
 		iv.bbComms <- comms.Image{FileName: iv.fileName, MousePix: iv.mousePix, Mult: iv.mult}
 	}()
 
 	// TODO optimize this (ex: move elsewhere, update as changes come in, use a better algorithm)
 	// make array of 2d-vertex pairs representing texel selection outlines
+	swl := util.Start()
 	lines := []float32{}
 	iv.selection.Range(func(i int32) bool {
 		// i is every y*width+x index
@@ -183,6 +186,7 @@ func (iv *View) Render() {
 		}
 		return true
 	})
+	swl.StopRecordAverage(iv.String() + ".SelLines")
 
 	if len(lines) > 0 {
 		gl.BindBuffer(gl.ARRAY_BUFFER, iv.selVbo)
@@ -238,9 +242,11 @@ func (iv *View) Render() {
 
 	select {
 	case tool := <-iv.toolComms:
+		log.Debugln("image.View switching tool to", tool.String())
 		iv.activeTool = tool
 	default:
 	}
+	sw.StopRecordAverage(iv.String() + ".Render")
 }
 
 func (iv *View) zoomIn() {
@@ -335,10 +341,13 @@ func (iv *View) OnScroll(evt *sdl.MouseWheelEvent) bool {
 	return true
 }
 
+// ErrCoordOutOfRange indicates that given coordinates are out of range
+const ErrCoordOutOfRange log.ConstErr = "coordinates out of range"
+
 // SelectPixel adds the given x, y pixel to the
 func (iv *View) SelectPixel(x, y int32) error {
 	if x < 0 || y < 0 || x > iv.origW || y > iv.origH {
-		return fmt.Errorf("x and y coordinates (%v, %v) are out of range", x, y)
+		return fmt.Errorf("SelectPixel(%v, %v): %w", x, y, ErrCoordOutOfRange)
 	}
 	iv.selection.Add(iv.mousePix.X + iv.mousePix.Y*iv.origW)
 	return nil
@@ -378,7 +387,7 @@ func (iv *View) OnResize(x, y int32) {
 
 // String returns the name of the component type
 func (iv *View) String() string {
-	return "View"
+	return "image.View"
 }
 
 func loadImage(fileName string) (width, height int, data []byte, err error) {
@@ -421,6 +430,9 @@ func loadImage(fileName string) (width, height int, data []byte, err error) {
 	return width, height, data, nil
 }
 
+// ErrWriteFormat indicates that an unsupported image format was trying to be written to
+const ErrWriteFormat log.ConstErr = "unsupported image format"
+
 // WriteToFile writes the image data stored in the OpenGL texture to a file specified by fileName
 func (iv *View) WriteToFile(fileName string) error {
 	var texWidth, texHeight int32
@@ -455,7 +467,7 @@ func (iv *View) WriteToFile(fileName string) error {
 			return err
 		}
 	default:
-		return fmt.Errorf("%v is an unsupported file extension", ext)
+		return fmt.Errorf("writing to file extension %v: %w", ext, ErrWriteFormat)
 	}
 
 	return nil

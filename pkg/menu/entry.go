@@ -3,6 +3,7 @@ package menu
 import (
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
+	"github.com/gregjohnson2017/tabula-editor/pkg/util"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -88,10 +89,12 @@ func (e *entry) OnClick(evt *sdl.MouseButtonEvent) bool {
 
 // Render calls the underlying button's render function
 func (e *entry) Render() {
+	sw := util.Start()
 	e.button.Render()
 	if e.list != nil && e.enabled {
 		e.list.Render()
 	}
+	sw.StopRecordAverage(e.String() + ".Render")
 }
 
 // OnResize calls the underlying ui.Components' OnResize function
@@ -106,4 +109,8 @@ func (e *entry) OnMotion(evt *sdl.MouseMotionEvent) bool {
 		e.list.OnMotion(evt)
 	}
 	return true
+}
+
+func (e *entry) String() string {
+	return "menu.entry"
 }
