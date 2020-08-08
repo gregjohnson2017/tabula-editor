@@ -234,6 +234,10 @@ func (app *Application) PostEventActions() {
 
 	app.win.GLSwap()
 	perf.EndFrame()
+
+	for glErr := gl.GetError(); glErr != gl.NO_ERROR; glErr = gl.GetError() {
+		log.Warnf("OpenGL error: %v", glErr)
+	}
 	// wait until frametime has passed
 	<-app.ticker.C
 }
