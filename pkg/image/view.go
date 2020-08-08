@@ -265,15 +265,19 @@ func (iv *View) CenterImage() {
 	iv.canvas.Y = int32(float64(iv.area.H)/2.0 - float64(iv.canvas.H)/2.0)
 }
 
-func (iv *View) setPixel(x, y int32, color []byte) {
+func (iv *View) setPixel(p sdl.Point, col color.RGBA) error {
+	if p.X < 0 || p.Y < 0 || p.X >= iv.origW || p.Y >= iv.origH {
+		return fmt.Errorf("setPixel(%v, %v): %w", p.X, p.Y, ErrCoordOutOfRange)
+	}
 	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 4)
-	gl.TextureSubImage2D(iv.textureID, 0, x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, unsafe.Pointer(&color[0]))
+	gl.TextureSubImage2D(iv.textureID, 0, p.X, p.Y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, unsafe.Pointer(&col))
 	// TODO update mipmap textures only when needed
 	gl.BindTexture(gl.TEXTURE_2D, iv.textureID)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
 	gl.GenerateMipmap(gl.TEXTURE_2D)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
+	return nil
 }
 
 func (iv *View) updateMousePos(x, y int32) {
@@ -297,17 +301,15 @@ func (iv *View) OnLeave() {
 func (iv *View) OnMotion(evt *sdl.MouseMotionEvent) bool {
 	if !iv.dragging {
 		iv.updateMousePos(evt.X, evt.Y)
+		iv.activeTool.OnMotion(evt, iv)
+		return ui.InBounds(*iv.canvas, sdl.Point{X: evt.X, Y: evt.Y})
 	}
-	if !iv.dragging && !ui.InBounds(*iv.canvas, sdl.Point{X: evt.X, Y: evt.Y}) {
-		return false
-	}
-	if evt.State == sdl.ButtonRMask() && iv.dragging {
+	if evt.State == sdl.ButtonRMask() {
 		iv.canvas.X += evt.X - iv.dragPoint.X
 		iv.canvas.Y += evt.Y - iv.dragPoint.Y
 		iv.dragPoint.X = evt.X
 		iv.dragPoint.Y = evt.Y
 	}
-	iv.activeTool.OnMotion(evt, iv)
 	return true
 }
 
@@ -332,17 +334,18 @@ func (iv *View) OnScroll(evt *sdl.MouseWheelEvent) bool {
 const ErrCoordOutOfRange log.ConstErr = "coordinates out of range"
 
 // SelectPixel adds the given x, y pixel to the
-func (iv *View) SelectPixel(x, y int32) error {
-	if x < 0 || y < 0 || x > iv.origW || y > iv.origH {
-		return fmt.Errorf("SelectPixel(%v, %v): %w", x, y, ErrCoordOutOfRange)
+func (iv *View) SelectPixel(p sdl.Point) error {
+	if p.X < 0 || p.Y < 0 || p.X >= iv.origW || p.Y >= iv.origH {
+		return fmt.Errorf("SelectPixel(%v, %v): %w", p.X, p.Y, ErrCoordOutOfRange)
 	}
-	iv.selection.Add(iv.mousePix.X + iv.mousePix.Y*iv.origW)
+	iv.selection.Add(p.X + p.Y*iv.origW)
 	return nil
 }
 
 // OnClick is called when the user clicks within the ui.Component's region
 func (iv *View) OnClick(evt *sdl.MouseButtonEvent) bool {
 	iv.updateMousePos(evt.X, evt.Y)
+	iv.activeTool.OnClick(evt, iv)
 	if !ui.InBounds(*iv.canvas, sdl.Point{X: evt.X, Y: evt.Y}) {
 		return true
 	}
@@ -355,7 +358,6 @@ func (iv *View) OnClick(evt *sdl.MouseButtonEvent) bool {
 		iv.dragPoint.X = evt.X
 		iv.dragPoint.Y = evt.Y
 	}
-	iv.activeTool.OnClick(evt, iv)
 	return true
 }
 
