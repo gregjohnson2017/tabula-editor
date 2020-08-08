@@ -54,8 +54,11 @@ func (t PixelSelectionTool) OnClick(evt *sdl.MouseButtonEvent, iv *View) {
 // OnMotion is called when the user clicks within the Image View's region and the tool is
 // currently active for the image view.
 func (t PixelSelectionTool) OnMotion(evt *sdl.MouseMotionEvent, iv *View) {
-	if evt.State == sdl.ButtonLMask() && ui.InBounds(*iv.canvas, sdl.Point{X: evt.X, Y: evt.Y}) {
-		iv.selection.Add(iv.mousePix.X + iv.mousePix.Y*iv.origW)
+	if evt.State == sdl.ButtonLMask() {
+		err := iv.SelectPixel(iv.mousePix.X, iv.mousePix.Y)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 }
 
