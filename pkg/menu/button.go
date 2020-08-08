@@ -55,23 +55,17 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 	backColor := [4]float32{0.8392, 0.8118, 0.8118, 1.0}
 	textColor := [4]float32{0.0, 0.0, 0.0, 1.0}
 
-	backColorID := gl.GetUniformLocation(backProgramID, &[]byte("uni_color\x00")[0])
-	gl.UseProgram(backProgramID)
-	gl.Uniform4f(backColorID, backColor[0], backColor[1], backColor[2], backColor[3])
-
-	uniScrSizeID := gl.GetUniformLocation(textProgramID, &[]byte("screen_size\x00")[0])
-	texSizeID := gl.GetUniformLocation(textProgramID, &[]byte("tex_size\x00")[0])
-	textColorID := gl.GetUniformLocation(textProgramID, &[]byte("text_color\x00")[0])
+	gfx.UploadUniform(backProgramID, "uni_color", backColor[0], backColor[1], backColor[2], backColor[3])
 
 	var texSheetWidth, texSheetHeight int32
 	gl.BindTexture(gl.TEXTURE_2D, fnt.TextureID())
 	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_WIDTH, &texSheetWidth)
 	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_HEIGHT, &texSheetHeight)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
-	gl.UseProgram(textProgramID)
-	gl.Uniform2f(uniScrSizeID, float32(cfg.ScreenWidth), float32(cfg.ScreenHeight))
-	gl.Uniform2f(texSizeID, float32(texSheetWidth), float32(texSheetHeight))
-	gl.Uniform4f(textColorID, textColor[0], textColor[1], textColor[2], textColor[3])
+
+	gfx.UploadUniform(textProgramID, "screen_size", float32(cfg.ScreenWidth), float32(cfg.ScreenHeight))
+	gfx.UploadUniform(textProgramID, "tex_size", float32(texSheetWidth), float32(texSheetHeight))
+	gfx.UploadUniform(textProgramID, "text_color", textColor[0], textColor[1], textColor[2], textColor[3])
 
 	backTriangles := []float32{
 		-1.0, -1.0, // bottom-left
@@ -133,10 +127,7 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 // SetDefaultBackgroundColor changes the default background color
 func (b *Button) SetDefaultBackgroundColor(color [4]float32) {
 	b.defaultBackColor = color
-	backColorID := gl.GetUniformLocation(b.textProgramID, &[]byte("text_color\x00")[0])
-	gl.UseProgram(b.backProgramID)
-	gl.Uniform4f(backColorID, b.defaultBackColor[0], b.defaultBackColor[1], b.defaultBackColor[2], b.defaultBackColor[3])
-	gl.UseProgram(0)
+	gfx.UploadUniform(b.backProgramID, "text_color", b.defaultBackColor[0], b.defaultBackColor[1], b.defaultBackColor[2], b.defaultBackColor[3])
 }
 
 // SetHighlightBackgroundColor changes the highlight background color
@@ -147,10 +138,7 @@ func (b *Button) SetHighlightBackgroundColor(color [4]float32) {
 // SetDefaultTextColor changes the default text color
 func (b *Button) SetDefaultTextColor(color [4]float32) {
 	b.defaultTextColor = color
-	textColorID := gl.GetUniformLocation(b.textProgramID, &[]byte("text_color\x00")[0])
-	gl.UseProgram(b.textProgramID)
-	gl.Uniform4f(textColorID, b.defaultTextColor[0], b.defaultTextColor[1], b.defaultTextColor[2], b.defaultTextColor[3])
-	gl.UseProgram(0)
+	gfx.UploadUniform(b.textProgramID, "text_color", b.defaultTextColor[0], b.defaultTextColor[1], b.defaultTextColor[2], b.defaultTextColor[3])
 }
 
 // SetHighlightTextColor changes the highlight text color
@@ -211,13 +199,9 @@ func (b *Button) Render() {
 func (b *Button) OnEnter() {
 	b.hovering = true
 
-	backColorID := gl.GetUniformLocation(b.backProgramID, &[]byte("uni_color\x00")[0])
-	gl.UseProgram(b.backProgramID)
-	gl.Uniform4f(backColorID, b.highlightBackColor[0], b.highlightBackColor[1], b.highlightBackColor[2], b.highlightBackColor[3])
-	textColorID := gl.GetUniformLocation(b.textProgramID, &[]byte("text_color\x00")[0])
-	gl.UseProgram(b.textProgramID)
-	gl.Uniform4f(textColorID, b.highlightTextColor[0], b.highlightTextColor[1], b.highlightTextColor[2], b.highlightTextColor[3])
-	gl.UseProgram(0)
+	gfx.UploadUniform(b.backProgramID, "uni_color", b.highlightBackColor[0], b.highlightBackColor[1], b.highlightBackColor[2], b.highlightBackColor[3])
+
+	gfx.UploadUniform(b.textProgramID, "text_color", b.highlightTextColor[0], b.highlightTextColor[1], b.highlightTextColor[2], b.highlightTextColor[3])
 }
 
 // OnLeave is called when the cursor leaves the ui.Component's region
@@ -225,13 +209,8 @@ func (b *Button) OnLeave() {
 	b.hovering = false
 	b.pressed = false
 
-	backColorID := gl.GetUniformLocation(b.backProgramID, &[]byte("uni_color\x00")[0])
-	gl.UseProgram(b.backProgramID)
-	gl.Uniform4f(backColorID, b.defaultBackColor[0], b.defaultBackColor[1], b.defaultBackColor[2], b.defaultBackColor[3])
-	textColorID := gl.GetUniformLocation(b.textProgramID, &[]byte("text_color\x00")[0])
-	gl.UseProgram(b.textProgramID)
-	gl.Uniform4f(textColorID, b.defaultTextColor[0], b.defaultTextColor[1], b.defaultTextColor[2], b.defaultTextColor[3])
-	gl.UseProgram(0)
+	gfx.UploadUniform(b.backProgramID, "uni_color", b.defaultBackColor[0], b.defaultBackColor[1], b.defaultBackColor[2], b.defaultBackColor[3])
+	gfx.UploadUniform(b.textProgramID, "text_color", b.defaultTextColor[0], b.defaultTextColor[1], b.defaultTextColor[2], b.defaultTextColor[3])
 }
 
 // OnMotion is called when the cursor moves within the ui.Component's region
@@ -258,10 +237,7 @@ func (b *Button) OnClick(evt *sdl.MouseButtonEvent) bool {
 // OnResize is called when the user resizes the window
 func (b *Button) OnResize(x, y int32) {
 	// recompute text triangles
-	uniformID := gl.GetUniformLocation(b.textProgramID, &[]byte("screen_size\x00")[0])
-	gl.UseProgram(b.textProgramID)
-	gl.Uniform2f(uniformID, float32(b.cfg.ScreenWidth), float32(b.cfg.ScreenHeight))
-	gl.UseProgram(0)
+	gfx.UploadUniform(b.textProgramID, "screen_size", float32(b.cfg.ScreenWidth), float32(b.cfg.ScreenHeight))
 
 	pos := sdl.Point{X: b.area.X + b.area.W/2, Y: b.cfg.ScreenHeight - b.area.Y - b.area.H/2}
 	align := ui.Align{V: ui.AlignMiddle, H: ui.AlignCenter}

@@ -56,10 +56,7 @@ func (iv *View) LoadFromFile(fileName string) error {
 	}
 	iv.origW = int32(width)
 	iv.origH = int32(height)
-	uniformID := gl.GetUniformLocation(iv.selProgramID, &[]byte("origDims\x00")[0])
-	gl.UseProgram(iv.selProgramID)
-	gl.Uniform2f(uniformID, float32(iv.origW), float32(iv.origH))
-	gl.UseProgram(0)
+	gfx.UploadUniform(iv.selProgramID, "origDims", float32(iv.origW), float32(iv.origH))
 
 	format := int32(gl.RGBA)
 	gl.DeleteTextures(1, &iv.textureID)
@@ -80,10 +77,7 @@ func (iv *View) LoadFromFile(fileName string) error {
 	}
 	iv.CenterImage()
 	iv.mult = 1.0
-	uniformID = gl.GetUniformLocation(iv.selProgramID, &[]byte("mult\x00")[0])
-	gl.UseProgram(iv.selProgramID)
-	gl.Uniform1f(uniformID, float32(iv.mult))
-	gl.UseProgram(0)
+	gfx.UploadUniform(iv.selProgramID, "mult", float32(iv.mult))
 
 	parts := strings.Split(fileName, string(os.PathSeparator))
 	iv.fileName = parts[len(parts)-1]
@@ -114,10 +108,7 @@ func NewView(area *sdl.Rect, fileName string, bbComms chan<- comms.Image, toolCo
 		return nil, err
 	}
 
-	uniformID := gl.GetUniformLocation(iv.programID, &[]byte("area\x00")[0])
-	gl.UseProgram(iv.programID)
-	gl.Uniform2f(uniformID, float32(iv.area.W), float32(iv.area.H))
-	gl.UseProgram(0)
+	gfx.UploadUniform(iv.programID, "area", float32(iv.area.W), float32(iv.area.H))
 
 	gl.GenBuffers(1, &iv.vboID)
 	gl.GenVertexArrays(1, &iv.vaoID)
@@ -255,10 +246,8 @@ func (iv *View) zoomIn() {
 	iv.canvas.H = int32(float64(iv.origH) * iv.mult)
 	iv.canvas.X = 2*iv.canvas.X - int32(math.Round(float64(iv.area.W)/2.0)) //iv.mouseLoc.x
 	iv.canvas.Y = 2*iv.canvas.Y - int32(math.Round(float64(iv.area.H)/2.0)) //iv.mouseLoc.y
-	uniformID := gl.GetUniformLocation(iv.selProgramID, &[]byte("mult\x00")[0])
-	gl.UseProgram(iv.selProgramID)
-	gl.Uniform1f(uniformID, float32(iv.mult))
-	gl.UseProgram(0)
+
+	gfx.UploadUniform(iv.selProgramID, "mult", float32(iv.mult))
 }
 
 func (iv *View) zoomOut() {
@@ -267,10 +256,8 @@ func (iv *View) zoomOut() {
 	iv.canvas.H = int32(float64(iv.origH) * iv.mult)
 	iv.canvas.X = int32(math.Round(float64(iv.canvas.X)/2.0 + float64(iv.area.W)/4.0)) //iv.mouseLoc.x/2
 	iv.canvas.Y = int32(math.Round(float64(iv.canvas.Y)/2.0 + float64(iv.area.H)/4.0)) //iv.mouseLoc.y/2
-	uniformID := gl.GetUniformLocation(iv.selProgramID, &[]byte("mult\x00")[0])
-	gl.UseProgram(iv.selProgramID)
-	gl.Uniform1f(uniformID, float32(iv.mult))
-	gl.UseProgram(0)
+
+	gfx.UploadUniform(iv.selProgramID, "mult", float32(iv.mult))
 }
 
 func (iv *View) CenterImage() {
@@ -377,10 +364,7 @@ func (iv *View) OnResize(x, y int32) {
 	iv.area.W += x
 	iv.area.H += y
 
-	uniformID := gl.GetUniformLocation(iv.programID, &[]byte("area\x00")[0])
-	gl.UseProgram(iv.programID)
-	gl.Uniform2f(uniformID, float32(iv.area.W), float32(iv.area.H))
-	gl.UseProgram(0)
+	gfx.UploadUniform(iv.programID, "area", float32(iv.area.W), float32(iv.area.H))
 
 	iv.CenterImage()
 }

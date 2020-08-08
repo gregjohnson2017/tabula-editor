@@ -50,23 +50,17 @@ func NewBottomBar(area *sdl.Rect, comms <-chan comms.Image, cfg *config.Config) 
 	barColor := [4]float32{0.5, 0.5, 0.5, 1.0}
 	textColor := [4]float32{1.0, 1.0, 1.0, 1.0}
 
-	barColorID := gl.GetUniformLocation(backProgramID, &[]byte("uni_color\x00")[0])
-	gl.UseProgram(backProgramID)
-	gl.Uniform4f(barColorID, barColor[0], barColor[1], barColor[2], barColor[3])
-
-	uniScrSizeID := gl.GetUniformLocation(textProgramID, &[]byte("screen_size\x00")[0])
-	texSizeID := gl.GetUniformLocation(textProgramID, &[]byte("tex_size\x00")[0])
-	textColorID := gl.GetUniformLocation(textProgramID, &[]byte("text_color\x00")[0])
+	gfx.UploadUniform(backProgramID, "uni_color", barColor[0], barColor[1], barColor[2], barColor[3])
 
 	var texSheetWidth, texSheetHeight int32
 	gl.BindTexture(gl.TEXTURE_2D, fnt.TextureID())
 	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_WIDTH, &texSheetWidth)
 	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_HEIGHT, &texSheetHeight)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
-	gl.UseProgram(textProgramID)
-	gl.Uniform2f(texSizeID, float32(texSheetWidth), float32(texSheetHeight))
-	gl.Uniform2f(uniScrSizeID, float32(cfg.ScreenWidth), float32(cfg.ScreenHeight))
-	gl.Uniform4f(textColorID, textColor[0], textColor[1], textColor[2], textColor[3])
+
+	gfx.UploadUniform(textProgramID, "screen_size", float32(cfg.ScreenWidth), float32(cfg.ScreenHeight))
+	gfx.UploadUniform(textProgramID, "tex_size", float32(texSheetWidth), float32(texSheetHeight))
+	gfx.UploadUniform(textProgramID, "text_color", textColor[0], textColor[1], textColor[2], textColor[3])
 
 	backTriangles := []float32{
 		-1.0, -1.0, // bottom-left
@@ -109,18 +103,12 @@ func NewBottomBar(area *sdl.Rect, comms <-chan comms.Image, cfg *config.Config) 
 
 // SetBackgroundColor sets the color for the bottom bar's background texture
 func (bb *BottomBar) SetBackgroundColor(color []float32) {
-	uniformID := gl.GetUniformLocation(bb.backProgramID, &[]byte("uni_color\x00")[0])
-	gl.UseProgram(bb.backProgramID)
-	gl.Uniform4f(uniformID, float32(color[0]), float32(color[1]), float32(color[2]), float32(color[3]))
-	gl.UseProgram(0)
+	gfx.UploadUniform(bb.backProgramID, "uni_color", float32(color[0]), float32(color[1]), float32(color[2]), float32(color[3]))
 }
 
 // SetTextColor sets the color for the bottom bar's text elements
 func (bb *BottomBar) SetTextColor(color []float32) {
-	uniformID := gl.GetUniformLocation(bb.textProgramID, &[]byte("text_color\x00")[0])
-	gl.UseProgram(bb.textProgramID)
-	gl.Uniform4f(uniformID, float32(color[0]), float32(color[1]), float32(color[2]), float32(color[3]))
-	gl.UseProgram(0)
+	gfx.UploadUniform(bb.textProgramID, "text_color", float32(color[0]), float32(color[1]), float32(color[2]), float32(color[3]))
 }
 
 // Destroy frees all assets obtained by the ui.Component
@@ -219,10 +207,7 @@ func (bb *BottomBar) OnResize(x, y int32) {
 	bb.area.W += x
 	bb.area.Y += y
 
-	uniformID := gl.GetUniformLocation(bb.textProgramID, &[]byte("screen_size\x00")[0])
-	gl.UseProgram(bb.textProgramID)
-	gl.Uniform2f(uniformID, float32(bb.cfg.ScreenWidth), float32(bb.cfg.ScreenHeight))
-	gl.UseProgram(0)
+	gfx.UploadUniform(bb.textProgramID, "screen_size", float32(bb.cfg.ScreenWidth), float32(bb.cfg.ScreenHeight))
 }
 
 // String returns the name of the component type

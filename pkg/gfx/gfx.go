@@ -92,3 +92,29 @@ func compileShader(source string, shaderType uint32) (uint32, error) {
 
 	return shader, nil
 }
+
+// UploadUniform uploads float32 data in the given uniform variable
+// belonging to the given program ID.
+//
+// If data does not contain between 1 and 4 arguments (inclusive),
+// UploadUniform will panic.
+func UploadUniform(programID uint32, uniformName string, data ...float32) {
+	uniformID := gl.GetUniformLocation(programID, &[]byte(uniformName + "\x00")[0])
+	if uniformID == -1 {
+		log.Fatalf("\"%s\" is an invalid uniform name", uniformName)
+	}
+	gl.UseProgram(programID)
+	switch len(data) {
+	case 1:
+		gl.Uniform1f(uniformID, data[0])
+	case 2:
+		gl.Uniform2f(uniformID, data[0], data[1])
+	case 3:
+		gl.Uniform3f(uniformID, data[0], data[1], data[2])
+	case 4:
+		gl.Uniform4f(uniformID, data[0], data[1], data[2], data[3])
+	default:
+		log.Fatal("Invalid number of arguments to uploadUniform")
+	}
+	gl.UseProgram(0)
+}
