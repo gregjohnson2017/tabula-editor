@@ -2,13 +2,13 @@ package image
 
 import (
 	"fmt"
+	"image/color"
 
-	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
-// Tool defines the behavior of tools used for the image view
+// Tool defines the behavior of tools used for the image view.
 type Tool interface {
 	OnClick(evt *sdl.MouseButtonEvent, iv *View)
 	OnMotion(evt *sdl.MouseMotionEvent, iv *View)
@@ -17,18 +17,18 @@ type Tool interface {
 
 // Make sure the tools satisfy the interface
 var _ Tool = Tool(EmptyTool{})
-var _ Tool = Tool(PixelSelectionTool{})
-var _ Tool = Tool(PixelColorTool{})
+var _ Tool = Tool(&PixelSelectionTool{})
+var _ Tool = Tool(&PixelColorTool{})
 
-// EmptyTool does nothing
+// EmptyTool does nothing.
 type EmptyTool struct {
 }
 
-// OnClick does nothing
+// OnClick does nothing.
 func (t EmptyTool) OnClick(evt *sdl.MouseButtonEvent, iv *View) {
 }
 
-// OnMotion does nothing
+// OnMotion does nothing.
 func (t EmptyTool) OnMotion(evt *sdl.MouseMotionEvent, iv *View) {
 }
 
@@ -38,54 +38,59 @@ func (t EmptyTool) String() string {
 
 // PixelSelectionTool selects any clicked pixels
 type PixelSelectionTool struct {
+	lastDrag sdl.Point
 }
 
-// OnClick is called when the user clicks within the Image View's region and the tool is
-// currently active for the image view.
-func (t PixelSelectionTool) OnClick(evt *sdl.MouseButtonEvent, iv *View) {
+// OnClick is called when the user clicks within the Image View's region and the
+// tool is currently active for the image view.
+func (t *PixelSelectionTool) OnClick(evt *sdl.MouseButtonEvent, iv *View) {
 	if evt.Button == sdl.BUTTON_LEFT && evt.State == sdl.PRESSED {
-		err := iv.SelectPixel(iv.mousePix.X, iv.mousePix.Y)
-		if err != nil {
-			log.Fatal(err)
-		}
+		_ = iv.SelectPixel(iv.mousePix)
+		t.lastDrag = iv.mousePix
 	}
 }
 
-// OnMotion is called when the user clicks within the Image View's region and the tool is
-// currently active for the image view.
-func (t PixelSelectionTool) OnMotion(evt *sdl.MouseMotionEvent, iv *View) {
+// OnMotion is called when the user clicks within the Image View's region and
+// the tool is currently active for the image view.
+func (t *PixelSelectionTool) OnMotion(evt *sdl.MouseMotionEvent, iv *View) {
 	if evt.State == sdl.ButtonLMask() {
-		err := iv.SelectPixel(iv.mousePix.X, iv.mousePix.Y)
-		if err != nil {
-			log.Fatal(err)
+		points := ui.Interpolate(iv.mousePix, t.lastDrag)
+		for _, p := range points {
+			_ = iv.SelectPixel(p)
 		}
+		t.lastDrag = iv.mousePix
 	}
 }
 
-func (t PixelSelectionTool) String() string {
+func (t *PixelSelectionTool) String() string {
 	return "image.PixelSelectionTool"
 }
 
 // PixelColorTool colors any clicked pixels purple
 type PixelColorTool struct {
+	lastDrag sdl.Point
 }
 
-// OnClick is called when the user clicks within the Image View's region and the tool is
-// currently active for the image view.
-func (t PixelColorTool) OnClick(evt *sdl.MouseButtonEvent, iv *View) {
+// OnClick is called when the user clicks within the Image View's region and the
+// tool is currently active for the image view.
+func (t *PixelColorTool) OnClick(evt *sdl.MouseButtonEvent, iv *View) {
 	if evt.Button == sdl.BUTTON_LEFT && evt.State == sdl.PRESSED {
-		iv.setPixel(iv.mousePix.X, iv.mousePix.Y, []byte{0xff, 0x00, 0xff, 0xff})
+		_ = iv.setPixel(iv.mousePix, color.RGBA{R: 0xFF, G: 0x00, B: 0xFF, A: 0xFF})
+		t.lastDrag = iv.mousePix
 	}
 }
 
-// OnMotion is called when the user clicks within the Image View's region and the tool is
-// currently active for the image view.
-func (t PixelColorTool) OnMotion(evt *sdl.MouseMotionEvent, iv *View) {
-	if evt.State == sdl.ButtonLMask() && ui.InBounds(*iv.canvas, sdl.Point{X: evt.X, Y: evt.Y}) {
-		iv.setPixel(iv.mousePix.X, iv.mousePix.Y, []byte{0xff, 0x00, 0xff, 0xff})
+// OnMotion is called when the user clicks within the Image View's region and
+// the tool is currently active for the image view.
+func (t *PixelColorTool) OnMotion(evt *sdl.MouseMotionEvent, iv *View) {
+	if evt.State == sdl.ButtonLMask() {
+		for _, p := range ui.Interpolate(iv.mousePix, t.lastDrag) {
+			_ = iv.setPixel(p, color.RGBA{R: 0xFF, G: 0x00, B: 0xFF, A: 0xFF})
+		}
+		t.lastDrag = iv.mousePix
 	}
 }
 
-func (t PixelColorTool) String() string {
+func (t *PixelColorTool) String() string {
 	return "image.PixelColorTool"
 }

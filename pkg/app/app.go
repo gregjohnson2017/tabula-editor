@@ -157,14 +157,14 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 					Text: "Pixel selector",
 					Action: func() {
 						// set the image view tool to the pixel selection tool
-						go func() { toolComms <- image.PixelSelectionTool{} }()
+						go func() { toolComms <- &image.PixelSelectionTool{} }()
 					},
 				},
 				{
 					Text: "Pixel color changer",
 					Action: func() {
 						// set the image view tool to the pixel selection tool
-						go func() { toolComms <- image.PixelColorTool{} }()
+						go func() { toolComms <- &image.PixelColorTool{} }()
 					},
 				},
 			},
