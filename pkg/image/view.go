@@ -36,8 +36,8 @@ type View struct {
 	dragPoint      sdl.Point
 	dragging       bool
 	mult           float64
-	programID      uint32
-	selProgramID   uint32
+	programID      gfx.Program
+	selProgramID   gfx.Program
 	textureID      uint32
 	vaoID, vboID   uint32
 	selVao, selVbo uint32
@@ -56,7 +56,7 @@ func (iv *View) LoadFromFile(fileName string) error {
 	}
 	iv.origW = int32(width)
 	iv.origH = int32(height)
-	gfx.UploadUniform(iv.selProgramID, "origDims", float32(iv.origW), float32(iv.origH))
+	iv.selProgramID.UploadUniform("origDims", float32(iv.origW), float32(iv.origH))
 
 	format := int32(gl.RGBA)
 	gl.DeleteTextures(1, &iv.textureID)
@@ -77,7 +77,7 @@ func (iv *View) LoadFromFile(fileName string) error {
 	}
 	iv.CenterImage()
 	iv.mult = 1.0
-	gfx.UploadUniform(iv.selProgramID, "mult", float32(iv.mult))
+	iv.selProgramID.UploadUniform("mult", float32(iv.mult))
 
 	parts := strings.Split(fileName, string(os.PathSeparator))
 	iv.fileName = parts[len(parts)-1]
@@ -96,11 +96,29 @@ func NewView(area *sdl.Rect, fileName string, bbComms chan<- comms.Image, toolCo
 	iv.bbComms = bbComms
 	iv.toolComms = toolComms
 
-	if iv.programID, err = gfx.CreateShaderProgram(gfx.VertexShaderSource, gfx.CheckerShaderFragment); err != nil {
+	v1, err := gfx.NewShader(gfx.VertexShaderSource, gl.VERTEX_SHADER)
+	if err != nil {
+		return nil, err
+	}
+	f1, err := gfx.NewShader(gfx.CheckerShaderFragment, gl.FRAGMENT_SHADER)
+	if err != nil {
 		return nil, err
 	}
 
-	if iv.selProgramID, err = gfx.CreateShaderProgram(gfx.OutlineVsh, gfx.OutlineFsh); err != nil {
+	if iv.programID, err = gfx.NewProgram([]gfx.Shader{v1, f1}); err != nil {
+		return nil, err
+	}
+
+	v2, err := gfx.NewShader(gfx.OutlineVsh, gl.VERTEX_SHADER)
+	if err != nil {
+		return nil, err
+	}
+	f2, err := gfx.NewShader(gfx.OutlineFsh, gl.FRAGMENT_SHADER)
+	if err != nil {
+		return nil, err
+	}
+
+	if iv.selProgramID, err = gfx.NewProgram([]gfx.Shader{v2, f2}); err != nil {
 		return nil, err
 	}
 
@@ -108,7 +126,7 @@ func NewView(area *sdl.Rect, fileName string, bbComms chan<- comms.Image, toolCo
 		return nil, err
 	}
 
-	gfx.UploadUniform(iv.programID, "area", float32(iv.area.W), float32(iv.area.H))
+	iv.programID.UploadUniform("area", float32(iv.area.W), float32(iv.area.H))
 
 	gl.GenBuffers(1, &iv.vboID)
 	gl.GenVertexArrays(1, &iv.vaoID)
@@ -131,8 +149,8 @@ func (iv *View) Destroy() {
 	gl.DeleteVertexArrays(1, &iv.vaoID)
 	gl.DeleteBuffers(1, &iv.selVbo)
 	gl.DeleteVertexArrays(1, &iv.selVao)
-	gl.DeleteProgram(iv.programID)
-	gl.DeleteProgram(iv.selProgramID)
+	iv.programID.Delete()
+	iv.selProgramID.Delete()
 }
 
 // InBoundary returns whether a point is in this ui.Component's bounds
@@ -207,7 +225,7 @@ func (iv *View) Render() {
 	// gl viewport x,y is bottom left
 	gl.Viewport(iv.area.X, iv.cfg.ScreenHeight-iv.area.H-iv.area.Y, iv.area.W, iv.area.H)
 	// draw image
-	gl.UseProgram(iv.programID)
+	iv.programID.Bind()
 
 	gl.BindVertexArray(iv.vaoID)
 	gl.EnableVertexAttribArray(0)
@@ -219,9 +237,11 @@ func (iv *View) Render() {
 	gl.DisableVertexAttribArray(1)
 	gl.BindVertexArray(0)
 
+	iv.programID.Unbind()
+
 	// draw selection outlines
 	gl.Viewport(iv.area.X+iv.canvas.X, iv.cfg.ScreenHeight-iv.area.Y-iv.canvas.Y-iv.canvas.H, iv.canvas.W, iv.canvas.H)
-	gl.UseProgram(iv.selProgramID)
+	iv.selProgramID.Bind()
 
 	gl.BindVertexArray(iv.selVao)
 	gl.EnableVertexAttribArray(0)
@@ -229,7 +249,7 @@ func (iv *View) Render() {
 	gl.DisableVertexAttribArray(0)
 	gl.BindVertexArray(0)
 
-	gl.UseProgram(0)
+	iv.selProgramID.Unbind()
 
 	select {
 	case tool := <-iv.toolComms:
@@ -246,8 +266,7 @@ func (iv *View) zoomIn() {
 	iv.canvas.H = int32(float64(iv.origH) * iv.mult)
 	iv.canvas.X = 2*iv.canvas.X - int32(math.Round(float64(iv.area.W)/2.0)) //iv.mouseLoc.x
 	iv.canvas.Y = 2*iv.canvas.Y - int32(math.Round(float64(iv.area.H)/2.0)) //iv.mouseLoc.y
-
-	gfx.UploadUniform(iv.selProgramID, "mult", float32(iv.mult))
+	iv.selProgramID.UploadUniform("mult", float32(iv.mult))
 }
 
 func (iv *View) zoomOut() {
@@ -256,8 +275,7 @@ func (iv *View) zoomOut() {
 	iv.canvas.H = int32(float64(iv.origH) * iv.mult)
 	iv.canvas.X = int32(math.Round(float64(iv.canvas.X)/2.0 + float64(iv.area.W)/4.0)) //iv.mouseLoc.x/2
 	iv.canvas.Y = int32(math.Round(float64(iv.canvas.Y)/2.0 + float64(iv.area.H)/4.0)) //iv.mouseLoc.y/2
-
-	gfx.UploadUniform(iv.selProgramID, "mult", float32(iv.mult))
+	iv.selProgramID.UploadUniform("mult", float32(iv.mult))
 }
 
 func (iv *View) CenterImage() {
@@ -365,8 +383,7 @@ func (iv *View) OnClick(evt *sdl.MouseButtonEvent) bool {
 func (iv *View) OnResize(x, y int32) {
 	iv.area.W += x
 	iv.area.H += y
-
-	gfx.UploadUniform(iv.programID, "area", float32(iv.area.W), float32(iv.area.H))
+	iv.programID.UploadUniform("area", float32(iv.area.W), float32(iv.area.H))
 
 	iv.CenterImage()
 }
