@@ -17,16 +17,16 @@ var _ ui.Component = ui.Component(&BottomBar{})
 
 // BottomBar defines a solid color bar with text displays
 type BottomBar struct {
-	area          *sdl.Rect
-	comms         <-chan comms.Image
-	backProgramID gfx.Program
-	textProgramID gfx.Program
-	backVaoID     uint32
-	backVboID     uint32
-	textVaoID     uint32
-	textVboID     uint32
-	fontInfo      font.Info
-	cfg           *config.Config
+	area        *sdl.Rect
+	comms       <-chan comms.Image
+	backProgram gfx.Program
+	textProgram gfx.Program
+	backVaoID   uint32
+	backVboID   uint32
+	textVaoID   uint32
+	textVboID   uint32
+	fontInfo    font.Info
+	cfg         *config.Config
 }
 
 // NewBottomBar returns a pointer to a new BottomBar struct that implements ui.Component
@@ -42,7 +42,7 @@ func NewBottomBar(area *sdl.Rect, comms <-chan comms.Image, cfg *config.Config) 
 	if err != nil {
 		return nil, err
 	}
-	backProgramID, err := gfx.NewProgram([]gfx.Shader{v1, f1})
+	backProgram, err := gfx.NewProgram([]gfx.Shader{v1, f1})
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +54,7 @@ func NewBottomBar(area *sdl.Rect, comms <-chan comms.Image, cfg *config.Config) 
 	if err != nil {
 		return nil, err
 	}
-	textProgramID, err := gfx.NewProgram([]gfx.Shader{v2, f2})
+	textProgram, err := gfx.NewProgram([]gfx.Shader{v2, f2})
 	if err != nil {
 		return nil, err
 	}
@@ -67,17 +67,11 @@ func NewBottomBar(area *sdl.Rect, comms <-chan comms.Image, cfg *config.Config) 
 	barColor := [4]float32{0.5, 0.5, 0.5, 1.0}
 	textColor := [4]float32{1.0, 1.0, 1.0, 1.0}
 
-	backProgramID.UploadUniform("uni_color", barColor[0], barColor[1], barColor[2], barColor[3])
+	backProgram.UploadUniform("uni_color", barColor[0], barColor[1], barColor[2], barColor[3])
 
-	var texSheetWidth, texSheetHeight int32
-	gl.BindTexture(gl.TEXTURE_2D, fnt.TextureID())
-	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_WIDTH, &texSheetWidth)
-	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_HEIGHT, &texSheetHeight)
-	gl.BindTexture(gl.TEXTURE_2D, 0)
-
-	textProgramID.UploadUniform("screen_size", float32(cfg.ScreenWidth), float32(cfg.ScreenHeight))
-	textProgramID.UploadUniform("tex_size", float32(texSheetWidth), float32(texSheetHeight))
-	textProgramID.UploadUniform("text_color", textColor[0], textColor[1], textColor[2], textColor[3])
+	textProgram.UploadUniform("screen_size", float32(cfg.ScreenWidth), float32(cfg.ScreenHeight))
+	textProgram.UploadUniform("tex_size", float32(fnt.GetTexture().GetWidth()), float32(fnt.GetTexture().GetHeight()))
+	textProgram.UploadUniform("text_color", textColor[0], textColor[1], textColor[2], textColor[3])
 
 	backTriangles := []float32{
 		-1.0, -1.0, // bottom-left
@@ -105,27 +99,27 @@ func NewBottomBar(area *sdl.Rect, comms <-chan comms.Image, cfg *config.Config) 
 	gl.UseProgram(0)
 
 	return &BottomBar{
-		area:          area,
-		comms:         comms,
-		backProgramID: backProgramID,
-		textProgramID: textProgramID,
-		backVaoID:     backVaoID,
-		backVboID:     backVboID,
-		textVaoID:     textVaoID,
-		textVboID:     textVboID,
-		fontInfo:      fnt,
-		cfg:           cfg,
+		area:        area,
+		comms:       comms,
+		backProgram: backProgram,
+		textProgram: textProgram,
+		backVaoID:   backVaoID,
+		backVboID:   backVboID,
+		textVaoID:   textVaoID,
+		textVboID:   textVboID,
+		fontInfo:    fnt,
+		cfg:         cfg,
 	}, nil
 }
 
 // SetBackgroundColor sets the color for the bottom bar's background texture
 func (bb *BottomBar) SetBackgroundColor(color []float32) {
-	bb.backProgramID.UploadUniform("uni_color", float32(color[0]), float32(color[1]), float32(color[2]), float32(color[3]))
+	bb.backProgram.UploadUniform("uni_color", float32(color[0]), float32(color[1]), float32(color[2]), float32(color[3]))
 }
 
 // SetTextColor sets the color for the bottom bar's text elements
 func (bb *BottomBar) SetTextColor(color []float32) {
-	bb.textProgramID.UploadUniform("text_color", float32(color[0]), float32(color[1]), float32(color[2]), float32(color[3]))
+	bb.textProgram.UploadUniform("text_color", float32(color[0]), float32(color[1]), float32(color[2]), float32(color[3]))
 }
 
 // Destroy frees all assets obtained by the ui.Component
@@ -148,7 +142,7 @@ func (bb *BottomBar) Render() {
 
 	// first render solid color background
 	gl.Viewport(bb.area.X, 0, bb.area.W, bb.area.H)
-	bb.backProgramID.Bind()
+	bb.backProgram.Bind()
 
 	gl.BindVertexArray(bb.backVaoID)
 	gl.EnableVertexAttribArray(0)
@@ -156,7 +150,7 @@ func (bb *BottomBar) Render() {
 	gl.DisableVertexAttribArray(0)
 	gl.BindVertexArray(0)
 
-	bb.backProgramID.Unbind()
+	bb.backProgram.Unbind()
 
 	// second render text on top
 	// TODO optimize rendering by no-oping if string hasn't changed (or window size)
@@ -179,24 +173,24 @@ func (bb *BottomBar) Render() {
 	triangles = append(triangles, mousePixTriangles...)
 
 	gl.Viewport(0, 0, bb.cfg.ScreenWidth, bb.cfg.ScreenHeight)
-	bb.textProgramID.Bind()
+	bb.textProgram.Bind()
 
 	gl.BindBuffer(gl.ARRAY_BUFFER, bb.textVboID)
 	gl.BindVertexArray(bb.textVaoID)
 	gl.EnableVertexAttribArray(0)
 	gl.EnableVertexAttribArray(1)
-	gl.BindTexture(gl.TEXTURE_2D, bb.fontInfo.TextureID())
+	bb.fontInfo.GetTexture().Bind()
 
 	gl.BufferData(gl.ARRAY_BUFFER, 4*len(triangles), gl.Ptr(&triangles[0]), gl.STATIC_DRAW)
 	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(triangles)/4))
 
-	gl.BindTexture(gl.TEXTURE_2D, 0)
+	bb.fontInfo.GetTexture().Unbind()
 	gl.DisableVertexAttribArray(0)
 	gl.DisableVertexAttribArray(1)
 	gl.BindVertexArray(0)
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 
-	bb.textProgramID.Unbind()
+	bb.textProgram.Unbind()
 	sw.StopRecordAverage(bb.String() + ".Render")
 }
 
@@ -226,7 +220,7 @@ func (bb *BottomBar) OnResize(x, y int32) {
 	bb.area.W += x
 	bb.area.Y += y
 
-	bb.textProgramID.UploadUniform("screen_size", float32(bb.cfg.ScreenWidth), float32(bb.cfg.ScreenHeight))
+	bb.textProgram.UploadUniform("screen_size", float32(bb.cfg.ScreenWidth), float32(bb.cfg.ScreenHeight))
 }
 
 // String returns the name of the component type
