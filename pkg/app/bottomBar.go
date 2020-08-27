@@ -8,6 +8,7 @@ import (
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
 	"github.com/gregjohnson2017/tabula-editor/pkg/font"
 	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
+	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/gregjohnson2017/tabula-editor/pkg/util"
 	"github.com/veandco/go-sdl2/sdl"
@@ -23,8 +24,7 @@ type BottomBar struct {
 	textProgram gfx.Program
 	backVaoID   uint32
 	backVboID   uint32
-	textVaoID   uint32
-	textVboID   uint32
+	textBA      *gfx.BufferArray
 	fontInfo    font.Info
 	cfg         *config.Config
 }
@@ -91,10 +91,7 @@ func NewBottomBar(area *sdl.Rect, comms <-chan comms.Image, cfg *config.Config) 
 	gl.BufferData(gl.ARRAY_BUFFER, 4*len(backTriangles), gl.Ptr(&backTriangles[0]), gl.STATIC_DRAW)
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 
-	var textVaoID, textVboID uint32
-	gl.GenVertexArrays(1, &textVaoID)
-	gl.GenBuffers(1, &textVboID)
-	gfx.ConfigureVAO(textVaoID, textVboID, []int32{2, 2})
+	textBA := gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2})
 
 	gl.UseProgram(0)
 
@@ -105,8 +102,7 @@ func NewBottomBar(area *sdl.Rect, comms <-chan comms.Image, cfg *config.Config) 
 		textProgram: textProgram,
 		backVaoID:   backVaoID,
 		backVboID:   backVboID,
-		textVaoID:   textVaoID,
-		textVboID:   textVboID,
+		textBA:      textBA,
 		fontInfo:    fnt,
 		cfg:         cfg,
 	}, nil
@@ -125,9 +121,8 @@ func (bb *BottomBar) SetTextColor(color []float32) {
 // Destroy frees all assets obtained by the ui.Component
 func (bb *BottomBar) Destroy() {
 	gl.DeleteBuffers(1, &bb.backVboID)
-	gl.DeleteBuffers(1, &bb.textVboID)
 	gl.DeleteVertexArrays(1, &bb.backVaoID)
-	gl.DeleteVertexArrays(1, &bb.textVaoID)
+	bb.textBA.Destroy()
 }
 
 // InBoundary returns whether a point is in this ui.Component's bounds
@@ -175,20 +170,18 @@ func (bb *BottomBar) Render() {
 	gl.Viewport(0, 0, bb.cfg.ScreenWidth, bb.cfg.ScreenHeight)
 	bb.textProgram.Bind()
 
-	gl.BindBuffer(gl.ARRAY_BUFFER, bb.textVboID)
-	gl.BindVertexArray(bb.textVaoID)
-	gl.EnableVertexAttribArray(0)
-	gl.EnableVertexAttribArray(1)
+	bb.textBA.Bind()
 	bb.fontInfo.GetTexture().Bind()
 
-	gl.BufferData(gl.ARRAY_BUFFER, 4*len(triangles), gl.Ptr(&triangles[0]), gl.STATIC_DRAW)
-	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(triangles)/4))
+	err := bb.textBA.Load(triangles, gl.STATIC_DRAW)
+	if err != nil {
+		log.Warnf("failed to load bottom bar text triangles: %v", err)
+	} else {
+		bb.textBA.Draw()
+	}
 
 	bb.fontInfo.GetTexture().Unbind()
-	gl.DisableVertexAttribArray(0)
-	gl.DisableVertexAttribArray(1)
-	gl.BindVertexArray(0)
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
+	bb.textBA.Unbind()
 
 	bb.textProgram.Unbind()
 	sw.StopRecordAverage(bb.String() + ".Render")
