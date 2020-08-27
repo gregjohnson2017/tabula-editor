@@ -26,26 +26,26 @@ var _ ui.Component = ui.Component(&View{})
 
 // View defines an interactable image viewing pane
 type View struct {
-	area           *sdl.Rect
-	canvas         *sdl.Rect
-	origW, origH   int32
-	cfg            *config.Config
-	mouseLoc       sdl.Point
-	mousePix       sdl.Point
-	dragPoint      sdl.Point
-	dragging       bool
-	mult           float64
-	program        gfx.Program
-	selProgram     gfx.Program
-	texture        gfx.Texture
-	vaoID, vboID   uint32
-	selVao, selVbo uint32
-	bbComms        chan<- comms.Image
-	fileName       string
-	fullPath       string
-	toolComms      <-chan Tool
-	activeTool     Tool
-	selection      set.Set
+	area         *sdl.Rect
+	canvas       *sdl.Rect
+	origW, origH int32
+	cfg          *config.Config
+	mouseLoc     sdl.Point
+	mousePix     sdl.Point
+	dragPoint    sdl.Point
+	dragging     bool
+	mult         float64
+	program      gfx.Program
+	selProgram   gfx.Program
+	texture      gfx.Texture
+	imgBuf       *gfx.BufferArray
+	selBuf       *gfx.BufferArray
+	bbComms      chan<- comms.Image
+	fileName     string
+	fullPath     string
+	toolComms    <-chan Tool
+	activeTool   Tool
+	selection    set.Set
 }
 
 func (iv *View) LoadFromFile(fileName string) error {
@@ -120,13 +120,10 @@ func NewView(area *sdl.Rect, fileName string, bbComms chan<- comms.Image, toolCo
 
 	iv.program.UploadUniform("area", float32(iv.area.W), float32(iv.area.H))
 
-	gl.GenBuffers(1, &iv.vboID)
-	gl.GenVertexArrays(1, &iv.vaoID)
-	gfx.ConfigureVAO(iv.vaoID, iv.vboID, []int32{2, 2})
-
-	gl.GenBuffers(1, &iv.selVbo)
-	gl.GenVertexArrays(1, &iv.selVao)
-	gfx.ConfigureVAO(iv.selVao, iv.selVbo, []int32{2})
+	// layout: (x,y s,t)
+	iv.imgBuf = gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2})
+	// layout: (x,y)
+	iv.selBuf = gfx.NewBufferArray(gl.LINES, []int32{2})
 
 	iv.selection = set.NewSet()
 	iv.activeTool = EmptyTool{}
@@ -137,10 +134,8 @@ func NewView(area *sdl.Rect, fileName string, bbComms chan<- comms.Image, toolCo
 // Destroy frees all assets acquired by the ui.Component
 func (iv *View) Destroy() {
 	iv.texture.Delete()
-	gl.DeleteBuffers(1, &iv.vboID)
-	gl.DeleteVertexArrays(1, &iv.vaoID)
-	gl.DeleteBuffers(1, &iv.selVbo)
-	gl.DeleteVertexArrays(1, &iv.selVao)
+	iv.imgBuf.Destroy()
+	iv.selBuf.Destroy()
 	iv.program.Delete()
 	iv.selProgram.Delete()
 }
@@ -190,9 +185,10 @@ func (iv *View) Render() {
 	swl.StopRecordAverage(iv.String() + ".SelLines")
 
 	if len(lines) > 0 {
-		gl.BindBuffer(gl.ARRAY_BUFFER, iv.selVbo)
-		gl.BufferData(gl.ARRAY_BUFFER, 4*len(lines), gl.Ptr(&lines[0]), gl.STATIC_DRAW)
-		gl.BindBuffer(gl.ARRAY_BUFFER, 0)
+		err := iv.selBuf.Load(lines, gl.STATIC_DRAW)
+		if err != nil {
+			log.Warnf("failed to load image selection lines: %v", err)
+		}
 	}
 
 	// update triangles that represent the position and scale of the image (these are SDL/window coordinates, converted to -1,1 gl space coordinates in the vertex shader)
@@ -210,37 +206,25 @@ func (iv *View) Render() {
 		brx, bry, 1.0, 1.0, // bottom-right
 	}
 
-	gl.BindBuffer(gl.ARRAY_BUFFER, iv.vboID)
-	gl.BufferData(gl.ARRAY_BUFFER, 4*len(triangles), gl.Ptr(&triangles[0]), gl.STATIC_DRAW)
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
+	err := iv.imgBuf.Load(triangles, gl.STATIC_DRAW)
+	if err != nil {
+		log.Warnf("failed to load image triangles: %v", err)
+	}
 
 	// gl viewport x,y is bottom left
 	gl.Viewport(iv.area.X, iv.cfg.ScreenHeight-iv.area.H-iv.area.Y, iv.area.W, iv.area.H)
 	// draw image
 	iv.program.Bind()
-
-	gl.BindVertexArray(iv.vaoID)
-	gl.EnableVertexAttribArray(0)
-	gl.EnableVertexAttribArray(1)
 	iv.texture.Bind()
-	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(triangles)/4))
+	iv.imgBuf.Draw()
 	iv.texture.Unbind()
-	gl.DisableVertexAttribArray(0)
-	gl.DisableVertexAttribArray(1)
-	gl.BindVertexArray(0)
-
 	iv.program.Unbind()
 
 	// draw selection outlines
 	gl.Viewport(iv.area.X+iv.canvas.X, iv.cfg.ScreenHeight-iv.area.Y-iv.canvas.Y-iv.canvas.H, iv.canvas.W, iv.canvas.H)
+
 	iv.selProgram.Bind()
-
-	gl.BindVertexArray(iv.selVao)
-	gl.EnableVertexAttribArray(0)
-	gl.DrawArrays(gl.LINES, 0, int32(len(lines)/2))
-	gl.DisableVertexAttribArray(0)
-	gl.BindVertexArray(0)
-
+	iv.selBuf.Draw()
 	iv.selProgram.Unbind()
 
 	select {

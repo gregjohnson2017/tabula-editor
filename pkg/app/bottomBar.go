@@ -22,8 +22,8 @@ type BottomBar struct {
 	comms       <-chan comms.Image
 	backProgram gfx.Program
 	textProgram gfx.Program
-	backBA      *gfx.BufferArray
-	textBA      *gfx.BufferArray
+	backBuf     *gfx.BufferArray
+	textBuf     *gfx.BufferArray
 	fontInfo    font.Info
 	cfg         *config.Config
 }
@@ -82,16 +82,14 @@ func NewBottomBar(area *sdl.Rect, comms <-chan comms.Image, cfg *config.Config) 
 		+1.0, -1.0, // bottom-right
 	}
 
-	backBA := gfx.NewBufferArray(gl.TRIANGLES, []int32{2})
+	backBuf := gfx.NewBufferArray(gl.TRIANGLES, []int32{2})
 
-	backBA.Bind()
-	err = backBA.Load(backTriangles, gl.STATIC_DRAW)
+	err = backBuf.Load(backTriangles, gl.STATIC_DRAW)
 	if err != nil {
 		log.Warnf("failed to load bottom bar background triangles: %v", err)
 	}
-	backBA.Unbind()
 
-	textBA := gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2})
+	textBuf := gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2})
 
 	gl.UseProgram(0)
 
@@ -100,8 +98,8 @@ func NewBottomBar(area *sdl.Rect, comms <-chan comms.Image, cfg *config.Config) 
 		comms:       comms,
 		backProgram: backProgram,
 		textProgram: textProgram,
-		backBA:      backBA,
-		textBA:      textBA,
+		backBuf:     backBuf,
+		textBuf:     textBuf,
 		fontInfo:    fnt,
 		cfg:         cfg,
 	}, nil
@@ -119,8 +117,8 @@ func (bb *BottomBar) SetTextColor(color []float32) {
 
 // Destroy frees all assets obtained by the ui.Component
 func (bb *BottomBar) Destroy() {
-	bb.backBA.Destroy()
-	bb.textBA.Destroy()
+	bb.backBuf.Destroy()
+	bb.textBuf.Destroy()
 }
 
 // InBoundary returns whether a point is in this ui.Component's bounds
@@ -136,11 +134,7 @@ func (bb *BottomBar) Render() {
 	// first render solid color background
 	gl.Viewport(bb.area.X, 0, bb.area.W, bb.area.H)
 	bb.backProgram.Bind()
-
-	bb.backBA.Bind()
-	bb.backBA.Draw()
-	bb.backBA.Unbind()
-
+	bb.backBuf.Draw()
 	bb.backProgram.Unbind()
 
 	// second render text on top
@@ -165,21 +159,18 @@ func (bb *BottomBar) Render() {
 
 	gl.Viewport(0, 0, bb.cfg.ScreenWidth, bb.cfg.ScreenHeight)
 	bb.textProgram.Bind()
-
-	bb.textBA.Bind()
 	bb.fontInfo.GetTexture().Bind()
 
-	err := bb.textBA.Load(triangles, gl.STATIC_DRAW)
+	err := bb.textBuf.Load(triangles, gl.STATIC_DRAW)
 	if err != nil {
 		log.Warnf("failed to load bottom bar text triangles: %v", err)
 	} else {
-		bb.textBA.Draw()
+		bb.textBuf.Draw()
 	}
 
 	bb.fontInfo.GetTexture().Unbind()
-	bb.textBA.Unbind()
-
 	bb.textProgram.Unbind()
+
 	sw.StopRecordAverage(bb.String() + ".Render")
 }
 

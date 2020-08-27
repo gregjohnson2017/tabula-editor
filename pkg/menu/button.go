@@ -5,6 +5,7 @@ import (
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
 	"github.com/gregjohnson2017/tabula-editor/pkg/font"
 	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
+	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/gregjohnson2017/tabula-editor/pkg/util"
 	"github.com/veandco/go-sdl2/sdl"
@@ -21,10 +22,8 @@ type Button struct {
 	strTriangles       []float32
 	backProgram        gfx.Program
 	textProgram        gfx.Program
-	backVaoID          uint32
-	backVboID          uint32
-	textVaoID          uint32
-	textVboID          uint32
+	backBuf            *gfx.BufferArray
+	textBuf            *gfx.BufferArray
 	fontInfo           font.Info
 	text               string
 	pressed            bool
@@ -38,7 +37,6 @@ var _ ui.Component = ui.Component(&Button{})
 // defaultColor and highlightColor default to light grey (0xD6CFCFFF) and blue (0X0046AFFF) respectively, if nil
 func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (*Button, error) {
 	var err error
-
 	v1, err := gfx.NewShader(gfx.SolidColorVertex, gl.VERTEX_SHADER)
 	if err != nil {
 		return nil, err
@@ -76,13 +74,6 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 	textColor := [4]float32{0.0, 0.0, 0.0, 1.0}
 
 	backProgram.UploadUniform("uni_color", backColor[0], backColor[1], backColor[2], backColor[3])
-
-	// var texSheetWidth, texSheetHeight int32
-	// gl.BindTexture(gl.TEXTURE_2D, fnt.TextureID())
-	// gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_WIDTH, &texSheetWidth)
-	// gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_HEIGHT, &texSheetHeight)
-	// gl.BindTexture(gl.TEXTURE_2D, 0)
-
 	textProgram.UploadUniform("screen_size", float32(cfg.ScreenWidth), float32(cfg.ScreenHeight))
 	textProgram.UploadUniform("tex_size", float32(fnt.GetTexture().GetWidth()),
 		float32(fnt.GetTexture().GetHeight()))
@@ -101,23 +92,17 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 	align := ui.Align{V: ui.AlignMiddle, H: ui.AlignCenter}
 	textTriangles := font.MapString(text, fnt, pos, align)
 
-	var backVaoID, backVboID uint32
-	gl.GenVertexArrays(1, &backVaoID)
-	gl.GenBuffers(1, &backVboID)
-	gfx.ConfigureVAO(backVaoID, backVboID, []int32{2})
-	gl.BindBuffer(gl.ARRAY_BUFFER, backVboID)
-	gl.BufferData(gl.ARRAY_BUFFER, 4*len(backTriangles), gl.Ptr(&backTriangles[0]), gl.STATIC_DRAW)
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
+	backBuf := gfx.NewBufferArray(gl.TRIANGLES, []int32{2})
+	err = backBuf.Load(backTriangles, gl.STATIC_DRAW)
+	if err != nil {
+		log.Warnf("failed to load button background triangles: %v", err)
+	}
 
-	var textVaoID, textVboID uint32
-	gl.GenVertexArrays(1, &textVaoID)
-	gl.GenBuffers(1, &textVboID)
-	gfx.ConfigureVAO(textVaoID, textVboID, []int32{2, 2})
-	gl.BindBuffer(gl.ARRAY_BUFFER, textVboID)
-	gl.BufferData(gl.ARRAY_BUFFER, 4*len(textTriangles), gl.Ptr(&textTriangles[0]), gl.STATIC_DRAW)
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
-
-	gl.UseProgram(0)
+	textBuf := gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2})
+	err = textBuf.Load(textTriangles, gl.STATIC_DRAW)
+	if err != nil {
+		log.Warnf("failed to load button text triangles: %v", err)
+	}
 
 	if action == nil {
 		action = func() {}
@@ -132,10 +117,8 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 		strTriangles:       textTriangles,
 		backProgram:        backProgram,
 		textProgram:        textProgram,
-		backVaoID:          backVaoID,
-		backVboID:          backVboID,
-		textVaoID:          textVaoID,
-		textVboID:          textVboID,
+		backBuf:            backBuf,
+		textBuf:            textBuf,
 		fontInfo:           fnt,
 		text:               text,
 		cfg:                cfg,
@@ -169,10 +152,8 @@ func (b *Button) SetHighlightTextColor(color [4]float32) {
 
 // Destroy frees all assets obtained by the ui.Component
 func (b *Button) Destroy() {
-	gl.DeleteBuffers(1, &b.backVboID)
-	gl.DeleteBuffers(1, &b.textVboID)
-	gl.DeleteVertexArrays(1, &b.backVaoID)
-	gl.DeleteVertexArrays(1, &b.textVaoID)
+	b.backBuf.Destroy()
+	b.textBuf.Destroy()
 }
 
 // InBoundary returns whether a point is in this ui.Component's bounds
@@ -183,37 +164,21 @@ func (b *Button) InBoundary(pt sdl.Point) bool {
 // Render draws the ui.Component
 func (b *Button) Render() {
 	sw := util.Start()
+
 	// render solid color background
 	gl.Viewport(b.area.X, b.cfg.ScreenHeight-b.area.Y-b.area.H, b.area.W, b.area.H)
 	b.backProgram.Bind()
-
-	gl.BindVertexArray(b.backVaoID)
-	gl.EnableVertexAttribArray(0)
-
-	gl.DrawArrays(gl.TRIANGLES, 0, 6) // always 6 vertices for background rectangle
-
-	gl.DisableVertexAttribArray(0)
-	gl.BindVertexArray(0)
-
+	b.backBuf.Draw()
 	b.backProgram.Unbind()
+
 	// render text on top
 	gl.Viewport(0, 0, b.cfg.ScreenWidth, b.cfg.ScreenHeight)
 	b.textProgram.Bind()
-	gl.BindBuffer(gl.ARRAY_BUFFER, b.textVboID)
-	gl.BindVertexArray(b.textVaoID)
-	gl.EnableVertexAttribArray(0)
-	gl.EnableVertexAttribArray(1)
 	b.fontInfo.GetTexture().Bind()
-
-	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(b.strTriangles)/4))
-
+	b.textBuf.Draw()
 	b.fontInfo.GetTexture().Unbind()
-	gl.DisableVertexAttribArray(0)
-	gl.DisableVertexAttribArray(1)
-	gl.BindVertexArray(0)
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
-
 	b.textProgram.Unbind()
+
 	sw.StopRecordAverage(b.String() + ".Render")
 }
 
@@ -264,10 +229,10 @@ func (b *Button) OnResize(x, y int32) {
 	pos := sdl.Point{X: b.area.X + b.area.W/2, Y: b.cfg.ScreenHeight - b.area.Y - b.area.H/2}
 	align := ui.Align{V: ui.AlignMiddle, H: ui.AlignCenter}
 	textTriangles := font.MapString(b.text, b.fontInfo, pos, align)
-	gl.BindBuffer(gl.ARRAY_BUFFER, b.textVboID)
-	gl.BufferData(gl.ARRAY_BUFFER, 4*len(textTriangles), gl.Ptr(&textTriangles[0]), gl.STATIC_DRAW)
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
-
+	err := b.textBuf.Load(textTriangles, gl.STATIC_DRAW)
+	if err != nil {
+		log.Warnf("failed to load button text triangles: %v", err)
+	}
 }
 
 // String  returns the name of the component type
