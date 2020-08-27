@@ -10,6 +10,7 @@ type BufferArray struct {
 	vaoID uint32
 	vboID uint32
 	mode  uint32
+	size  int32
 	data  []float32
 }
 
@@ -22,7 +23,11 @@ func NewBufferArray(mode uint32, layout []int32) *BufferArray {
 	gl.GenVertexArrays(1, &vaoID)
 	gl.GenBuffers(1, &vboID)
 	ConfigureVAO(vaoID, vboID, layout)
-	return &BufferArray{vaoID, vboID, mode, nil}
+	var size int32
+	for _, i := range layout {
+		size += i
+	}
+	return &BufferArray{vaoID, vboID, mode, size, nil}
 }
 
 // Bind binds its GL primitives. This is required for Load and Draw.
@@ -57,7 +62,7 @@ func (ts *BufferArray) Load(data []float32, usage uint32) error {
 
 // Draw renders the shapes from previously loaded data.
 func (ts *BufferArray) Draw() {
-	gl.DrawArrays(ts.mode, 0, int32(len(ts.data)/4))
+	gl.DrawArrays(ts.mode, 0, int32(len(ts.data))/ts.size)
 }
 
 // Destroy frees the resources.
