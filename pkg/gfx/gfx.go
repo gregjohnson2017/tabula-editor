@@ -8,6 +8,7 @@ import (
 
 // ConfigureVAO configures a VAO & VBO pair with a specified vertex layout
 // example vertex layout: (x,y,z, s,t) -> layout = (3, 2)
+// TODO move to NewBufferArray
 func ConfigureVAO(vaoID uint32, vboID uint32, layout []int32) {
 	gl.BindBuffer(gl.ARRAY_BUFFER, vboID)
 	gl.BindVertexArray(vaoID)
