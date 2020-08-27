@@ -22,8 +22,7 @@ type BottomBar struct {
 	comms       <-chan comms.Image
 	backProgram gfx.Program
 	textProgram gfx.Program
-	backVaoID   uint32
-	backVboID   uint32
+	backBA      *gfx.BufferArray
 	textBA      *gfx.BufferArray
 	fontInfo    font.Info
 	cfg         *config.Config
@@ -83,13 +82,14 @@ func NewBottomBar(area *sdl.Rect, comms <-chan comms.Image, cfg *config.Config) 
 		+1.0, -1.0, // bottom-right
 	}
 
-	var backVaoID, backVboID uint32
-	gl.GenVertexArrays(1, &backVaoID)
-	gl.GenBuffers(1, &backVboID)
-	gfx.ConfigureVAO(backVaoID, backVboID, []int32{2})
-	gl.BindBuffer(gl.ARRAY_BUFFER, backVboID)
-	gl.BufferData(gl.ARRAY_BUFFER, 4*len(backTriangles), gl.Ptr(&backTriangles[0]), gl.STATIC_DRAW)
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
+	backBA := gfx.NewBufferArray(gl.TRIANGLES, []int32{2})
+
+	backBA.Bind()
+	err = backBA.Load(backTriangles, gl.STATIC_DRAW)
+	if err != nil {
+		log.Warnf("failed to load bottom bar background triangles: %v", err)
+	}
+	backBA.Unbind()
 
 	textBA := gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2})
 
@@ -100,8 +100,7 @@ func NewBottomBar(area *sdl.Rect, comms <-chan comms.Image, cfg *config.Config) 
 		comms:       comms,
 		backProgram: backProgram,
 		textProgram: textProgram,
-		backVaoID:   backVaoID,
-		backVboID:   backVboID,
+		backBA:      backBA,
 		textBA:      textBA,
 		fontInfo:    fnt,
 		cfg:         cfg,
@@ -120,8 +119,7 @@ func (bb *BottomBar) SetTextColor(color []float32) {
 
 // Destroy frees all assets obtained by the ui.Component
 func (bb *BottomBar) Destroy() {
-	gl.DeleteBuffers(1, &bb.backVboID)
-	gl.DeleteVertexArrays(1, &bb.backVaoID)
+	bb.backBA.Destroy()
 	bb.textBA.Destroy()
 }
 
@@ -139,11 +137,9 @@ func (bb *BottomBar) Render() {
 	gl.Viewport(bb.area.X, 0, bb.area.W, bb.area.H)
 	bb.backProgram.Bind()
 
-	gl.BindVertexArray(bb.backVaoID)
-	gl.EnableVertexAttribArray(0)
-	gl.DrawArrays(gl.TRIANGLES, 0, 6) // always 6 vertices for background rectangle
-	gl.DisableVertexAttribArray(0)
-	gl.BindVertexArray(0)
+	bb.backBA.Bind()
+	bb.backBA.Draw()
+	bb.backBA.Unbind()
 
 	bb.backProgram.Unbind()
 
