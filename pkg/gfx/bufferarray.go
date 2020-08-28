@@ -27,15 +27,14 @@ func NewBufferArray(mode uint32, layout []int32) *BufferArray {
 	gl.GenBuffers(1, &vboID)
 	configureVAO(vaoID, vboID, layout)
 	var vertSize int32
-	for _, i := range layout {
-		vertSize += i
+	for _, s := range layout {
+		vertSize += s
 	}
 	return &BufferArray{vaoID, vboID, mode, vertSize, uint32(len(layout)), nil}
 }
 
 // configureVAO configures a VAO & VBO pair with a specified vertex layout
 // example vertex layout: (x,y,z, s,t) -> layout = (3, 2)
-// TODO move to NewBufferArray
 func configureVAO(vaoID uint32, vboID uint32, layout []int32) {
 	gl.BindBuffer(gl.ARRAY_BUFFER, vboID)
 	gl.BindVertexArray(vaoID)
