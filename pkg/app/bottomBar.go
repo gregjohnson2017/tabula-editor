@@ -91,8 +91,6 @@ func NewBottomBar(area *sdl.Rect, comms <-chan comms.Image, cfg *config.Config) 
 
 	textBuf := gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2})
 
-	gl.UseProgram(0)
-
 	return &BottomBar{
 		area:        area,
 		comms:       comms,
