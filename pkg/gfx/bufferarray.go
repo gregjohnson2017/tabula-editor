@@ -38,6 +38,7 @@ func NewBufferArray(mode uint32, layout []int32) *BufferArray {
 func configureVAO(vaoID uint32, vboID uint32, layout []int32) {
 	gl.BindBuffer(gl.ARRAY_BUFFER, vboID)
 	gl.BindVertexArray(vaoID)
+
 	var vertexSize int32
 	for i := 0; i < len(layout); i++ {
 		vertexSize += layout[i]
@@ -51,8 +52,8 @@ func configureVAO(vaoID uint32, vboID uint32, layout []int32) {
 		offset += layout[i]
 	}
 
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 	gl.BindVertexArray(0)
+	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 }
 
 // ErrEmptyData indiciates that the given data is empty.
