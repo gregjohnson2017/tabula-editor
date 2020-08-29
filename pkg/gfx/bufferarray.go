@@ -25,27 +25,23 @@ func NewBufferArray(mode uint32, layout []int32) *BufferArray {
 	var vaoID, vboID uint32
 	gl.GenVertexArrays(1, &vaoID)
 	gl.GenBuffers(1, &vboID)
-	configureVAO(vaoID, vboID, layout)
 	var vertSize int32
 	for _, s := range layout {
 		vertSize += s
 	}
+	configureVAO(vaoID, vboID, layout, vertSize)
 	return &BufferArray{vaoID, vboID, mode, vertSize, uint32(len(layout)), nil}
 }
 
 // configureVAO configures a VAO & VBO pair with a specified vertex layout
 // example vertex layout: (x,y,z, s,t) -> layout = (3, 2)
-func configureVAO(vaoID uint32, vboID uint32, layout []int32) {
+func configureVAO(vaoID uint32, vboID uint32, layout []int32, vertSize int32) {
 	gl.BindBuffer(gl.ARRAY_BUFFER, vboID)
 	gl.BindVertexArray(vaoID)
 
-	var vertexSize int32
-	for i := 0; i < len(layout); i++ {
-		vertexSize += layout[i]
-	}
 	// calculate vertex size in bytes
 	// ex: (x,y,z,s,t) -> 5*4 = 20 bytes
-	vertexStride := vertexSize * 4
+	vertexStride := vertSize * 4
 	var offset int32
 	for i := 0; i < len(layout); i++ {
 		gl.VertexAttribPointer(uint32(i), layout[i], gl.FLOAT, false, vertexStride, unsafe.Pointer(uintptr(offset*4)))
