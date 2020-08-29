@@ -49,7 +49,7 @@ type View struct {
 }
 
 func (iv *View) LoadFromFile(fileName string) error {
-	iv.texture.Delete() // clear old texture data before loading new
+	iv.texture.Destroy() // clear old texture data before loading new
 
 	tex, err := gfx.NewTextureFromFile(fileName)
 	if err != nil {
@@ -133,11 +133,11 @@ func NewView(area *sdl.Rect, fileName string, bbComms chan<- comms.Image, toolCo
 
 // Destroy frees all assets acquired by the ui.Component
 func (iv *View) Destroy() {
-	iv.texture.Delete()
+	iv.texture.Destroy()
 	iv.imgBuf.Destroy()
 	iv.selBuf.Destroy()
-	iv.program.Delete()
-	iv.selProgram.Delete()
+	iv.program.Destroy()
+	iv.selProgram.Destroy()
 }
 
 // InBoundary returns whether a point is in this ui.Component's bounds

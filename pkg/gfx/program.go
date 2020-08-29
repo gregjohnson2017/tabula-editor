@@ -75,6 +75,6 @@ func (p Program) Unbind() {
 }
 
 // Delete tells OpenGL to delete the program ID
-func (p Program) Delete() {
+func (p Program) Destroy() {
 	gl.DeleteProgram(p.id)
 }

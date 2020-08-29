@@ -124,6 +124,6 @@ func (t Texture) GetHeight() int32 {
 	return t.height
 }
 
-func (t Texture) Delete() {
+func (t Texture) Destroy() {
 	gl.DeleteTextures(1, &t.id)
 }
