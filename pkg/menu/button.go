@@ -46,7 +46,7 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 		return nil, err
 	}
 
-	backProgram, err := gfx.NewProgram([]gfx.Shader{v1, f1})
+	backProgram, err := gfx.NewProgram(v1, f1)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +60,7 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 		return nil, err
 	}
 
-	textProgram, err := gfx.NewProgram([]gfx.Shader{v2, f2})
+	textProgram, err := gfx.NewProgram(v2, f2)
 	if err != nil {
 		return nil, err
 	}

@@ -16,7 +16,7 @@ const ErrProgramLink log.ConstErr = "failed to compile shader"
 
 // CreateShaderProgram compiles a vertex and fragment shader,
 // attaches them to a new shader program and returns its ID.
-func NewProgram(shaders []Shader) (Program, error) {
+func NewProgram(shaders ...Shader) (Program, error) {
 	prog := gl.CreateProgram()
 	for _, shader := range shaders {
 		gl.AttachShader(prog, shader.id)

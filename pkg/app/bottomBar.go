@@ -41,7 +41,7 @@ func NewBottomBar(area *sdl.Rect, comms <-chan comms.Image, cfg *config.Config) 
 	if err != nil {
 		return nil, err
 	}
-	backProgram, err := gfx.NewProgram([]gfx.Shader{v1, f1})
+	backProgram, err := gfx.NewProgram(v1, f1)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func NewBottomBar(area *sdl.Rect, comms <-chan comms.Image, cfg *config.Config) 
 	if err != nil {
 		return nil, err
 	}
-	textProgram, err := gfx.NewProgram([]gfx.Shader{v2, f2})
+	textProgram, err := gfx.NewProgram(v2, f2)
 	if err != nil {
 		return nil, err
 	}
