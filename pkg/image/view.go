@@ -97,7 +97,7 @@ func NewView(area *sdl.Rect, fileName string, bbComms chan<- comms.Image, toolCo
 		return nil, err
 	}
 
-	if iv.program, err = gfx.NewProgram([]gfx.Shader{v1, f1}); err != nil {
+	if iv.program, err = gfx.NewProgram(v1, f1); err != nil {
 		return nil, err
 	}
 
@@ -110,7 +110,7 @@ func NewView(area *sdl.Rect, fileName string, bbComms chan<- comms.Image, toolCo
 		return nil, err
 	}
 
-	if iv.selProgram, err = gfx.NewProgram([]gfx.Shader{v2, f2}); err != nil {
+	if iv.selProgram, err = gfx.NewProgram(v2, f2); err != nil {
 		return nil, err
 	}
 
