@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"unsafe"
 
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/comms"
@@ -27,47 +26,40 @@ var _ ui.Component = ui.Component(&View{})
 
 // View defines an interactable image viewing pane
 type View struct {
-	area           *sdl.Rect
-	canvas         *sdl.Rect
-	origW, origH   int32
-	cfg            *config.Config
-	mouseLoc       sdl.Point
-	mousePix       sdl.Point
-	dragPoint      sdl.Point
-	dragging       bool
-	mult           float64
-	programID      uint32
-	selProgramID   uint32
-	textureID      uint32
-	vaoID, vboID   uint32
-	selVao, selVbo uint32
-	bbComms        chan<- comms.Image
-	fileName       string
-	fullPath       string
-	toolComms      <-chan Tool
-	activeTool     Tool
-	selection      set.Set
+	area         *sdl.Rect
+	canvas       *sdl.Rect
+	origW, origH int32
+	cfg          *config.Config
+	mouseLoc     sdl.Point
+	mousePix     sdl.Point
+	dragPoint    sdl.Point
+	dragging     bool
+	mult         float64
+	program      gfx.Program
+	selProgram   gfx.Program
+	texture      gfx.Texture
+	imgBuf       *gfx.BufferArray
+	selBuf       *gfx.BufferArray
+	bbComms      chan<- comms.Image
+	fileName     string
+	fullPath     string
+	toolComms    <-chan Tool
+	activeTool   Tool
+	selection    set.Set
 }
 
 func (iv *View) LoadFromFile(fileName string) error {
-	width, height, data, err := loadImage(fileName)
+	iv.texture.Destroy() // clear old texture data before loading new
+
+	tex, err := gfx.NewTextureFromFile(fileName)
 	if err != nil {
 		return err
 	}
-	iv.origW = int32(width)
-	iv.origH = int32(height)
-	gfx.UploadUniform(iv.selProgramID, "origDims", float32(iv.origW), float32(iv.origH))
+	iv.texture = tex
+	iv.origW = int32(tex.GetWidth())
+	iv.origH = int32(tex.GetHeight())
 
-	format := int32(gl.RGBA)
-	gl.DeleteTextures(1, &iv.textureID)
-	gl.GenTextures(1, &iv.textureID)
-	gl.BindTexture(gl.TEXTURE_2D, iv.textureID)
-	// copy pixels to texture
-	gl.TexImage2D(gl.TEXTURE_2D, 0, format, iv.origW, iv.origH, 0, uint32(format), gl.UNSIGNED_BYTE, unsafe.Pointer(&data[0]))
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
-	gl.GenerateMipmap(gl.TEXTURE_2D)
-	gl.BindTexture(gl.TEXTURE_2D, 0)
+	iv.selProgram.UploadUniform("origDims", float32(iv.origW), float32(iv.origH))
 
 	iv.canvas = &sdl.Rect{
 		X: 0,
@@ -77,7 +69,7 @@ func (iv *View) LoadFromFile(fileName string) error {
 	}
 	iv.CenterImage()
 	iv.mult = 1.0
-	gfx.UploadUniform(iv.selProgramID, "mult", float32(iv.mult))
+	iv.selProgram.UploadUniform("mult", float32(iv.mult))
 
 	parts := strings.Split(fileName, string(os.PathSeparator))
 	iv.fileName = parts[len(parts)-1]
@@ -96,11 +88,29 @@ func NewView(area *sdl.Rect, fileName string, bbComms chan<- comms.Image, toolCo
 	iv.bbComms = bbComms
 	iv.toolComms = toolComms
 
-	if iv.programID, err = gfx.CreateShaderProgram(gfx.VertexShaderSource, gfx.CheckerShaderFragment); err != nil {
+	v1, err := gfx.NewShader(gfx.VertexShaderSource, gl.VERTEX_SHADER)
+	if err != nil {
+		return nil, err
+	}
+	f1, err := gfx.NewShader(gfx.CheckerShaderFragment, gl.FRAGMENT_SHADER)
+	if err != nil {
 		return nil, err
 	}
 
-	if iv.selProgramID, err = gfx.CreateShaderProgram(gfx.OutlineVsh, gfx.OutlineFsh); err != nil {
+	if iv.program, err = gfx.NewProgram(v1, f1); err != nil {
+		return nil, err
+	}
+
+	v2, err := gfx.NewShader(gfx.OutlineVsh, gl.VERTEX_SHADER)
+	if err != nil {
+		return nil, err
+	}
+	f2, err := gfx.NewShader(gfx.OutlineFsh, gl.FRAGMENT_SHADER)
+	if err != nil {
+		return nil, err
+	}
+
+	if iv.selProgram, err = gfx.NewProgram(v2, f2); err != nil {
 		return nil, err
 	}
 
@@ -108,15 +118,12 @@ func NewView(area *sdl.Rect, fileName string, bbComms chan<- comms.Image, toolCo
 		return nil, err
 	}
 
-	gfx.UploadUniform(iv.programID, "area", float32(iv.area.W), float32(iv.area.H))
+	iv.program.UploadUniform("area", float32(iv.area.W), float32(iv.area.H))
 
-	gl.GenBuffers(1, &iv.vboID)
-	gl.GenVertexArrays(1, &iv.vaoID)
-	gfx.ConfigureVAO(iv.vaoID, iv.vboID, []int32{2, 2})
-
-	gl.GenBuffers(1, &iv.selVbo)
-	gl.GenVertexArrays(1, &iv.selVao)
-	gfx.ConfigureVAO(iv.selVao, iv.selVbo, []int32{2})
+	// layout: (x,y s,t)
+	iv.imgBuf = gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2})
+	// layout: (x,y)
+	iv.selBuf = gfx.NewBufferArray(gl.LINES, []int32{2})
 
 	iv.selection = set.NewSet()
 	iv.activeTool = EmptyTool{}
@@ -126,13 +133,11 @@ func NewView(area *sdl.Rect, fileName string, bbComms chan<- comms.Image, toolCo
 
 // Destroy frees all assets acquired by the ui.Component
 func (iv *View) Destroy() {
-	gl.DeleteTextures(1, &iv.textureID)
-	gl.DeleteBuffers(1, &iv.vboID)
-	gl.DeleteVertexArrays(1, &iv.vaoID)
-	gl.DeleteBuffers(1, &iv.selVbo)
-	gl.DeleteVertexArrays(1, &iv.selVao)
-	gl.DeleteProgram(iv.programID)
-	gl.DeleteProgram(iv.selProgramID)
+	iv.texture.Destroy()
+	iv.imgBuf.Destroy()
+	iv.selBuf.Destroy()
+	iv.program.Destroy()
+	iv.selProgram.Destroy()
 }
 
 // InBoundary returns whether a point is in this ui.Component's bounds
@@ -180,9 +185,10 @@ func (iv *View) Render() {
 	swl.StopRecordAverage(iv.String() + ".SelLines")
 
 	if len(lines) > 0 {
-		gl.BindBuffer(gl.ARRAY_BUFFER, iv.selVbo)
-		gl.BufferData(gl.ARRAY_BUFFER, 4*len(lines), gl.Ptr(&lines[0]), gl.STATIC_DRAW)
-		gl.BindBuffer(gl.ARRAY_BUFFER, 0)
+		err := iv.selBuf.Load(lines, gl.STATIC_DRAW)
+		if err != nil {
+			log.Warnf("failed to load image selection lines: %v", err)
+		}
 	}
 
 	// update triangles that represent the position and scale of the image (these are SDL/window coordinates, converted to -1,1 gl space coordinates in the vertex shader)
@@ -200,36 +206,26 @@ func (iv *View) Render() {
 		brx, bry, 1.0, 1.0, // bottom-right
 	}
 
-	gl.BindBuffer(gl.ARRAY_BUFFER, iv.vboID)
-	gl.BufferData(gl.ARRAY_BUFFER, 4*len(triangles), gl.Ptr(&triangles[0]), gl.STATIC_DRAW)
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
+	err := iv.imgBuf.Load(triangles, gl.STATIC_DRAW)
+	if err != nil {
+		log.Warnf("failed to load image triangles: %v", err)
+	}
 
 	// gl viewport x,y is bottom left
 	gl.Viewport(iv.area.X, iv.cfg.ScreenHeight-iv.area.H-iv.area.Y, iv.area.W, iv.area.H)
 	// draw image
-	gl.UseProgram(iv.programID)
-
-	gl.BindVertexArray(iv.vaoID)
-	gl.EnableVertexAttribArray(0)
-	gl.EnableVertexAttribArray(1)
-	gl.BindTexture(gl.TEXTURE_2D, iv.textureID)
-	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(triangles)/4))
-	gl.BindTexture(gl.TEXTURE_2D, 0)
-	gl.DisableVertexAttribArray(0)
-	gl.DisableVertexAttribArray(1)
-	gl.BindVertexArray(0)
+	iv.program.Bind()
+	iv.texture.Bind()
+	iv.imgBuf.Draw()
+	iv.texture.Unbind()
+	iv.program.Unbind()
 
 	// draw selection outlines
 	gl.Viewport(iv.area.X+iv.canvas.X, iv.cfg.ScreenHeight-iv.area.Y-iv.canvas.Y-iv.canvas.H, iv.canvas.W, iv.canvas.H)
-	gl.UseProgram(iv.selProgramID)
 
-	gl.BindVertexArray(iv.selVao)
-	gl.EnableVertexAttribArray(0)
-	gl.DrawArrays(gl.LINES, 0, int32(len(lines)/2))
-	gl.DisableVertexAttribArray(0)
-	gl.BindVertexArray(0)
-
-	gl.UseProgram(0)
+	iv.selProgram.Bind()
+	iv.selBuf.Draw()
+	iv.selProgram.Unbind()
 
 	select {
 	case tool := <-iv.toolComms:
@@ -246,8 +242,7 @@ func (iv *View) zoomIn() {
 	iv.canvas.H = int32(float64(iv.origH) * iv.mult)
 	iv.canvas.X = 2*iv.canvas.X - int32(math.Round(float64(iv.area.W)/2.0)) //iv.mouseLoc.x
 	iv.canvas.Y = 2*iv.canvas.Y - int32(math.Round(float64(iv.area.H)/2.0)) //iv.mouseLoc.y
-
-	gfx.UploadUniform(iv.selProgramID, "mult", float32(iv.mult))
+	iv.selProgram.UploadUniform("mult", float32(iv.mult))
 }
 
 func (iv *View) zoomOut() {
@@ -256,8 +251,7 @@ func (iv *View) zoomOut() {
 	iv.canvas.H = int32(float64(iv.origH) * iv.mult)
 	iv.canvas.X = int32(math.Round(float64(iv.canvas.X)/2.0 + float64(iv.area.W)/4.0)) //iv.mouseLoc.x/2
 	iv.canvas.Y = int32(math.Round(float64(iv.canvas.Y)/2.0 + float64(iv.area.H)/4.0)) //iv.mouseLoc.y/2
-
-	gfx.UploadUniform(iv.selProgramID, "mult", float32(iv.mult))
+	iv.selProgram.UploadUniform("mult", float32(iv.mult))
 }
 
 func (iv *View) CenterImage() {
@@ -266,18 +260,7 @@ func (iv *View) CenterImage() {
 }
 
 func (iv *View) setPixel(p sdl.Point, col color.RGBA) error {
-	if p.X < 0 || p.Y < 0 || p.X >= iv.origW || p.Y >= iv.origH {
-		return fmt.Errorf("setPixel(%v, %v): %w", p.X, p.Y, ErrCoordOutOfRange)
-	}
-	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 4)
-	gl.TextureSubImage2D(iv.textureID, 0, p.X, p.Y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, unsafe.Pointer(&col))
-	// TODO update mipmap textures only when needed
-	gl.BindTexture(gl.TEXTURE_2D, iv.textureID)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
-	gl.GenerateMipmap(gl.TEXTURE_2D)
-	gl.BindTexture(gl.TEXTURE_2D, 0)
-	return nil
+	return iv.texture.SetPixel(p, col)
 }
 
 func (iv *View) updateMousePos(x, y int32) {
@@ -365,8 +348,7 @@ func (iv *View) OnClick(evt *sdl.MouseButtonEvent) bool {
 func (iv *View) OnResize(x, y int32) {
 	iv.area.W += x
 	iv.area.H += y
-
-	gfx.UploadUniform(iv.programID, "area", float32(iv.area.W), float32(iv.area.H))
+	iv.program.UploadUniform("area", float32(iv.area.W), float32(iv.area.H))
 
 	iv.CenterImage()
 }
@@ -376,61 +358,15 @@ func (iv *View) String() string {
 	return "image.View"
 }
 
-func loadImage(fileName string) (width, height int, data []byte, err error) {
-	in, err := os.Open(fileName)
-	if err != nil {
-		return 0, 0, nil, err
-	}
-	defer in.Close()
-
-	img, _, err := image.Decode(in)
-	if err != nil {
-		return 0, 0, nil, err
-	}
-	// TODO load from underlying arrays directly and correctly format in OpenGL
-	// switch img.(type) {
-	// case *image.Alpha:
-	// case *image.Alpha16:
-	// case *image.CMYK:
-	// case *image.Gray:
-	// case *image.Gray16:
-	// case *image.NRGBA:
-	// case *image.NRGBA64:
-	// case *image.Paletted:
-	// case *image.RGBA:
-	// case *image.RGBA64:
-	// case *image.YCbCr, *image.NYCbCrA, *image.Uniform:
-	// 	// no Pix array
-	// }
-	width = img.Bounds().Dx()
-	height = img.Bounds().Dy()
-	data = make([]byte, 0, width*height*4)
-	for j := 0; j < height; j++ {
-		for i := 0; i < width; i++ {
-			col := color.NRGBAModel.Convert(img.At(i, j))
-			nrgba := col.(color.NRGBA)
-			r, g, b, a := nrgba.R, nrgba.G, nrgba.B, nrgba.A
-			data = append(data, r, g, b, a)
-		}
-	}
-	return width, height, data, nil
-}
-
 // ErrWriteFormat indicates that an unsupported image format was trying to be written to
 const ErrWriteFormat log.ConstErr = "unsupported image format"
 
 // WriteToFile writes the image data stored in the OpenGL texture to a file specified by fileName
 func (iv *View) WriteToFile(fileName string) error {
-	var texWidth, texHeight int32
-	gl.BindTexture(gl.TEXTURE_2D, iv.textureID)
-	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_WIDTH, &texWidth)
-	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_HEIGHT, &texHeight)
-	// TODO do this in batches to avoid memory limitations
-	var data = make([]byte, texWidth*texHeight*4)
-	gl.GetTexImage(gl.TEXTURE_2D, 0, gl.RGBA, gl.UNSIGNED_BYTE, unsafe.Pointer(&data[0]))
-	gl.BindTexture(gl.TEXTURE_2D, 0)
+	data := iv.texture.GetTextureData()
 
-	img := image.NewNRGBA(image.Rect(0, 0, int(texWidth), int(texHeight)))
+	img := image.NewNRGBA(image.Rect(0, 0, int(iv.texture.GetWidth()),
+		int(iv.texture.GetHeight())))
 	copy(img.Pix, data)
 	out, err := os.Create(fileName)
 	if err != nil {

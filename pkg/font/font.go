@@ -10,10 +10,10 @@ import (
 	"os"
 	"time"
 	"unicode"
-	"unsafe"
 
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/golang/freetype/truetype"
+	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
 	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/gregjohnson2017/tabula-editor/pkg/util"
@@ -168,9 +168,9 @@ type fontKey struct {
 }
 
 type Info struct {
-	textureID uint32     // OpenGL texture ID of cached glyph data
-	runeMap   []runeInfo // map of character-specific spacing info
-	metrics   metrics
+	texture gfx.Texture // texture of cached glyph data
+	runeMap []runeInfo  // map of character-specific spacing info
+	metrics metrics
 }
 
 type metrics struct {
@@ -182,8 +182,8 @@ type metrics struct {
 	CaretSlope image.Point
 }
 
-func (i Info) TextureID() uint32 {
-	return i.textureID
+func (i Info) GetTexture() gfx.Texture {
+	return i.texture
 }
 
 // TODO save cached fonts to local direct
@@ -300,14 +300,12 @@ func LoadFontTexture(fontName string, fontSize int32) (Info, error) {
 	// writeFontToFile(fontName+"-"+strconv.Itoa(int(fontSize))+"-texture.png", glyphBytes, int(texWidth), int(texHeight))
 
 	// pass glyphBytes to OpenGL texture
-	var fontTextureID uint32
-	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 1) // Disable byte-alignment restriction
-	gl.GenTextures(1, &fontTextureID)
-	gl.BindTexture(gl.TEXTURE_2D, fontTextureID)
-	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RED, texWidth, texHeight, 0, uint32(gl.RED), gl.UNSIGNED_BYTE, unsafe.Pointer(&glyphBytes[0]))
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
-	gl.BindTexture(gl.TEXTURE_2D, 0)
+	fontTexture, err := gfx.NewTexture(texWidth, texHeight, glyphBytes, gl.RED, 1)
+	if err != nil {
+		return Info{}, err
+	}
+	fontTexture.SetParameter(gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+	fontTexture.SetParameter(gl.TEXTURE_MAG_FILTER, gl.NEAREST)
 
 	otfFace, err := opentype.NewFace(sfntFont, &opentype.FaceOptions{
 		Size:    float64(fontSize),
@@ -328,7 +326,7 @@ func LoadFontTexture(fontName string, fontSize int32) (Info, error) {
 	}
 
 	log.Perff("Loaded %v at size %v:\t%v", fontName, fontSize, time.Duration(int64(time.Nanosecond)*sw.StopGetNano()))
-	InfoLoaded := Info{fontTextureID, runeMap[:], metrics}
+	InfoLoaded := Info{fontTexture, runeMap[:], metrics}
 	fontMap[fontKey{fontName, fontSize}] = InfoLoaded
 	return InfoLoaded, nil
 }

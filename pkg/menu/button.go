@@ -5,6 +5,7 @@ import (
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
 	"github.com/gregjohnson2017/tabula-editor/pkg/font"
 	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
+	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/gregjohnson2017/tabula-editor/pkg/util"
 	"github.com/veandco/go-sdl2/sdl"
@@ -19,12 +20,10 @@ type Button struct {
 	defaultTextColor   [4]float32
 	highlightTextColor [4]float32
 	strTriangles       []float32
-	backProgramID      uint32
-	textProgramID      uint32
-	backVaoID          uint32
-	backVboID          uint32
-	textVaoID          uint32
-	textVboID          uint32
+	backProgram        gfx.Program
+	textProgram        gfx.Program
+	backBuf            *gfx.BufferArray
+	textBuf            *gfx.BufferArray
 	fontInfo           font.Info
 	text               string
 	pressed            bool
@@ -38,12 +37,31 @@ var _ ui.Component = ui.Component(&Button{})
 // defaultColor and highlightColor default to light grey (0xD6CFCFFF) and blue (0X0046AFFF) respectively, if nil
 func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (*Button, error) {
 	var err error
-	var backProgramID uint32
-	if backProgramID, err = gfx.CreateShaderProgram(gfx.SolidColorVertex, gfx.SolidColorFragment); err != nil {
+	v1, err := gfx.NewShader(gfx.SolidColorVertex, gl.VERTEX_SHADER)
+	if err != nil {
 		return nil, err
 	}
-	var textProgramID uint32
-	if textProgramID, err = gfx.CreateShaderProgram(gfx.GlyphShaderVertex, gfx.GlyphShaderFragment); err != nil {
+	f1, err := gfx.NewShader(gfx.SolidColorFragment, gl.FRAGMENT_SHADER)
+	if err != nil {
+		return nil, err
+	}
+
+	backProgram, err := gfx.NewProgram(v1, f1)
+	if err != nil {
+		return nil, err
+	}
+
+	v2, err := gfx.NewShader(gfx.GlyphShaderVertex, gl.VERTEX_SHADER)
+	if err != nil {
+		return nil, err
+	}
+	f2, err := gfx.NewShader(gfx.GlyphShaderFragment, gl.FRAGMENT_SHADER)
+	if err != nil {
+		return nil, err
+	}
+
+	textProgram, err := gfx.NewProgram(v2, f2)
+	if err != nil {
 		return nil, err
 	}
 
@@ -55,17 +73,11 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 	backColor := [4]float32{0.8392, 0.8118, 0.8118, 1.0}
 	textColor := [4]float32{0.0, 0.0, 0.0, 1.0}
 
-	gfx.UploadUniform(backProgramID, "uni_color", backColor[0], backColor[1], backColor[2], backColor[3])
-
-	var texSheetWidth, texSheetHeight int32
-	gl.BindTexture(gl.TEXTURE_2D, fnt.TextureID())
-	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_WIDTH, &texSheetWidth)
-	gl.GetTexLevelParameteriv(gl.TEXTURE_2D, 0, gl.TEXTURE_HEIGHT, &texSheetHeight)
-	gl.BindTexture(gl.TEXTURE_2D, 0)
-
-	gfx.UploadUniform(textProgramID, "screen_size", float32(cfg.ScreenWidth), float32(cfg.ScreenHeight))
-	gfx.UploadUniform(textProgramID, "tex_size", float32(texSheetWidth), float32(texSheetHeight))
-	gfx.UploadUniform(textProgramID, "text_color", textColor[0], textColor[1], textColor[2], textColor[3])
+	backProgram.UploadUniform("uni_color", backColor[0], backColor[1], backColor[2], backColor[3])
+	textProgram.UploadUniform("screen_size", float32(cfg.ScreenWidth), float32(cfg.ScreenHeight))
+	textProgram.UploadUniform("tex_size", float32(fnt.GetTexture().GetWidth()),
+		float32(fnt.GetTexture().GetHeight()))
+	textProgram.UploadUniform("text_color", textColor[0], textColor[1], textColor[2], textColor[3])
 
 	backTriangles := []float32{
 		-1.0, -1.0, // bottom-left
@@ -80,23 +92,17 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 	align := ui.Align{V: ui.AlignMiddle, H: ui.AlignCenter}
 	textTriangles := font.MapString(text, fnt, pos, align)
 
-	var backVaoID, backVboID uint32
-	gl.GenVertexArrays(1, &backVaoID)
-	gl.GenBuffers(1, &backVboID)
-	gfx.ConfigureVAO(backVaoID, backVboID, []int32{2})
-	gl.BindBuffer(gl.ARRAY_BUFFER, backVboID)
-	gl.BufferData(gl.ARRAY_BUFFER, 4*len(backTriangles), gl.Ptr(&backTriangles[0]), gl.STATIC_DRAW)
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
+	backBuf := gfx.NewBufferArray(gl.TRIANGLES, []int32{2})
+	err = backBuf.Load(backTriangles, gl.STATIC_DRAW)
+	if err != nil {
+		log.Warnf("failed to load button background triangles: %v", err)
+	}
 
-	var textVaoID, textVboID uint32
-	gl.GenVertexArrays(1, &textVaoID)
-	gl.GenBuffers(1, &textVboID)
-	gfx.ConfigureVAO(textVaoID, textVboID, []int32{2, 2})
-	gl.BindBuffer(gl.ARRAY_BUFFER, textVboID)
-	gl.BufferData(gl.ARRAY_BUFFER, 4*len(textTriangles), gl.Ptr(&textTriangles[0]), gl.STATIC_DRAW)
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
-
-	gl.UseProgram(0)
+	textBuf := gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2})
+	err = textBuf.Load(textTriangles, gl.STATIC_DRAW)
+	if err != nil {
+		log.Warnf("failed to load button text triangles: %v", err)
+	}
 
 	if action == nil {
 		action = func() {}
@@ -109,12 +115,10 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 		defaultTextColor:   textColor,
 		highlightTextColor: [4]float32{1.0, 1.0, 1.0, 1.0},
 		strTriangles:       textTriangles,
-		backProgramID:      backProgramID,
-		textProgramID:      textProgramID,
-		backVaoID:          backVaoID,
-		backVboID:          backVboID,
-		textVaoID:          textVaoID,
-		textVboID:          textVboID,
+		backProgram:        backProgram,
+		textProgram:        textProgram,
+		backBuf:            backBuf,
+		textBuf:            textBuf,
 		fontInfo:           fnt,
 		text:               text,
 		cfg:                cfg,
@@ -127,7 +131,7 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 // SetDefaultBackgroundColor changes the default background color
 func (b *Button) SetDefaultBackgroundColor(color [4]float32) {
 	b.defaultBackColor = color
-	gfx.UploadUniform(b.backProgramID, "text_color", b.defaultBackColor[0], b.defaultBackColor[1], b.defaultBackColor[2], b.defaultBackColor[3])
+	b.backProgram.UploadUniform("text_color", b.defaultBackColor[0], b.defaultBackColor[1], b.defaultBackColor[2], b.defaultBackColor[3])
 }
 
 // SetHighlightBackgroundColor changes the highlight background color
@@ -138,7 +142,7 @@ func (b *Button) SetHighlightBackgroundColor(color [4]float32) {
 // SetDefaultTextColor changes the default text color
 func (b *Button) SetDefaultTextColor(color [4]float32) {
 	b.defaultTextColor = color
-	gfx.UploadUniform(b.textProgramID, "text_color", b.defaultTextColor[0], b.defaultTextColor[1], b.defaultTextColor[2], b.defaultTextColor[3])
+	b.textProgram.UploadUniform("text_color", b.defaultTextColor[0], b.defaultTextColor[1], b.defaultTextColor[2], b.defaultTextColor[3])
 }
 
 // SetHighlightTextColor changes the highlight text color
@@ -148,10 +152,8 @@ func (b *Button) SetHighlightTextColor(color [4]float32) {
 
 // Destroy frees all assets obtained by the ui.Component
 func (b *Button) Destroy() {
-	gl.DeleteBuffers(1, &b.backVboID)
-	gl.DeleteBuffers(1, &b.textVboID)
-	gl.DeleteVertexArrays(1, &b.backVaoID)
-	gl.DeleteVertexArrays(1, &b.textVaoID)
+	b.backBuf.Destroy()
+	b.textBuf.Destroy()
 }
 
 // InBoundary returns whether a point is in this ui.Component's bounds
@@ -162,36 +164,21 @@ func (b *Button) InBoundary(pt sdl.Point) bool {
 // Render draws the ui.Component
 func (b *Button) Render() {
 	sw := util.Start()
+
 	// render solid color background
 	gl.Viewport(b.area.X, b.cfg.ScreenHeight-b.area.Y-b.area.H, b.area.W, b.area.H)
-	gl.UseProgram(b.backProgramID)
-
-	gl.BindVertexArray(b.backVaoID)
-	gl.EnableVertexAttribArray(0)
-
-	gl.DrawArrays(gl.TRIANGLES, 0, 6) // always 6 vertices for background rectangle
-
-	gl.DisableVertexAttribArray(0)
-	gl.BindVertexArray(0)
+	b.backProgram.Bind()
+	b.backBuf.Draw()
+	b.backProgram.Unbind()
 
 	// render text on top
 	gl.Viewport(0, 0, b.cfg.ScreenWidth, b.cfg.ScreenHeight)
-	gl.UseProgram(b.textProgramID)
-	gl.BindBuffer(gl.ARRAY_BUFFER, b.textVboID)
-	gl.BindVertexArray(b.textVaoID)
-	gl.EnableVertexAttribArray(0)
-	gl.EnableVertexAttribArray(1)
-	gl.BindTexture(gl.TEXTURE_2D, b.fontInfo.TextureID())
+	b.textProgram.Bind()
+	b.fontInfo.GetTexture().Bind()
+	b.textBuf.Draw()
+	b.fontInfo.GetTexture().Unbind()
+	b.textProgram.Unbind()
 
-	gl.DrawArrays(gl.TRIANGLES, 0, int32(len(b.strTriangles)/4))
-
-	gl.BindTexture(gl.TEXTURE_2D, 0)
-	gl.DisableVertexAttribArray(0)
-	gl.DisableVertexAttribArray(1)
-	gl.BindVertexArray(0)
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
-
-	gl.UseProgram(0)
 	sw.StopRecordAverage(b.String() + ".Render")
 }
 
@@ -199,9 +186,9 @@ func (b *Button) Render() {
 func (b *Button) OnEnter() {
 	b.hovering = true
 
-	gfx.UploadUniform(b.backProgramID, "uni_color", b.highlightBackColor[0], b.highlightBackColor[1], b.highlightBackColor[2], b.highlightBackColor[3])
+	b.backProgram.UploadUniform("uni_color", b.highlightBackColor[0], b.highlightBackColor[1], b.highlightBackColor[2], b.highlightBackColor[3])
 
-	gfx.UploadUniform(b.textProgramID, "text_color", b.highlightTextColor[0], b.highlightTextColor[1], b.highlightTextColor[2], b.highlightTextColor[3])
+	b.textProgram.UploadUniform("text_color", b.highlightTextColor[0], b.highlightTextColor[1], b.highlightTextColor[2], b.highlightTextColor[3])
 }
 
 // OnLeave is called when the cursor leaves the ui.Component's region
@@ -209,8 +196,8 @@ func (b *Button) OnLeave() {
 	b.hovering = false
 	b.pressed = false
 
-	gfx.UploadUniform(b.backProgramID, "uni_color", b.defaultBackColor[0], b.defaultBackColor[1], b.defaultBackColor[2], b.defaultBackColor[3])
-	gfx.UploadUniform(b.textProgramID, "text_color", b.defaultTextColor[0], b.defaultTextColor[1], b.defaultTextColor[2], b.defaultTextColor[3])
+	b.backProgram.UploadUniform("uni_color", b.defaultBackColor[0], b.defaultBackColor[1], b.defaultBackColor[2], b.defaultBackColor[3])
+	b.textProgram.UploadUniform("text_color", b.defaultTextColor[0], b.defaultTextColor[1], b.defaultTextColor[2], b.defaultTextColor[3])
 }
 
 // OnMotion is called when the cursor moves within the ui.Component's region
@@ -237,15 +224,15 @@ func (b *Button) OnClick(evt *sdl.MouseButtonEvent) bool {
 // OnResize is called when the user resizes the window
 func (b *Button) OnResize(x, y int32) {
 	// recompute text triangles
-	gfx.UploadUniform(b.textProgramID, "screen_size", float32(b.cfg.ScreenWidth), float32(b.cfg.ScreenHeight))
+	b.textProgram.UploadUniform("screen_size", float32(b.cfg.ScreenWidth), float32(b.cfg.ScreenHeight))
 
 	pos := sdl.Point{X: b.area.X + b.area.W/2, Y: b.cfg.ScreenHeight - b.area.Y - b.area.H/2}
 	align := ui.Align{V: ui.AlignMiddle, H: ui.AlignCenter}
 	textTriangles := font.MapString(b.text, b.fontInfo, pos, align)
-	gl.BindBuffer(gl.ARRAY_BUFFER, b.textVboID)
-	gl.BufferData(gl.ARRAY_BUFFER, 4*len(textTriangles), gl.Ptr(&textTriangles[0]), gl.STATIC_DRAW)
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
-
+	err := b.textBuf.Load(textTriangles, gl.STATIC_DRAW)
+	if err != nil {
+		log.Warnf("failed to load button text triangles: %v", err)
+	}
 }
 
 // String  returns the name of the component type
