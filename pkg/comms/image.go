@@ -7,5 +7,5 @@ import (
 type Image struct {
 	FileName string
 	MousePix sdl.Point
-	Mult     float64
+	Mult     int32
 }

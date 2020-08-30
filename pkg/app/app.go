@@ -6,6 +6,7 @@ import (
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/comms"
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
+	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
 	"github.com/gregjohnson2017/tabula-editor/pkg/image"
 	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/gregjohnson2017/tabula-editor/pkg/menu"
@@ -38,7 +39,7 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 		}
 	}
 
-	imageViewArea := &sdl.Rect{
+	imageViewArea := sdl.Rect{
 		X: 0,
 		Y: 0,
 		W: cfg.ScreenWidth,
@@ -61,10 +62,16 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 	toolComms := make(chan image.Tool)
 	actionComms := make(chan func())
 
-	iv, err := image.NewView(imageViewArea, fileName, bottomBarComms, toolComms, cfg)
+	iv, err := image.NewView(imageViewArea, bottomBarComms, toolComms, cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
+	tex, err := gfx.NewTextureFromFile(fileName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	iv.AddLayer(tex)
+
 	bottomBar, err := NewBottomBar(bottomBarArea, bottomBarComms, cfg)
 	if err != nil {
 		log.Fatal(err)
@@ -72,7 +79,7 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 	centerButton, err := menu.NewButton(buttonAreaCenter, cfg, "Center Image", func() {
 		go func() {
 			actionComms <- func() {
-				iv.CenterImage()
+				iv.CenterView()
 			}
 		}()
 	})
@@ -96,9 +103,11 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 						}
 						go func() {
 							actionComms <- func() {
-								if err := iv.LoadFromFile(newFileName); err != nil {
+								tex, err := gfx.NewTextureFromFile(newFileName)
+								if err != nil {
 									log.Fatal(err)
 								}
+								iv.AddLayer(tex)
 							}
 						}()
 					},
@@ -114,9 +123,6 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 						go func() {
 							actionComms <- func() {
 								if err := iv.WriteToFile(newFileName); err != nil {
-									log.Fatal(err)
-								}
-								if err := iv.LoadFromFile(newFileName); err != nil {
 									log.Fatal(err)
 								}
 							}
