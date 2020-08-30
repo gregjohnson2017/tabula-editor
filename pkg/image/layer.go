@@ -8,24 +8,25 @@ import (
 )
 
 type Layer struct {
-	area    sdl.Rect
-	buffer  *gfx.BufferArray
-	program gfx.Program
-	texture gfx.Texture
+	area         sdl.Rect
+	origW, origH int32
+	buffer       *gfx.BufferArray
+	texture      gfx.Texture
 }
 
-func NewLayer(offset sdl.Point, program gfx.Program, texture gfx.Texture) (Layer, error) {
-	return Layer{
+func NewLayer(offset sdl.Point, texture gfx.Texture, mult float64) *Layer {
+	return &Layer{
 		area: sdl.Rect{
-			X: offset.X,
-			Y: offset.Y,
-			W: texture.GetWidth(),
-			H: texture.GetHeight(),
+			X: int32(float64(offset.X) * mult),
+			Y: int32(float64(offset.Y) * mult),
+			W: int32(float64(texture.GetWidth()) * mult),
+			H: int32(float64(texture.GetHeight()) * mult),
 		},
+		origW:   texture.GetWidth(),
+		origH:   texture.GetHeight(),
 		buffer:  gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2}),
-		program: program,
 		texture: texture,
-	}, nil
+	}
 }
 
 // Render draws the ui.Component
@@ -50,12 +51,13 @@ func (l Layer) Render() {
 		log.Warnf("failed to load image triangles: %v", err)
 	}
 
-	// gl viewport x,y is bottom left
-	gl.Viewport(l.area.X, l.area.Y, l.area.W, l.area.H)
 	// draw image
-	l.program.Bind()
 	l.texture.Bind()
 	l.buffer.Draw()
 	l.texture.Unbind()
-	l.program.Unbind()
+}
+
+func (l Layer) Destroy() {
+	l.buffer.Destroy()
+	l.texture.Destroy()
 }
