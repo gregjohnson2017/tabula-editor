@@ -1,14 +1,9 @@
 package image
 
 import (
-	"fmt"
-	"image"
 	"image/color"
-	"image/jpeg"
-	"image/png"
 	"math"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/go-gl/gl/v2.1/gl"
@@ -26,8 +21,8 @@ var _ ui.Component = ui.Component(&View{})
 
 // View defines an interactable image viewing pane
 type View struct {
-	area         *sdl.Rect
-	canvas       *sdl.Rect
+	area *sdl.Rect
+	// canvas       *sdl.Rect
 	origW, origH int32
 	cfg          *config.Config
 	mouseLoc     sdl.Point
@@ -37,45 +32,48 @@ type View struct {
 	mult         float64
 	program      gfx.Program
 	selProgram   gfx.Program
-	texture      gfx.Texture
-	imgBuf       *gfx.BufferArray
-	selBuf       *gfx.BufferArray
-	bbComms      chan<- comms.Image
-	fileName     string
-	fullPath     string
-	toolComms    <-chan Tool
-	activeTool   Tool
-	selection    set.Set
+	// texture      gfx.Texture
+	// imgBuf       *gfx.BufferArray
+	// selBuf       *gfx.BufferArray
+	bbComms       chan<- comms.Image
+	fileName      string
+	fullPath      string
+	toolComms     <-chan Tool
+	activeTool    Tool
+	selection     set.Set
+	layers        []*Layer
+	selectedLayer *Layer
 }
 
 func (iv *View) LoadFromFile(fileName string) error {
-	iv.texture.Destroy() // clear old texture data before loading new
+	// iv.texture.Destroy() // clear old texture data before loading new
 
 	tex, err := gfx.NewTextureFromFile(fileName)
 	if err != nil {
 		return err
 	}
-	iv.texture = tex
+	// iv.texture = tex
 	iv.origW = int32(tex.GetWidth())
 	iv.origH = int32(tex.GetHeight())
 
-	iv.selProgram.UploadUniform("origDims", float32(iv.origW), float32(iv.origH))
+	// iv.selProgram.UploadUniform("origDims", float32(iv.origW), float32(iv.origH))
 
-	iv.canvas = &sdl.Rect{
-		X: 0,
-		Y: 0,
-		W: iv.origW,
-		H: iv.origH,
-	}
-	iv.CenterImage()
-	iv.mult = 1.0
-	iv.selProgram.UploadUniform("mult", float32(iv.mult))
+	// iv.canvas = &sdl.Rect{
+	// 	X: 0,
+	// 	Y: 0,
+	// 	W: iv.origW,
+	// 	H: iv.origH,
+	// }
+	// iv.selProgram.UploadUniform("mult", float32(iv.mult))
 
 	parts := strings.Split(fileName, string(os.PathSeparator))
 	iv.fileName = parts[len(parts)-1]
 	iv.fullPath = fileName
 
-	iv.selection = set.NewSet()
+	iv.layers = append(iv.layers, NewLayer(sdl.Point{X: 0, Y: 0}, tex, iv.mult))
+	// iv.CenterImage()
+
+	// iv.selection = set.NewSet()
 	return nil
 }
 
@@ -87,6 +85,7 @@ func NewView(area *sdl.Rect, fileName string, bbComms chan<- comms.Image, toolCo
 	iv.area = area
 	iv.bbComms = bbComms
 	iv.toolComms = toolComms
+	iv.mult = 1
 
 	v1, err := gfx.NewShader(gfx.VertexShaderSource, gl.VERTEX_SHADER)
 	if err != nil {
@@ -120,12 +119,12 @@ func NewView(area *sdl.Rect, fileName string, bbComms chan<- comms.Image, toolCo
 
 	iv.program.UploadUniform("area", float32(iv.area.W), float32(iv.area.H))
 
-	// layout: (x,y s,t)
-	iv.imgBuf = gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2})
-	// layout: (x,y)
-	iv.selBuf = gfx.NewBufferArray(gl.LINES, []int32{2})
+	// // layout: (x,y s,t)
+	// iv.imgBuf = gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2})
+	// // layout: (x,y)
+	// iv.selBuf = gfx.NewBufferArray(gl.LINES, []int32{2})
 
-	iv.selection = set.NewSet()
+	// iv.selection = set.NewSet()
 	iv.activeTool = EmptyTool{}
 
 	return iv, nil
@@ -133,9 +132,9 @@ func NewView(area *sdl.Rect, fileName string, bbComms chan<- comms.Image, toolCo
 
 // Destroy frees all assets acquired by the ui.Component
 func (iv *View) Destroy() {
-	iv.texture.Destroy()
-	iv.imgBuf.Destroy()
-	iv.selBuf.Destroy()
+	// iv.texture.Destroy()
+	// iv.imgBuf.Destroy()
+	// iv.selBuf.Destroy()
 	iv.program.Destroy()
 	iv.selProgram.Destroy()
 }
@@ -154,78 +153,83 @@ func (iv *View) Render() {
 
 	// TODO optimize this (ex: move elsewhere, update as changes come in, use a better algorithm)
 	// make array of 2d-vertex pairs representing texel selection outlines
-	swl := util.Start()
-	lines := []float32{}
-	iv.selection.Range(func(i int32) bool {
-		// i is every y*width+x index
-		texelX := float32(i % iv.origW)
-		texelY := float32((float32(i) - texelX) / float32(iv.origW))
-		tlx, tly := texelX, texelY
-		trx, try := (texelX + 1), texelY
-		blx, bly := texelX, (texelY + 1)
-		brx, bry := (texelX + 1), (texelY + 1)
-		// left edge
-		if !iv.selection.Contains(i-1) || i%iv.origW == 0 {
-			lines = append(lines, tlx, tly, blx, bly)
-		}
-		// top edge
-		if !iv.selection.Contains(i - iv.origW) {
-			lines = append(lines, tlx, tly, trx, try)
-		}
-		// right edge
-		if !iv.selection.Contains(i+1) || (i+1)%iv.origW == 0 {
-			lines = append(lines, trx, try, brx, bry)
-		}
-		// bottom edge
-		if !iv.selection.Contains(i + iv.origW) {
-			lines = append(lines, blx, bly, brx, bry)
-		}
-		return true
-	})
-	swl.StopRecordAverage(iv.String() + ".SelLines")
+	// swl := util.Start()
+	// lines := []float32{}
+	// iv.selection.Range(func(i int32) bool {
+	// 	// i is every y*width+x index
+	// 	texelX := float32(i % iv.origW)
+	// 	texelY := float32((float32(i) - texelX) / float32(iv.origW))
+	// 	tlx, tly := texelX, texelY
+	// 	trx, try := (texelX + 1), texelY
+	// 	blx, bly := texelX, (texelY + 1)
+	// 	brx, bry := (texelX + 1), (texelY + 1)
+	// 	// left edge
+	// 	if !iv.selection.Contains(i-1) || i%iv.origW == 0 {
+	// 		lines = append(lines, tlx, tly, blx, bly)
+	// 	}
+	// 	// top edge
+	// 	if !iv.selection.Contains(i - iv.origW) {
+	// 		lines = append(lines, tlx, tly, trx, try)
+	// 	}
+	// 	// right edge
+	// 	if !iv.selection.Contains(i+1) || (i+1)%iv.origW == 0 {
+	// 		lines = append(lines, trx, try, brx, bry)
+	// 	}
+	// 	// bottom edge
+	// 	if !iv.selection.Contains(i + iv.origW) {
+	// 		lines = append(lines, blx, bly, brx, bry)
+	// 	}
+	// 	return true
+	// })
+	// swl.StopRecordAverage(iv.String() + ".SelLines")
 
-	if len(lines) > 0 {
-		err := iv.selBuf.Load(lines, gl.STATIC_DRAW)
-		if err != nil {
-			log.Warnf("failed to load image selection lines: %v", err)
-		}
-	}
+	// if len(lines) > 0 {
+	// 	err := iv.selBuf.Load(lines, gl.STATIC_DRAW)
+	// 	if err != nil {
+	// 		log.Warnf("failed to load image selection lines: %v", err)
+	// 	}
+	// }
 
 	// update triangles that represent the position and scale of the image (these are SDL/window coordinates, converted to -1,1 gl space coordinates in the vertex shader)
-	tlx, tly := float32(iv.canvas.X), float32(iv.canvas.Y)
-	trx, try := float32(iv.canvas.X+iv.canvas.W), float32(iv.canvas.Y)
-	blx, bly := float32(iv.canvas.X), float32(iv.canvas.H+iv.canvas.Y)
-	brx, bry := float32(iv.canvas.X+iv.canvas.W), float32(iv.canvas.H+iv.canvas.Y)
-	triangles := []float32{
-		blx, bly, 0.0, 1.0, // bottom-left
-		tlx, tly, 0.0, 0.0, // top-left
-		trx, try, 1.0, 0.0, // top-right
+	// tlx, tly := float32(iv.canvas.X), float32(iv.canvas.Y)
+	// trx, try := float32(iv.canvas.X+iv.origW), float32(iv.canvas.Y)
+	// blx, bly := float32(iv.canvas.X), float32(iv.origH+iv.canvas.Y)
+	// brx, bry := float32(iv.canvas.X+iv.origW), float32(iv.origH+iv.canvas.Y)
+	// triangles := []float32{
+	// 	blx, bly, 0.0, 1.0, // bottom-left
+	// 	tlx, tly, 0.0, 0.0, // top-left
+	// 	trx, try, 1.0, 0.0, // top-right
 
-		blx, bly, 0.0, 1.0, // bottom-left
-		trx, try, 1.0, 0.0, // top-right
-		brx, bry, 1.0, 1.0, // bottom-right
-	}
+	// 	blx, bly, 0.0, 1.0, // bottom-left
+	// 	trx, try, 1.0, 0.0, // top-right
+	// 	brx, bry, 1.0, 1.0, // bottom-right
+	// }
 
-	err := iv.imgBuf.Load(triangles, gl.STATIC_DRAW)
-	if err != nil {
-		log.Warnf("failed to load image triangles: %v", err)
-	}
+	// err := iv.imgBuf.Load(triangles, gl.STATIC_DRAW)
+	// if err != nil {
+	// 	log.Warnf("failed to load image triangles: %v", err)
+	// }
 
-	// gl viewport x,y is bottom left
+	// // gl viewport x,y is bottom left
 	gl.Viewport(iv.area.X, iv.cfg.ScreenHeight-iv.area.H-iv.area.Y, iv.area.W, iv.area.H)
-	// draw image
+	// // draw image
+	// iv.program.Bind()
+	// iv.texture.Bind()
+	// iv.imgBuf.Draw()
+	// iv.texture.Unbind()
+	// iv.program.Unbind()
 	iv.program.Bind()
-	iv.texture.Bind()
-	iv.imgBuf.Draw()
-	iv.texture.Unbind()
+	for _, layer := range iv.layers {
+		layer.Render()
+	}
 	iv.program.Unbind()
 
 	// draw selection outlines
-	gl.Viewport(iv.area.X+iv.canvas.X, iv.cfg.ScreenHeight-iv.area.Y-iv.canvas.Y-iv.canvas.H, iv.canvas.W, iv.canvas.H)
+	// gl.Viewport(iv.area.X+iv.canvas.X, iv.cfg.ScreenHeight-iv.area.Y-iv.canvas.Y-iv.canvas.H, iv.canvas.W, iv.canvas.H)
 
-	iv.selProgram.Bind()
-	iv.selBuf.Draw()
-	iv.selProgram.Unbind()
+	// iv.selProgram.Bind()
+	// iv.selBuf.Draw()
+	// iv.selProgram.Unbind()
 
 	select {
 	case tool := <-iv.toolComms:
@@ -237,39 +241,67 @@ func (iv *View) Render() {
 }
 
 func (iv *View) zoomIn() {
+	// check for integer wrap around and cap max zoom
+	for _, layer := range iv.layers {
+		if layer.area.W*2 <= layer.area.W ||
+			layer.area.H*2 <= layer.area.H || iv.mult >= maxZoom {
+			return
+		}
+	}
 	iv.mult *= 2.0
-	iv.canvas.W = int32(float64(iv.origW) * iv.mult)
-	iv.canvas.H = int32(float64(iv.origH) * iv.mult)
-	iv.canvas.X = 2*iv.canvas.X - int32(math.Round(float64(iv.area.W)/2.0)) //iv.mouseLoc.x
-	iv.canvas.Y = 2*iv.canvas.Y - int32(math.Round(float64(iv.area.H)/2.0)) //iv.mouseLoc.y
-	iv.selProgram.UploadUniform("mult", float32(iv.mult))
+	for _, layer := range iv.layers {
+		layer.area.W = int32(float64(layer.origW) * iv.mult)
+		layer.area.H = int32(float64(layer.origH) * iv.mult)
+		layer.area.X = 2*layer.area.X - int32(math.Round(float64(iv.area.W)/2.0))
+		layer.area.Y = 2*layer.area.Y - int32(math.Round(float64(iv.area.H)/2.0))
+	}
+	// iv.selProgram.UploadUniform("mult", float32(iv.mult))
 }
 
 func (iv *View) zoomOut() {
+	for _, layer := range iv.layers {
+		if layer.area.W/2.0 <= 0 || layer.area.H/2.0 <= 0 {
+			return
+		}
+	}
 	iv.mult /= 2.0
-	iv.canvas.W = int32(float64(iv.origW) * iv.mult)
-	iv.canvas.H = int32(float64(iv.origH) * iv.mult)
-	iv.canvas.X = int32(math.Round(float64(iv.canvas.X)/2.0 + float64(iv.area.W)/4.0)) //iv.mouseLoc.x/2
-	iv.canvas.Y = int32(math.Round(float64(iv.canvas.Y)/2.0 + float64(iv.area.H)/4.0)) //iv.mouseLoc.y/2
-	iv.selProgram.UploadUniform("mult", float32(iv.mult))
+	for _, layer := range iv.layers {
+		layer.area.W = int32(float64(layer.origW) * iv.mult)
+		layer.area.H = int32(float64(layer.origH) * iv.mult)
+		layer.area.X = int32(math.Round(float64(layer.area.X)/2.0 + float64(iv.area.W)/4.0))
+		layer.area.Y = int32(math.Round(float64(layer.area.Y)/2.0 + float64(iv.area.H)/4.0))
+	}
+	// iv.selProgram.UploadUniform("mult", float32(iv.mult))
 }
 
 func (iv *View) CenterImage() {
-	iv.canvas.X = int32(float64(iv.area.W)/2.0 - float64(iv.canvas.W)/2.0)
-	iv.canvas.Y = int32(float64(iv.area.H)/2.0 - float64(iv.canvas.H)/2.0)
+	// iv.layers.area.X = int32(float64(iv.area.W)/2.0 - float64(iv.layers.area.W)/2.0)
+	// iv.layers.area.Y = int32(float64(iv.area.H)/2.0 - float64(iv.layers.area.H)/2.0)
 }
 
 func (iv *View) setPixel(p sdl.Point, col color.RGBA) error {
-	return iv.texture.SetPixel(p, col)
+	if iv.selectedLayer != nil {
+		return iv.selectedLayer.texture.SetPixel(p, col)
+	}
+	return nil
 }
 
 func (iv *View) updateMousePos(x, y int32) {
 	iv.mouseLoc.X = x
 	iv.mouseLoc.Y = y
-	relx := float64(iv.mouseLoc.X - iv.canvas.X)
-	rely := float64(iv.mouseLoc.Y - iv.canvas.Y)
+	relx := float64(iv.mouseLoc.X - iv.selectedLayer.area.X)
+	rely := float64(iv.mouseLoc.Y - iv.selectedLayer.area.Y)
 	iv.mousePix.X = int32(math.Floor(relx / iv.mult))
 	iv.mousePix.Y = int32(math.Floor(rely / iv.mult))
+}
+
+func (iv *View) getMousePix(x, y int32) sdl.Point {
+	relx := float64(x - iv.selectedLayer.area.X)
+	rely := float64(y - iv.selectedLayer.area.Y)
+	return sdl.Point{
+		X: int32(math.Floor(relx / iv.mult)),
+		Y: int32(math.Floor(rely / iv.mult)),
+	}
 }
 
 // OnEnter is called when the cursor enters the ui.Component's region
@@ -282,19 +314,28 @@ func (iv *View) OnLeave() {
 
 // OnMotion is called when the cursor moves within the ui.Component's region
 func (iv *View) OnMotion(evt *sdl.MouseMotionEvent) bool {
+	if iv.selectedLayer == nil {
+		return true
+	}
 	if !iv.dragging {
 		iv.updateMousePos(evt.X, evt.Y)
 		iv.activeTool.OnMotion(evt, iv)
-		return ui.InBounds(*iv.canvas, sdl.Point{X: evt.X, Y: evt.Y})
+		return ui.InBounds(iv.selectedLayer.area, sdl.Point{X: evt.X, Y: evt.Y})
 	}
 	if evt.State == sdl.ButtonRMask() {
-		iv.canvas.X += evt.X - iv.dragPoint.X
-		iv.canvas.Y += evt.Y - iv.dragPoint.Y
+		newImgPix := iv.getMousePix(evt.X, evt.Y)
+		oldImgPix := iv.getMousePix(iv.dragPoint.X, iv.dragPoint.Y)
+		diffX := int32(float64(newImgPix.X-oldImgPix.X) * iv.mult)
+		diffY := int32(float64(newImgPix.Y-oldImgPix.Y) * iv.mult)
+		iv.selectedLayer.area.X += diffX
+		iv.selectedLayer.area.Y += diffY
 		iv.dragPoint.X = evt.X
 		iv.dragPoint.Y = evt.Y
 	}
 	return true
 }
+
+const maxZoom = 256
 
 // OnScroll is called when the user scrolls within the ui.Component's region
 func (iv *View) OnScroll(evt *sdl.MouseWheelEvent) bool {
@@ -302,13 +343,9 @@ func (iv *View) OnScroll(evt *sdl.MouseWheelEvent) bool {
 		return true
 	}
 	if evt.Y > 0 {
-		if int32(iv.mult*float64(iv.origW)*2.0) > iv.canvas.W && int32(iv.mult*float64(iv.origH)*2.0) > iv.canvas.H && iv.mult < 256 {
-			iv.zoomIn()
-		}
+		iv.zoomIn()
 	} else if evt.Y < 0 {
-		if int32(iv.mult*float64(iv.origW)/2.0) > 0 && int32(iv.mult*float64(iv.origH)/2.0) > 0 {
-			iv.zoomOut()
-		}
+		iv.zoomOut()
 	}
 	return true
 }
@@ -318,20 +355,29 @@ const ErrCoordOutOfRange log.ConstErr = "coordinates out of range"
 
 // SelectPixel adds the given x, y pixel to the
 func (iv *View) SelectPixel(p sdl.Point) error {
-	if p.X < 0 || p.Y < 0 || p.X >= iv.origW || p.Y >= iv.origH {
-		return fmt.Errorf("SelectPixel(%v, %v): %w", p.X, p.Y, ErrCoordOutOfRange)
-	}
-	iv.selection.Add(p.X + p.Y*iv.origW)
+	// if p.X < 0 || p.Y < 0 || p.X >= iv.layers.origW || p.Y >= iv.layers.origH {
+	// 	return fmt.Errorf("SelectPixel(%v, %v): %w", p.X, p.Y, ErrCoordOutOfRange)
+	// }
+	// iv.selection.Add(p.X + p.Y*iv.layers.origW)
 	return nil
 }
 
 // OnClick is called when the user clicks within the ui.Component's region
 func (iv *View) OnClick(evt *sdl.MouseButtonEvent) bool {
-	iv.updateMousePos(evt.X, evt.Y)
-	iv.activeTool.OnClick(evt, iv)
-	if !ui.InBounds(*iv.canvas, sdl.Point{X: evt.X, Y: evt.Y}) {
+	iv.selectedLayer = nil
+	for i := len(iv.layers) - 1; i >= 0; i-- {
+		layer := iv.layers[i]
+		if ui.InBounds(layer.area, sdl.Point{X: evt.X, Y: evt.Y}) {
+			iv.selectedLayer = layer
+			break
+		}
+	}
+	if iv.selectedLayer == nil {
+		// no layer was clicked on
 		return true
 	}
+	iv.updateMousePos(evt.X, evt.Y)
+	iv.activeTool.OnClick(evt, iv)
 	if evt.Button == sdl.BUTTON_RIGHT {
 		if evt.State == sdl.PRESSED {
 			iv.dragging = true
@@ -363,34 +409,34 @@ const ErrWriteFormat log.ConstErr = "unsupported image format"
 
 // WriteToFile writes the image data stored in the OpenGL texture to a file specified by fileName
 func (iv *View) WriteToFile(fileName string) error {
-	data := iv.texture.GetTextureData()
+	// data := iv.texture.GetTextureData()
 
-	img := image.NewNRGBA(image.Rect(0, 0, int(iv.texture.GetWidth()),
-		int(iv.texture.GetHeight())))
-	copy(img.Pix, data)
-	out, err := os.Create(fileName)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
+	// img := image.NewNRGBA(image.Rect(0, 0, int(iv.texture.GetWidth()),
+	// 	int(iv.texture.GetHeight())))
+	// copy(img.Pix, data)
+	// out, err := os.Create(fileName)
+	// if err != nil {
+	// 	return err
+	// }
+	// defer out.Close()
 
-	switch ext := filepath.Ext(fileName); ext {
-	case ".png":
-		err = png.Encode(out, img)
-		if err != nil {
-			return err
-		}
-	case ".jpg", ".jpeg", ".jpe", ".jfif":
-		// TODO add dialog to choose quality
-		var opt jpeg.Options
-		opt.Quality = 100
-		err = jpeg.Encode(out, img, &opt)
-		if err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf("writing to file extension %v: %w", ext, ErrWriteFormat)
-	}
+	// switch ext := filepath.Ext(fileName); ext {
+	// case ".png":
+	// 	err = png.Encode(out, img)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// case ".jpg", ".jpeg", ".jpe", ".jfif":
+	// 	// TODO add dialog to choose quality
+	// 	var opt jpeg.Options
+	// 	opt.Quality = 100
+	// 	err = jpeg.Encode(out, img, &opt)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// default:
+	// 	return fmt.Errorf("writing to file extension %v: %w", ext, ErrWriteFormat)
+	// }
 
 	return nil
 }
