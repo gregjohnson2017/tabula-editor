@@ -40,6 +40,7 @@ type View struct {
 	bbComms    chan<- comms.Image
 	toolComms  <-chan Tool
 	program    gfx.Program
+	canvasProg gfx.Program
 }
 
 func (iv *View) AddLayer(tex gfx.Texture) {
@@ -73,6 +74,20 @@ func NewView(area sdl.Rect, bbComms chan<- comms.Image, toolComms <-chan Tool, c
 	}
 
 	if iv.program, err = gfx.NewProgram(v1, f1); err != nil {
+		return nil, err
+	}
+
+	// v2, err := gfx.NewShader(gfx.VertexShaderSource, gl.VERTEX_SHADER)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	f2, err := gfx.NewShader(gfx.FragmentShaderSource, gl.FRAGMENT_SHADER)
+	if err != nil {
+		return nil, err
+	}
+
+	if iv.canvasProg, err = gfx.NewProgram(v1, f2); err != nil {
 		return nil, err
 	}
 
@@ -141,15 +156,16 @@ func (iv *View) RenderCanvas() {
 		H: float32(h),
 	}
 
-	iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
+	iv.canvasProg.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
 	// gl viewport 0, 0 is bottom left
 	gl.Viewport(iv.canvas.X, iv.canvas.Y, w, h)
 
-	iv.program.Bind()
+	iv.canvasProg.Bind()
 	for _, layer := range iv.layers {
 		layer.Render(iv.view)
 	}
-	iv.program.Unbind()
+	iv.canvasProg.Unbind()
+
 }
 
 const maxZoom = 8
