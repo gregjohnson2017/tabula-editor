@@ -18,6 +18,7 @@ type Texture struct {
 	id     uint32
 	width  int32
 	height int32
+	format uint32
 }
 
 func NewTextureFromFile(fileName string) (Texture, error) {
@@ -64,13 +65,20 @@ func NewTextureFromFile(fileName string) (Texture, error) {
 }
 
 func NewTexture(width, height int32, data []byte, format int, alignment int32) (Texture, error) {
-	t := Texture{width: width, height: height}
-
+	t := Texture{
+		width:  width,
+		height: height,
+		format: uint32(format),
+	}
+	var ptr unsafe.Pointer
+	if data != nil {
+		ptr = unsafe.Pointer(&data[0])
+	}
 	gl.GenTextures(1, &t.id)
 	t.Bind()
 	// copy pixels to texture
 	gl.PixelStorei(gl.UNPACK_ALIGNMENT, alignment)
-	gl.TexImage2D(gl.TEXTURE_2D, 0, int32(format), width, height, 0, uint32(format), gl.UNSIGNED_BYTE, unsafe.Pointer(&data[0]))
+	gl.TexImage2D(gl.TEXTURE_2D, 0, int32(format), width, height, 0, uint32(format), gl.UNSIGNED_BYTE, ptr)
 	gl.GenerateMipmap(gl.TEXTURE_2D)
 	t.Unbind()
 
@@ -99,12 +107,18 @@ func (t Texture) SetPixel(p sdl.Point, col color.RGBA) error {
 	return nil
 }
 
-func (t Texture) GetTextureData() []byte {
+func (t Texture) GetData() []byte {
 	// TODO do this in batches/stream to avoid memory limitations
 	var data = make([]byte, t.width*t.height*4)
 	t.Bind()
-	gl.GetTexImage(gl.TEXTURE_2D, 0, gl.RGBA, gl.UNSIGNED_BYTE, unsafe.Pointer(&data[0]))
+	gl.GetTexImage(gl.TEXTURE_2D, 0, t.format, gl.UNSIGNED_BYTE, unsafe.Pointer(&data[0]))
 	t.Unbind()
+	return data
+}
+func (t Texture) GetSubData(x, y, w, h int32) []byte {
+	// TODO do this in batches/stream to avoid memory limitations
+	var data = make([]byte, w*h*4)
+	gl.GetTextureSubImage(t.id, 0, x, y, 0, w, h, 1, t.format, gl.UNSIGNED_BYTE, w*h*4, unsafe.Pointer(&data[0]))
 	return data
 }
 
