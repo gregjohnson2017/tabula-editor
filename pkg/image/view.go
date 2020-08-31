@@ -1,8 +1,14 @@
 package image
 
 import (
+	"fmt"
+	"image"
 	"image/color"
+	"image/jpeg"
+	"image/png"
 	"math"
+	"os"
+	"path/filepath"
 
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/comms"
@@ -20,6 +26,7 @@ var _ ui.Component = ui.Component(&View{})
 type View struct {
 	cfg        *config.Config
 	area       sdl.Rect
+	canvas     sdl.Rect
 	view       sdl.FRect
 	mousePix   sdl.Point
 	mult       int32
@@ -48,6 +55,13 @@ func NewView(area sdl.Rect, bbComms chan<- comms.Image, toolComms <-chan Tool, c
 	iv.bbComms = bbComms
 	iv.toolComms = toolComms
 	iv.mult = 0
+
+	iv.canvas = sdl.Rect{
+		X: 0,
+		Y: 0,
+		W: 100,
+		H: 100,
+	}
 
 	v1, err := gfx.NewShader(gfx.VertexShaderSource, gl.VERTEX_SHADER)
 	if err != nil {
@@ -110,6 +124,34 @@ func (iv *View) Render() {
 	sw.StopRecordAverage(iv.String() + ".Render")
 }
 
+// RenderCanvas draws what is on the canvas or area, whichever is larger
+func (iv *View) RenderCanvas() {
+	w, h := iv.area.W, iv.area.H
+	if iv.canvas.W > iv.area.W {
+		w = iv.canvas.W
+	}
+	if iv.canvas.H > iv.area.H {
+		h = iv.canvas.H
+	}
+
+	iv.view = sdl.FRect{
+		X: float32(iv.canvas.X),
+		Y: float32(iv.canvas.Y),
+		W: float32(w),
+		H: float32(h),
+	}
+
+	iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
+	// gl viewport 0, 0 is bottom left
+	gl.Viewport(iv.canvas.X, iv.canvas.Y, w, h)
+
+	iv.program.Bind()
+	for _, layer := range iv.layers {
+		layer.Render(iv.view)
+	}
+	iv.program.Unbind()
+}
+
 const maxZoom = 8
 
 func (iv *View) updateView() {
@@ -126,6 +168,25 @@ func (iv *View) updateView() {
 func (iv *View) CenterView() {
 	iv.view = ui.RectToFRect(iv.area)
 	iv.updateView()
+}
+
+func (iv *View) LookAtCanvas() {
+	w, h := iv.area.W, iv.area.H
+	if iv.canvas.W > iv.area.W {
+		w = iv.canvas.W
+	}
+	if iv.canvas.H > iv.area.H {
+		h = iv.canvas.H
+	}
+
+	iv.view = sdl.FRect{
+		X: float32(iv.canvas.X),
+		Y: float32(iv.canvas.Y),
+		W: float32(w),
+		H: float32(h),
+	}
+
+	iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
 }
 
 func (iv *View) setPixel(p sdl.Point, col color.RGBA) error {
@@ -284,5 +345,58 @@ const ErrWriteFormat log.ConstErr = "unsupported image format"
 // WriteToFile writes the image data stored in the OpenGL texture to a file specified by fileName
 func (iv *View) WriteToFile(fileName string) error {
 	// TODO after canvas figured out
+	// w, h := iv.area.W, iv.area.H
+	// if iv.canvas.W > iv.area.W {
+	// 	w = iv.canvas.W
+	// }
+	// if iv.canvas.H > iv.area.H {
+	// 	h = iv.canvas.H
+	// }
+
+	// finalRect := sdl.Rect{
+	// 	X: iv.canvas.X,
+	// 	Y: iv.canvas.Y,
+	// 	W: w,
+	// 	H: h,
+	// }
+
+	fb, err := gfx.NewFrameBuffer(iv.area.W, iv.area.H)
+	if err != nil {
+		return err
+	}
+	fb.Bind()
+	iv.RenderCanvas()
+	fb.Unbind()
+	data := fb.GetTexture().GetData()
+
+	log.Infof("done opengl")
+	img := image.NewNRGBA(image.Rect(0, 0, int(iv.area.W), int(iv.area.H)))
+	for i := 0; i < len(data)/2; i++ {
+		temp := data[i]
+		data[i] = data[len(data)-i-1]
+		data[len(data)-i-1] = temp
+	}
+	copy(img.Pix, data)
+	out, err := os.Create(fileName)
+	if err != nil {
+		return err
+	}
+	switch ext := filepath.Ext(fileName); ext {
+	case ".png":
+		err = png.Encode(out, img)
+		if err != nil {
+			return err
+		}
+	case ".jpg", ".jpeg", ".jpe", ".jfif":
+		// TODO add dialog to choose quality
+		var opt jpeg.Options
+		opt.Quality = 100
+		err = jpeg.Encode(out, img, &opt)
+		if err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("writing to file extension %v: %w", ext, ErrWriteFormat)
+	}
 	return nil
 }
