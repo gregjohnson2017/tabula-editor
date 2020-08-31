@@ -58,10 +58,10 @@ func NewView(area sdl.Rect, bbComms chan<- comms.Image, toolComms <-chan Tool, c
 	iv.mult = 0
 
 	iv.canvas = sdl.Rect{
-		X: 0,
-		Y: 0,
-		W: 100,
-		H: 100,
+		X: -10,
+		Y: -10,
+		W: 28,
+		H: 28,
 	}
 
 	v1, err := gfx.NewShader(gfx.VertexShaderSource, gl.VERTEX_SHADER)
@@ -76,11 +76,6 @@ func NewView(area sdl.Rect, bbComms chan<- comms.Image, toolComms <-chan Tool, c
 	if iv.program, err = gfx.NewProgram(v1, f1); err != nil {
 		return nil, err
 	}
-
-	// v2, err := gfx.NewShader(gfx.VertexShaderSource, gl.VERTEX_SHADER)
-	// if err != nil {
-	// 	return nil, err
-	// }
 
 	f2, err := gfx.NewShader(gfx.FragmentShaderSource, gl.FRAGMENT_SHADER)
 	if err != nil {
@@ -141,28 +136,19 @@ func (iv *View) Render() {
 
 // RenderCanvas draws what is on the canvas or area, whichever is larger
 func (iv *View) RenderCanvas() {
-	w, h := iv.area.W, iv.area.H
-	if iv.canvas.W > iv.area.W {
-		w = iv.canvas.W
-	}
-	if iv.canvas.H > iv.area.H {
-		h = iv.canvas.H
-	}
 
-	iv.view = sdl.FRect{
-		X: float32(iv.canvas.X),
-		Y: float32(iv.canvas.Y),
-		W: float32(w),
-		H: float32(h),
-	}
-
-	iv.canvasProg.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
+	iv.canvasProg.UploadUniform("area", float32(iv.canvas.W), float32(iv.canvas.H))
 	// gl viewport 0, 0 is bottom left
-	gl.Viewport(iv.canvas.X, iv.canvas.Y, w, h)
+	gl.Viewport(0, 0, iv.canvas.W, iv.canvas.H)
 
 	iv.canvasProg.Bind()
 	for _, layer := range iv.layers {
-		layer.Render(iv.view)
+		layer.Render(sdl.FRect{
+			X: float32(iv.canvas.X),
+			Y: float32(iv.canvas.Y),
+			W: float32(iv.canvas.W),
+			H: float32(iv.canvas.H),
+		})
 	}
 	iv.canvasProg.Unbind()
 
@@ -187,21 +173,7 @@ func (iv *View) CenterView() {
 }
 
 func (iv *View) LookAtCanvas() {
-	w, h := iv.area.W, iv.area.H
-	if iv.canvas.W > iv.area.W {
-		w = iv.canvas.W
-	}
-	if iv.canvas.H > iv.area.H {
-		h = iv.canvas.H
-	}
-
-	iv.view = sdl.FRect{
-		X: float32(iv.canvas.X),
-		Y: float32(iv.canvas.Y),
-		W: float32(w),
-		H: float32(h),
-	}
-
+	iv.view = ui.RectToFRect(iv.canvas)
 	iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
 }
 
@@ -361,24 +333,9 @@ const ErrWriteFormat log.ConstErr = "unsupported image format"
 // WriteToFile writes the image data stored in the OpenGL texture to a file specified by fileName
 func (iv *View) WriteToFile(fileName string) error {
 	// TODO after canvas figured out
-	// w, h := iv.area.W, iv.area.H
-	// if iv.canvas.W > iv.area.W {
-	// 	w = iv.canvas.W
-	// }
-	// if iv.canvas.H > iv.area.H {
-	// 	h = iv.canvas.H
-	// }
+	w, h := iv.canvas.W, iv.canvas.H
 
-	// finalRect := sdl.Rect{
-	// 	X: iv.canvas.X,
-	// 	Y: iv.canvas.Y,
-	// 	W: w,
-	// 	H: h,
-	// }
-
-	w, h := iv.area.W, iv.area.H
-
-	fb, err := gfx.NewFrameBuffer(w, h)
+	fb, err := gfx.NewFrameBuffer(iv.canvas.W, iv.canvas.H)
 	if err != nil {
 		return err
 	}
@@ -386,15 +343,13 @@ func (iv *View) WriteToFile(fileName string) error {
 	iv.RenderCanvas()
 	fb.Unbind()
 	data := fb.GetTexture().GetData()
-
-	log.Infof("done opengl")
 	img := image.NewNRGBA(image.Rect(0, 0, int(w), int(h)))
 	// flip resulting data vertically
 	for j := 0; j < int(h)/2; j++ {
 		for i := 0; i < int(w)*4; i++ {
-			temp := data[j*int(w)*4+i]
-			data[j*int(w)*4+i] = data[(int(h)-j-1)*int(w)*4+i]
-			data[(int(h)-j-1)*int(w)*4+i] = temp
+			a := j*int(w)*4 + i
+			b := (int(h)-j-1)*int(w)*4 + i
+			data[a], data[b] = data[b], data[a]
 		}
 	}
 	copy(img.Pix, data)
