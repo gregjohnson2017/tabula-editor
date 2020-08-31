@@ -57,6 +57,15 @@ func InBounds(area sdl.Rect, point sdl.Point) bool {
 	return true
 }
 
+func RectToFRect(rect sdl.Rect) sdl.FRect {
+	return sdl.FRect{
+		X: float32(rect.X),
+		Y: float32(rect.Y),
+		W: float32(rect.W),
+		H: float32(rect.H),
+	}
+}
+
 // Interpolate returns all the points hit by the line connecting points a and b.
 // The interpolated points are returned in random order.
 // The returned points excludes a (beginning) and includes b (ending).
