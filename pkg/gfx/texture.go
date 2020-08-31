@@ -115,6 +115,7 @@ func (t Texture) GetData() []byte {
 	t.Unbind()
 	return data
 }
+
 func (t Texture) GetSubData(x, y, w, h int32) []byte {
 	// TODO do this in batches/stream to avoid memory limitations
 	var data = make([]byte, w*h*4)
