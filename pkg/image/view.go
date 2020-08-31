@@ -360,7 +360,9 @@ func (iv *View) WriteToFile(fileName string) error {
 	// 	H: h,
 	// }
 
-	fb, err := gfx.NewFrameBuffer(iv.area.W, iv.area.H)
+	w, h := iv.area.W, iv.area.H
+
+	fb, err := gfx.NewFrameBuffer(w, h)
 	if err != nil {
 		return err
 	}
@@ -370,11 +372,14 @@ func (iv *View) WriteToFile(fileName string) error {
 	data := fb.GetTexture().GetData()
 
 	log.Infof("done opengl")
-	img := image.NewNRGBA(image.Rect(0, 0, int(iv.area.W), int(iv.area.H)))
-	for i := 0; i < len(data)/2; i++ {
-		temp := data[i]
-		data[i] = data[len(data)-i-1]
-		data[len(data)-i-1] = temp
+	img := image.NewNRGBA(image.Rect(0, 0, int(w), int(h)))
+	// flip resulting data vertically
+	for j := 0; j < int(h)/2; j++ {
+		for i := 0; i < int(w)*4; i++ {
+			temp := data[j*int(w)*4+i]
+			data[j*int(w)*4+i] = data[(int(h)-j-1)*int(w)*4+i]
+			data[(int(h)-j-1)*int(w)*4+i] = temp
+		}
 	}
 	copy(img.Pix, data)
 	out, err := os.Create(fileName)
