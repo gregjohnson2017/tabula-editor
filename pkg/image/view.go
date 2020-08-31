@@ -20,16 +20,16 @@ var _ ui.Component = ui.Component(&View{})
 type View struct {
 	cfg        *config.Config
 	area       sdl.Rect
-	view       sdl.Rect
-	pan        sdl.Point
+	view       sdl.FRect
 	mousePix   sdl.Point
 	mult       int32
 	activeTool Tool
 	layers     []*Layer
 	selLayer   *Layer
-	mouseLoc   sdl.Point
 	dragLoc    sdl.Point
+	panLoc     sdl.Point
 	dragging   bool
+	panning    bool
 	bbComms    chan<- comms.Image
 	toolComms  <-chan Tool
 	program    gfx.Program
@@ -44,7 +44,7 @@ func NewView(area sdl.Rect, bbComms chan<- comms.Image, toolComms <-chan Tool, c
 	var iv = &View{}
 	iv.cfg = cfg
 	iv.area = area
-	iv.view = area
+	iv.view = ui.RectToFRect(area)
 	iv.bbComms = bbComms
 	iv.toolComms = toolComms
 	iv.mult = 0
@@ -65,7 +65,7 @@ func NewView(area sdl.Rect, bbComms chan<- comms.Image, toolComms <-chan Tool, c
 	iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
 	iv.activeTool = &EmptyTool{}
 
-	iv.zoom()
+	iv.updateView()
 
 	return iv, nil
 }
@@ -112,36 +112,20 @@ func (iv *View) Render() {
 
 const maxZoom = 8
 
-func (iv *View) zoom() {
+func (iv *View) updateView() {
 	frac := float32(math.Pow(2, float64(-iv.mult)))
-	newView := sdl.Rect{}
-	newView.W = int32(float32(iv.area.W) * frac)
-	newView.H = int32(float32(iv.area.H) * frac)
-	newView.X = iv.pan.X + (iv.area.W-newView.W)/2 - iv.area.W/2
-	newView.Y = iv.pan.Y + (iv.area.H-newView.H)/2 - iv.area.H/2
+	newView := sdl.FRect{}
+	newView.W = float32(iv.area.W) * frac
+	newView.H = float32(iv.area.H) * frac
+	newView.X = (iv.view.W-newView.W)/2 + iv.view.X
+	newView.Y = (iv.view.H-newView.H)/2 + iv.view.Y
 	iv.view = newView
 	iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
 }
 
-func (iv *View) zoomIn() {
-	iv.mult++
-	if iv.mult > maxZoom {
-		iv.mult = maxZoom
-	}
-	iv.zoom()
-}
-
-func (iv *View) zoomOut() {
-	iv.mult--
-	iv.zoom()
-}
-
 func (iv *View) CenterView() {
-	iv.view = iv.area
-	iv.pan.X = 0
-	iv.pan.Y = 0
-	iv.zoom()
-	iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
+	iv.view = ui.RectToFRect(iv.area)
+	iv.updateView()
 }
 
 func (iv *View) setPixel(p sdl.Point, col color.RGBA) error {
@@ -161,8 +145,8 @@ func (iv *View) updateMousePos(x, y int32) {
 // x and y is in the SDL window coordinate space.
 func (iv *View) getMousePix(x, y int32) sdl.Point {
 	return sdl.Point{
-		X: iv.view.X + x*iv.view.W/iv.area.W,
-		Y: iv.view.Y + y*iv.view.H/iv.area.H,
+		X: int32(math.Floor(float64(iv.view.X + float32(x)*iv.view.W/float32(iv.area.W)))),
+		Y: int32(math.Floor(float64(iv.view.Y + float32(y)*iv.view.H/float32(iv.area.H)))),
 	}
 }
 
@@ -174,9 +158,38 @@ func (iv *View) OnLeave() {
 	iv.dragging = false
 }
 
+// OnClick is called when the user clicks within the ui.Component's region
+func (iv *View) OnClick(evt *sdl.MouseButtonEvent) bool {
+	iv.updateMousePos(evt.X, evt.Y)
+	iv.activeTool.OnClick(evt, iv)
+	iv.selectLayer()
+	if evt.Button == sdl.BUTTON_RIGHT {
+		if evt.State == sdl.PRESSED {
+			if iv.selLayer == nil {
+				// no layer was clicked on
+				return true
+			}
+			iv.dragging = true
+		} else if evt.State == sdl.RELEASED {
+			iv.dragging = false
+		}
+		iv.dragLoc.X = evt.X
+		iv.dragLoc.Y = evt.Y
+	} else if evt.Button == sdl.BUTTON_MIDDLE {
+		if evt.State == sdl.PRESSED {
+			iv.panning = true
+		} else if evt.State == sdl.RELEASED {
+			iv.panning = false
+		}
+		iv.panLoc.X = evt.X
+		iv.panLoc.Y = evt.Y
+	}
+	return true
+}
+
 // OnMotion is called when the cursor moves within the ui.Component's region
 func (iv *View) OnMotion(evt *sdl.MouseMotionEvent) bool {
-	if !iv.dragging {
+	if !iv.dragging && !iv.panning {
 		iv.updateMousePos(evt.X, evt.Y)
 		iv.activeTool.OnMotion(evt, iv)
 		if iv.selLayer == nil {
@@ -184,10 +197,10 @@ func (iv *View) OnMotion(evt *sdl.MouseMotionEvent) bool {
 		}
 		return ui.InBounds(iv.selLayer.area, sdl.Point{X: evt.X, Y: evt.Y})
 	}
-	if iv.selLayer == nil {
-		return true
-	}
 	if evt.State == sdl.ButtonRMask() {
+		if iv.selLayer == nil {
+			return true
+		}
 		newImgPix := iv.getMousePix(evt.X, evt.Y)
 		oldImgPix := iv.getMousePix(iv.dragLoc.X, iv.dragLoc.Y)
 		diff := sdl.Point{
@@ -198,6 +211,13 @@ func (iv *View) OnMotion(evt *sdl.MouseMotionEvent) bool {
 		iv.selLayer.area.Y += diff.Y
 		iv.dragLoc.X = evt.X
 		iv.dragLoc.Y = evt.Y
+	} else if evt.State == sdl.ButtonMMask() {
+		if iv.panning {
+			iv.view.X += float32(iv.panLoc.X-evt.X) * float32(iv.view.W) / float32(iv.area.W)
+			iv.view.Y += float32(iv.panLoc.Y-evt.Y) * float32(iv.view.W) / float32(iv.area.W)
+			iv.panLoc.X = evt.X
+			iv.panLoc.Y = evt.Y
+		}
 	}
 	return true
 }
@@ -208,9 +228,14 @@ func (iv *View) OnScroll(evt *sdl.MouseWheelEvent) bool {
 		return true
 	}
 	if evt.Y > 0 {
-		iv.zoomIn()
+		iv.mult++
+		if iv.mult > maxZoom {
+			iv.mult = maxZoom
+		}
+		iv.updateView()
 	} else if evt.Y < 0 {
-		iv.zoomOut()
+		iv.mult--
+		iv.updateView()
 	}
 	return true
 }
@@ -241,32 +266,11 @@ func (iv *View) SelectPixel(p sdl.Point) error {
 	return nil
 }
 
-// OnClick is called when the user clicks within the ui.Component's region
-func (iv *View) OnClick(evt *sdl.MouseButtonEvent) bool {
-	iv.updateMousePos(evt.X, evt.Y)
-	iv.activeTool.OnClick(evt, iv)
-	iv.selectLayer()
-	if evt.Button == sdl.BUTTON_RIGHT {
-		if evt.State == sdl.PRESSED {
-			if iv.selLayer == nil {
-				// no layer was clicked on
-				return true
-			}
-			iv.dragging = true
-		} else if evt.State == sdl.RELEASED {
-			iv.dragging = false
-		}
-		iv.dragLoc.X = evt.X
-		iv.dragLoc.Y = evt.Y
-	}
-	return true
-}
-
 // OnResize is called when the user resizes the window
 func (iv *View) OnResize(x, y int32) {
 	iv.area.W += x
 	iv.area.H += y
-	iv.zoom()
+	iv.updateView()
 }
 
 // String returns the name of the component type

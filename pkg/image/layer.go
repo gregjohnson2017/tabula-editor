@@ -4,6 +4,7 @@ import (
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
 	"github.com/gregjohnson2017/tabula-editor/pkg/log"
+	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -31,44 +32,45 @@ func NewLayer(offset sdl.Point, texture gfx.Texture) *Layer {
 }
 
 // Render draws the ui.Component
-func (l Layer) Render(view sdl.Rect) {
-	rect, ok := view.Intersect(&l.area)
+func (l Layer) Render(view sdl.FRect) {
+	fArea := ui.RectToFRect(l.area)
+	rect, ok := view.Intersect(&fArea)
 	if !ok {
 		// not in view
 		return
 	}
 
 	// update triangles that represent the position and scale of the image (these are SDL/window coordinates, converted to -1,1 gl space coordinates in the vertex shader)
-	blx, bly := float32(rect.X-view.X), float32(rect.H+rect.Y-view.Y)
-	tlx, tly := float32(rect.X-view.X), float32(rect.Y-view.Y)
-	trx, try := float32(rect.X+rect.W-view.X), float32(rect.Y-view.Y)
-	brx, bry := float32(rect.X+rect.W-view.X), float32(rect.H+rect.Y-view.Y)
+	blx, bly := rect.X-view.X, rect.H+rect.Y-view.Y
+	tlx, tly := rect.X-view.X, rect.Y-view.Y
+	trx, try := rect.X+rect.W-view.X, rect.Y-view.Y
+	brx, bry := rect.X+rect.W-view.X, rect.H+rect.Y-view.Y
 
 	var bls, blt float32 = 0.0, 1.0
 	var tls, tlt float32 = 0.0, 0.0
 	var trs, trt float32 = 1.0, 0.0
 	var brs, brt float32 = 1.0, 1.0
 
-	if rect.X != l.area.X {
-		ratio := float32(rect.X-l.area.X) / float32(l.area.W)
+	if rect.X != fArea.X {
+		ratio := (rect.X - fArea.X) / fArea.W
 		bls = ratio
 		tls = ratio
 	}
 
-	if rect.X+rect.W != l.area.X+l.area.W {
-		ratio := float32(rect.W+rect.X-l.area.X) / float32(l.area.W)
+	if rect.X+rect.W != fArea.X+fArea.W {
+		ratio := (rect.W + rect.X - fArea.X) / fArea.W
 		brs = ratio
 		trs = ratio
 	}
 
-	if rect.Y != l.area.Y {
-		ratio := float32(rect.Y-l.area.Y) / float32(l.area.H)
+	if rect.Y != fArea.Y {
+		ratio := (rect.Y - fArea.Y) / fArea.H
 		tlt = ratio
 		trt = ratio
 	}
 
-	if rect.Y+rect.H != l.area.Y+l.area.H {
-		ratio := float32(rect.H+rect.Y-l.area.Y) / float32(l.area.H)
+	if rect.Y+rect.H != fArea.Y+fArea.H {
+		ratio := (rect.H + rect.Y - fArea.Y) / fArea.H
 		blt = ratio
 		brt = ratio
 	}
