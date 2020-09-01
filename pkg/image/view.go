@@ -45,6 +45,7 @@ type View struct {
 	toolComms   <-chan Tool
 	checkerProg gfx.Program
 	program     gfx.Program
+	projName    string
 }
 
 func (iv *View) AddLayer(tex gfx.Texture) {
@@ -106,6 +107,7 @@ func NewView(area sdl.Rect, bbComms chan<- comms.Image, toolComms <-chan Tool, c
 	iv.activeTool = &EmptyTool{}
 
 	iv.CenterCanvas()
+	iv.projName = "New Project"
 
 	return iv, nil
 }
@@ -128,7 +130,7 @@ func (iv *View) InBoundary(pt sdl.Point) bool {
 func (iv *View) Render() {
 	sw := util.Start()
 	go func() {
-		iv.bbComms <- comms.Image{FileName: "layer", MousePix: iv.mousePix, Mult: iv.mult}
+		iv.bbComms <- comms.Image{FileName: iv.projName, MousePix: iv.mousePix, Mult: iv.mult}
 	}()
 
 	// TODO selection outline
@@ -449,7 +451,7 @@ func (iv *View) SaveProject(fileName string) error {
 	if err != nil {
 		return err
 	}
-
+	iv.projName = filepath.Base(fileName)
 	return nil
 }
 
@@ -502,6 +504,6 @@ func (iv *View) LoadProject(fileName string) error {
 	}
 
 	iv.updateView()
-
+	iv.projName = filepath.Base(fileName)
 	return nil
 }
