@@ -1,6 +1,8 @@
 package image
 
 import (
+	"encoding/gob"
+
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
 	"github.com/gregjohnson2017/tabula-editor/pkg/log"
@@ -10,8 +12,6 @@ import (
 
 type Layer struct {
 	area    sdl.Rect
-	origW   int32
-	origH   int32
 	buffer  *gfx.BufferArray
 	texture gfx.Texture
 }
@@ -24,8 +24,6 @@ func NewLayer(offset sdl.Point, texture gfx.Texture) *Layer {
 			W: texture.GetWidth(),
 			H: texture.GetHeight(),
 		},
-		origW:   texture.GetWidth(),
-		origH:   texture.GetHeight(),
 		buffer:  gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2}),
 		texture: texture,
 	}
@@ -99,4 +97,40 @@ func (l Layer) Render(view sdl.FRect) {
 func (l Layer) Destroy() {
 	l.buffer.Destroy()
 	l.texture.Destroy()
+}
+
+func (l Layer) EncodeLayer(enc *gob.Encoder) error {
+	err := enc.Encode(l.area)
+	if err != nil {
+		return err
+	}
+	err = enc.Encode(l.texture.GetData())
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func DecodeLayer(dec *gob.Decoder) (*Layer, error) {
+	var layer Layer
+	err := dec.Decode(&layer.area)
+	if err != nil {
+		return nil, err
+	}
+	layer.buffer = gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2})
+
+	var data = make([]byte, layer.area.W*layer.area.H*4)
+	err = dec.Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+	tex, err := gfx.NewTexture(layer.area.W, layer.area.H, data, gl.RGBA, 4)
+	if err != nil {
+		return nil, err
+	}
+	tex.SetParameter(gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST)
+	tex.SetParameter(gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+	layer.texture = tex
+
+	return &layer, nil
 }

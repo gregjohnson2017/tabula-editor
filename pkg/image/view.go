@@ -1,6 +1,9 @@
 package image
 
 import (
+	"bufio"
+	"bytes"
+	"encoding/gob"
 	"fmt"
 	"image"
 	"image/color"
@@ -399,5 +402,106 @@ func (iv *View) WriteToFile(fileName string) error {
 	default:
 		return fmt.Errorf("writing to file extension %v: %w", ext, ErrWriteFormat)
 	}
+	return nil
+}
+
+const ErrInvalidFormat log.ConstErr = "invalid project file (not .tabula)"
+
+func (iv *View) SaveProject(fileName string) error {
+	if ext := filepath.Ext(fileName); ext != ".tabula" {
+		return fmt.Errorf("%w: %v", ErrInvalidFormat, fileName)
+	}
+	out, err := os.Create(fileName)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	var network bytes.Buffer
+	enc := gob.NewEncoder(&network)
+
+	if err = enc.Encode(iv.mult); err != nil {
+		return err
+	}
+	if err = enc.Encode(iv.view); err != nil {
+		return err
+	}
+	if err = enc.Encode(iv.canvas); err != nil {
+		return err
+	}
+	// canvas layer written first
+	if err = iv.canvasLayer.EncodeLayer(enc); err != nil {
+		return err
+	}
+	// write number of other layers
+	if err = enc.Encode(len(iv.layers) - 1); err != nil {
+		return err
+	}
+	// then every other layer
+	for _, layer := range iv.layers {
+		if layer != iv.canvasLayer {
+			if err = layer.EncodeLayer(enc); err != nil {
+				return err
+			}
+		}
+	}
+
+	_, err = out.Write(network.Bytes())
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (iv *View) LoadProject(fileName string) error {
+	var err error
+	var in *os.File
+	if in, err = os.Open(fileName); err != nil {
+		return err
+	}
+
+	defer in.Close()
+	if ext := filepath.Ext(fileName); ext != ".tabula" {
+		return fmt.Errorf("%w: %v", ErrInvalidFormat, fileName)
+	}
+
+	var network bytes.Buffer
+	reader := bufio.NewReader(in)
+	if _, err = network.ReadFrom(reader); err != nil {
+		return err
+	}
+	dec := gob.NewDecoder(&network)
+
+	if err = dec.Decode(&iv.mult); err != nil {
+		return err
+	}
+	if err = dec.Decode(&iv.view); err != nil {
+		return err
+	}
+	if err = dec.Decode(&iv.canvas); err != nil {
+		return err
+	}
+	if iv.canvasLayer, err = DecodeLayer(dec); err != nil {
+		return err
+	}
+
+	// reset layers list
+	iv.layers = append([]*Layer{}, iv.canvasLayer)
+
+	var nLayers int
+	if err := dec.Decode(&nLayers); err != nil {
+		return err
+	}
+
+	for i := 0; i < nLayers; i++ {
+		var layer *Layer
+		if layer, err = DecodeLayer(dec); err != nil {
+			return err
+		}
+		iv.layers = append(iv.layers, layer)
+	}
+
+	iv.updateView()
+
 	return nil
 }
