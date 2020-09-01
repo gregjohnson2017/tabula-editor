@@ -24,23 +24,24 @@ var _ ui.Component = ui.Component(&View{})
 
 // View defines an interactable image viewing pane
 type View struct {
-	cfg        *config.Config
-	area       sdl.Rect
-	canvas     sdl.Rect
-	view       sdl.FRect
-	mousePix   sdl.Point
-	mult       int32
-	activeTool Tool
-	layers     []*Layer
-	selLayer   *Layer
-	dragLoc    sdl.Point
-	panLoc     sdl.Point
-	dragging   bool
-	panning    bool
-	bbComms    chan<- comms.Image
-	toolComms  <-chan Tool
-	program    gfx.Program
-	canvasProg gfx.Program
+	cfg         *config.Config
+	area        sdl.Rect
+	canvas      sdl.Rect
+	view        sdl.FRect
+	mousePix    sdl.Point
+	mult        int32
+	activeTool  Tool
+	layers      []*Layer
+	selLayer    *Layer
+	canvasLayer *Layer
+	dragLoc     sdl.Point
+	panLoc      sdl.Point
+	dragging    bool
+	panning     bool
+	bbComms     chan<- comms.Image
+	toolComms   <-chan Tool
+	program     gfx.Program
+	canvasProg  gfx.Program
 }
 
 func (iv *View) AddLayer(tex gfx.Texture) {
@@ -58,11 +59,21 @@ func NewView(area sdl.Rect, bbComms chan<- comms.Image, toolComms <-chan Tool, c
 	iv.mult = 0
 
 	iv.canvas = sdl.Rect{
-		X: -10,
-		Y: -10,
-		W: 28,
-		H: 28,
+		X: -50,
+		Y: -50,
+		W: 100,
+		H: 100,
 	}
+
+	var data = make([]byte, iv.canvas.W*iv.canvas.H*4)
+	canvasTex, err := gfx.NewTexture(iv.canvas.W, iv.canvas.H, data, gl.RGBA, 4)
+	if err != nil {
+		return nil, err
+	}
+	canvasTex.SetParameter(gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST)
+	canvasTex.SetParameter(gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+	iv.canvasLayer = NewLayer(sdl.Point{X: iv.canvas.X, Y: iv.canvas.Y}, canvasTex)
+	iv.layers = append(iv.layers, iv.canvasLayer)
 
 	v1, err := gfx.NewShader(gfx.VertexShaderSource, gl.VERTEX_SHADER)
 	if err != nil {
@@ -89,7 +100,7 @@ func NewView(area sdl.Rect, bbComms chan<- comms.Image, toolComms <-chan Tool, c
 	iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
 	iv.activeTool = &EmptyTool{}
 
-	iv.updateView()
+	iv.CenterCanvas()
 
 	return iv, nil
 }
@@ -97,6 +108,7 @@ func NewView(area sdl.Rect, bbComms chan<- comms.Image, toolComms <-chan Tool, c
 // Destroy frees all assets acquired by the ui.Component
 func (iv *View) Destroy() {
 	iv.program.Destroy()
+	iv.canvasProg.Destroy()
 	for _, layer := range iv.layers {
 		layer.Destroy()
 	}
@@ -167,13 +179,14 @@ func (iv *View) updateView() {
 	iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
 }
 
-func (iv *View) CenterView() {
-	iv.view = ui.RectToFRect(iv.area)
+func (iv *View) CenterCanvas() {
+	iv.view = sdl.FRect{
+		X: float32(iv.canvas.X) - (float32(iv.area.W)/2 - float32(iv.canvas.W)/2),
+		Y: float32(iv.canvas.Y) - (float32(iv.area.H)/2 - float32(iv.canvas.H)/2),
+		W: float32(iv.area.W),
+		H: float32(iv.area.H),
+	}
 	iv.updateView()
-}
-
-func (iv *View) LookAtCanvas() {
-	iv.view = ui.RectToFRect(iv.canvas)
 	iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
 }
 
@@ -247,7 +260,8 @@ func (iv *View) OnMotion(evt *sdl.MouseMotionEvent) bool {
 		return ui.InBounds(iv.selLayer.area, sdl.Point{X: evt.X, Y: evt.Y})
 	}
 	if evt.State == sdl.ButtonRMask() {
-		if iv.selLayer == nil {
+		// do not allow the canvas to be dragged
+		if iv.selLayer == nil || iv.selLayer == iv.canvasLayer {
 			return true
 		}
 		newImgPix := iv.getMousePix(evt.X, evt.Y)
