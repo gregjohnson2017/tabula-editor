@@ -173,21 +173,11 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 			Text: "Image",
 			Children: []menu.Definition{
 				{
-					Text: "Center View",
+					Text: "Center Canvas",
 					Action: func() {
 						go func() {
 							actionComms <- func() {
-								iv.CenterView()
-							}
-						}()
-					},
-				},
-				{
-					Text: "Look @ Canvas",
-					Action: func() {
-						go func() {
-							actionComms <- func() {
-								iv.LookAtCanvas()
+								iv.CenterCanvas()
 							}
 						}()
 					},
