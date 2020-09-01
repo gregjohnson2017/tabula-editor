@@ -117,7 +117,7 @@ func New(fileName, project string, win *sdl.Window, cfg *config.Config) *Applica
 					Text: "Save Project",
 					Action: func() {
 						go func() {
-							newFileName, err := util.OpenFileDialog(win)
+							newFileName, err := util.SaveFileDialog(win)
 							if err != nil {
 								log.Warn(err)
 								return
