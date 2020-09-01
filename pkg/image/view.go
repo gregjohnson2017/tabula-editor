@@ -40,8 +40,8 @@ type View struct {
 	panning     bool
 	bbComms     chan<- comms.Image
 	toolComms   <-chan Tool
+	checkerProg gfx.Program
 	program     gfx.Program
-	canvasProg  gfx.Program
 }
 
 func (iv *View) AddLayer(tex gfx.Texture) {
@@ -84,7 +84,7 @@ func NewView(area sdl.Rect, bbComms chan<- comms.Image, toolComms <-chan Tool, c
 		return nil, err
 	}
 
-	if iv.program, err = gfx.NewProgram(v1, f1); err != nil {
+	if iv.checkerProg, err = gfx.NewProgram(v1, f1); err != nil {
 		return nil, err
 	}
 
@@ -93,11 +93,13 @@ func NewView(area sdl.Rect, bbComms chan<- comms.Image, toolComms <-chan Tool, c
 		return nil, err
 	}
 
-	if iv.canvasProg, err = gfx.NewProgram(v1, f2); err != nil {
+	if iv.program, err = gfx.NewProgram(v1, f2); err != nil {
 		return nil, err
 	}
 
+	iv.checkerProg.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
 	iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
+
 	iv.activeTool = &EmptyTool{}
 
 	iv.CenterCanvas()
@@ -107,8 +109,8 @@ func NewView(area sdl.Rect, bbComms chan<- comms.Image, toolComms <-chan Tool, c
 
 // Destroy frees all assets acquired by the ui.Component
 func (iv *View) Destroy() {
+	iv.checkerProg.Destroy()
 	iv.program.Destroy()
-	iv.canvasProg.Destroy()
 	for _, layer := range iv.layers {
 		layer.Destroy()
 	}
@@ -133,7 +135,13 @@ func (iv *View) Render() {
 
 	iv.program.Bind()
 	for _, layer := range iv.layers {
-		layer.Render(iv.view)
+		if layer == iv.canvasLayer {
+			iv.checkerProg.Bind()
+			iv.canvasLayer.Render(iv.view)
+			iv.program.Bind()
+		} else {
+			layer.Render(iv.view)
+		}
 	}
 	iv.program.Unbind()
 
@@ -149,11 +157,11 @@ func (iv *View) Render() {
 // RenderCanvas draws what is on the canvas or area, whichever is larger
 func (iv *View) RenderCanvas() {
 
-	iv.canvasProg.UploadUniform("area", float32(iv.canvas.W), float32(iv.canvas.H))
+	iv.program.UploadUniform("area", float32(iv.canvas.W), float32(iv.canvas.H))
 	// gl viewport 0, 0 is bottom left
 	gl.Viewport(0, 0, iv.canvas.W, iv.canvas.H)
 
-	iv.canvasProg.Bind()
+	iv.program.Bind()
 	for _, layer := range iv.layers {
 		layer.Render(sdl.FRect{
 			X: float32(iv.canvas.X),
@@ -162,8 +170,9 @@ func (iv *View) RenderCanvas() {
 			H: float32(iv.canvas.H),
 		})
 	}
-	iv.canvasProg.Unbind()
+	iv.program.Unbind()
 
+	iv.updateView()
 }
 
 const maxZoom = 8
@@ -176,6 +185,7 @@ func (iv *View) updateView() {
 	newView.X = (iv.view.W-newView.W)/2 + iv.view.X
 	newView.Y = (iv.view.H-newView.H)/2 + iv.view.Y
 	iv.view = newView
+	iv.checkerProg.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
 	iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
 }
 
@@ -187,6 +197,7 @@ func (iv *View) CenterCanvas() {
 		H: float32(iv.area.H),
 	}
 	iv.updateView()
+	iv.checkerProg.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
 	iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
 }
 
