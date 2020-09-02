@@ -1,6 +1,7 @@
 package image
 
 import (
+	"bytes"
 	"encoding/gob"
 
 	"github.com/go-gl/gl/v2.1/gl"
@@ -99,38 +100,39 @@ func (l Layer) Destroy() {
 	l.texture.Destroy()
 }
 
-func (l Layer) EncodeLayer(enc *gob.Encoder) error {
-	err := enc.Encode(l.area)
-	if err != nil {
-		return err
+func (l Layer) MarshalBinary() ([]byte, error) {
+	var buf bytes.Buffer
+	var err error
+	enc := gob.NewEncoder(&buf)
+	if err = enc.Encode(l.area); err != nil {
+		return nil, err
 	}
-	err = enc.Encode(l.texture.GetData())
-	if err != nil {
-		return err
+	if err = enc.Encode(l.texture.GetData()); err != nil {
+		return nil, err
 	}
-	return nil
+	return buf.Bytes(), nil
 }
 
-func DecodeLayer(dec *gob.Decoder) (*Layer, error) {
-	var layer Layer
-	err := dec.Decode(&layer.area)
-	if err != nil {
-		return nil, err
-	}
-	layer.buffer = gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2})
+func (l *Layer) UnmarshalBinary(data []byte) error {
+	var err error
+	dec := gob.NewDecoder(bytes.NewReader(data))
 
-	var data = make([]byte, layer.area.W*layer.area.H*4)
-	err = dec.Decode(&data)
-	if err != nil {
-		return nil, err
+	if err = dec.Decode(&l.area); err != nil {
+		return err
 	}
-	tex, err := gfx.NewTexture(layer.area.W, layer.area.H, data, gl.RGBA, 4)
+	l.buffer = gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2})
+
+	var texData = make([]byte, l.area.W*l.area.H*4)
+	if err = dec.Decode(&texData); err != nil {
+		return err
+	}
+	tex, err := gfx.NewTexture(l.area.W, l.area.H, texData, gl.RGBA, 4)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	tex.SetParameter(gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST)
 	tex.SetParameter(gl.TEXTURE_MAG_FILTER, gl.NEAREST)
-	layer.texture = tex
+	l.texture = tex
 
-	return &layer, nil
+	return nil
 }

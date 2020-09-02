@@ -1,8 +1,8 @@
 package image
 
 import (
-	"bufio"
 	"bytes"
+	"compress/zlib"
 	"encoding/gob"
 	"fmt"
 	"image"
@@ -12,6 +12,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/comms"
@@ -407,10 +408,19 @@ func (iv *View) WriteToFile(fileName string) error {
 	return nil
 }
 
+type Project struct {
+	ProjName string
+	Mult     int32
+	Canvas   sdl.Rect
+	View     sdl.FRect
+	Layers   []*Layer
+}
+
 const ErrInvalidFormat log.ConstErr = "invalid project file (not .tabula)"
 
 func (iv *View) SaveProject(fileName string) error {
-	if ext := filepath.Ext(fileName); ext != ".tabula" {
+	var ext string
+	if ext = filepath.Ext(fileName); ext != ".tabula" {
 		return fmt.Errorf("%w: %v", ErrInvalidFormat, fileName)
 	}
 	out, err := os.Create(fileName)
@@ -418,40 +428,28 @@ func (iv *View) SaveProject(fileName string) error {
 		return err
 	}
 	defer out.Close()
-	var network bytes.Buffer
-	enc := gob.NewEncoder(&network)
 
-	if err = enc.Encode(iv.mult); err != nil {
-		return err
-	}
-	if err = enc.Encode(iv.view); err != nil {
-		return err
-	}
-	if err = enc.Encode(iv.canvas); err != nil {
-		return err
-	}
-	// canvas layer written first
-	if err = iv.canvasLayer.EncodeLayer(enc); err != nil {
-		return err
-	}
-	// write number of other layers
-	if err = enc.Encode(len(iv.layers) - 1); err != nil {
-		return err
-	}
-	// then every other layer
-	for _, layer := range iv.layers {
-		if layer != iv.canvasLayer {
-			if err = layer.EncodeLayer(enc); err != nil {
-				return err
-			}
-		}
+	proj := Project{
+		ProjName: strings.TrimSuffix(filepath.Base(fileName), ext),
+		Mult:     iv.mult,
+		Canvas:   iv.canvas,
+		View:     iv.view,
+		Layers:   iv.layers,
 	}
 
-	_, err = out.Write(network.Bytes())
-	if err != nil {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	if err = enc.Encode(proj); err != nil {
 		return err
 	}
-	iv.projName = filepath.Base(fileName)
+
+	zw := zlib.NewWriter(out)
+	if _, err = zw.Write(buf.Bytes()); err != nil {
+		return err
+	}
+	defer zw.Close()
+
+	iv.projName = proj.ProjName
 	return nil
 }
 
@@ -461,49 +459,30 @@ func (iv *View) LoadProject(fileName string) error {
 	if in, err = os.Open(fileName); err != nil {
 		return err
 	}
-
 	defer in.Close()
 	if ext := filepath.Ext(fileName); ext != ".tabula" {
 		return fmt.Errorf("%w: %v", ErrInvalidFormat, fileName)
 	}
 
-	var network bytes.Buffer
-	reader := bufio.NewReader(in)
-	if _, err = network.ReadFrom(reader); err != nil {
-		return err
+	zr, err := zlib.NewReader(in)
+	if err != nil {
+		return fmt.Errorf("zlib reader error: %w", err)
 	}
-	dec := gob.NewDecoder(&network)
+	defer zr.Close()
 
-	if err = dec.Decode(&iv.mult); err != nil {
-		return err
-	}
-	if err = dec.Decode(&iv.view); err != nil {
-		return err
-	}
-	if err = dec.Decode(&iv.canvas); err != nil {
-		return err
-	}
-	if iv.canvasLayer, err = DecodeLayer(dec); err != nil {
-		return err
+	var proj Project
+	dec := gob.NewDecoder(zr)
+	if err = dec.Decode(&proj); err != nil {
+		return fmt.Errorf("gob decoder error: %w", err)
 	}
 
-	// reset layers list
-	iv.layers = append([]*Layer{}, iv.canvasLayer)
-
-	var nLayers int
-	if err := dec.Decode(&nLayers); err != nil {
-		return err
-	}
-
-	for i := 0; i < nLayers; i++ {
-		var layer *Layer
-		if layer, err = DecodeLayer(dec); err != nil {
-			return err
-		}
-		iv.layers = append(iv.layers, layer)
-	}
+	iv.layers = proj.Layers
+	iv.canvasLayer = proj.Layers[0]
+	iv.mult = proj.Mult
+	iv.view = proj.View
+	iv.canvas = proj.Canvas
+	iv.projName = proj.ProjName
 
 	iv.updateView()
-	iv.projName = filepath.Base(fileName)
 	return nil
 }
