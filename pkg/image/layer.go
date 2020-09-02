@@ -95,11 +95,13 @@ func (l Layer) Render(view sdl.FRect) {
 	l.texture.Unbind()
 }
 
+// Destroy destroys OpenGL assets associated with the Layer
 func (l Layer) Destroy() {
 	l.buffer.Destroy()
 	l.texture.Destroy()
 }
 
+// MarshalBinary fulfills a requirement for gob to encode Layer
 func (l Layer) MarshalBinary() ([]byte, error) {
 	var buf bytes.Buffer
 	var err error
@@ -113,6 +115,7 @@ func (l Layer) MarshalBinary() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// UnmarshalBinary fulfills a requirement for gob to decode Layer
 func (l *Layer) UnmarshalBinary(data []byte) error {
 	var err error
 	dec := gob.NewDecoder(bytes.NewReader(data))

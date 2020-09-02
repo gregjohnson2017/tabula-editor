@@ -179,6 +179,8 @@ func (iv *View) RenderCanvas() {
 
 const maxZoom = 8
 
+// updateView updates the view rectangle according to the zoom multiplier,
+// while maintaining the current pan
 func (iv *View) updateView() {
 	frac := float32(math.Pow(2, float64(-iv.mult)))
 	newView := sdl.FRect{}
@@ -191,6 +193,7 @@ func (iv *View) updateView() {
 	iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
 }
 
+// CenterCanvas updates the view so the canvas is in the center of the window
 func (iv *View) CenterCanvas() {
 	iv.view = sdl.FRect{
 		X: float32(iv.canvas.X) - (float32(iv.area.W)/2 - float32(iv.canvas.W)/2),
@@ -203,6 +206,8 @@ func (iv *View) CenterCanvas() {
 	iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
 }
 
+// setPixel sets the currently hovered texel of the selected layer
+// to the specified color
 func (iv *View) setPixel(p sdl.Point, col color.RGBA) error {
 	if iv.selLayer != nil {
 		p.X -= iv.selLayer.area.X
@@ -316,6 +321,8 @@ func (iv *View) OnScroll(evt *sdl.MouseWheelEvent) bool {
 	return true
 }
 
+// selectLayer sets the currently selected layer to nil, and sets the layer
+// that the mouse is currently hovering over, if any.
 func (iv *View) selectLayer() {
 	iv.selLayer = nil
 	for i := len(iv.layers) - 1; i >= 0; i-- {
@@ -357,7 +364,8 @@ func (iv *View) String() string {
 // ErrWriteFormat indicates that an unsupported image format was trying to be written to
 const ErrWriteFormat log.ConstErr = "unsupported image format"
 
-// WriteToFile writes the image data stored in the OpenGL texture to a file specified by fileName
+// WriteToFile uses an OpenGL Frame Buffer Object to render the data in the canvas
+// to a texture, and then write the data in that texture to the specified file
 func (iv *View) WriteToFile(fileName string) error {
 	sw := util.Start()
 	// TODO after canvas figured out
@@ -417,6 +425,8 @@ type Project struct {
 
 const ErrInvalidFormat log.ConstErr = "invalid project file (not .tabula)"
 
+// SaveProject saves the relevant project data at the specified file location
+// in a compressed format. The fileName must end with '.tabula'
 func (iv *View) SaveProject(fileName string) error {
 	sw := util.Start()
 	var ext string
@@ -454,6 +464,9 @@ func (iv *View) SaveProject(fileName string) error {
 	return nil
 }
 
+// LoadProject loads the project data at the specified file location,
+// decompresses and decodes the data and populates the relevant fields in
+// the image view. The fileName must end with '.tabula'
 func (iv *View) LoadProject(fileName string) error {
 	sw := util.Start()
 	var err error
