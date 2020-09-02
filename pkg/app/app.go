@@ -70,18 +70,6 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// centerButton, err := menu.NewButton(buttonAreaCenter, cfg, "Center Image", func() {
-	// 	go func() {
-	// 		actionComms <- func() {
-	// 			iv.CenterView()
-	// 		}
-	// 	}()
-	// })
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// centerButton.SetHighlightBackgroundColor([4]float32{1.0, 0.0, 0.0, 1.0})
-	// centerButton.SetDefaultTextColor([4]float32{0.0, 0.0, 1.0, 1.0})
 
 	menuBar, err := menu.NewBar(cfg, []menu.Definition{
 		{
@@ -195,7 +183,7 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 
 	return &Application{
 		running:     false,
-		comps:       []ui.Component{iv, bottomBar /*, centerButton*/, menuBar},
+		comps:       []ui.Component{iv, bottomBar, menuBar},
 		cfg:         cfg,
 		postEvtActs: actionComms,
 		ticker:      ticker,
