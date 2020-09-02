@@ -162,7 +162,7 @@ func (iv *View) Render() {
 
 // RenderCanvas draws what is on the canvas or area, whichever is larger
 func (iv *View) RenderCanvas() {
-
+	sw := util.Start()
 	iv.program.UploadUniform("area", float32(iv.canvas.W), float32(iv.canvas.H))
 	// gl viewport 0, 0 is bottom left
 	gl.Viewport(0, 0, iv.canvas.W, iv.canvas.H)
@@ -179,6 +179,7 @@ func (iv *View) RenderCanvas() {
 	iv.program.Unbind()
 
 	iv.updateView()
+	sw.Stop("RenderCanvas")
 }
 
 const maxZoom = 8
@@ -363,6 +364,7 @@ const ErrWriteFormat log.ConstErr = "unsupported image format"
 
 // WriteToFile writes the image data stored in the OpenGL texture to a file specified by fileName
 func (iv *View) WriteToFile(fileName string) error {
+	sw := util.Start()
 	// TODO after canvas figured out
 	w, h := iv.canvas.W, iv.canvas.H
 
@@ -405,6 +407,8 @@ func (iv *View) WriteToFile(fileName string) error {
 	default:
 		return fmt.Errorf("writing to file extension %v: %w", ext, ErrWriteFormat)
 	}
+
+	sw.Stop("WriteToFile")
 	return nil
 }
 
@@ -419,6 +423,7 @@ type Project struct {
 const ErrInvalidFormat log.ConstErr = "invalid project file (not .tabula)"
 
 func (iv *View) SaveProject(fileName string) error {
+	sw := util.Start()
 	var ext string
 	if ext = filepath.Ext(fileName); ext != ".tabula" {
 		return fmt.Errorf("%w: %v", ErrInvalidFormat, fileName)
@@ -450,10 +455,12 @@ func (iv *View) SaveProject(fileName string) error {
 	defer zw.Close()
 
 	iv.projName = proj.ProjName
+	sw.Stop("SaveProject")
 	return nil
 }
 
 func (iv *View) LoadProject(fileName string) error {
+	sw := util.Start()
 	var err error
 	var in *os.File
 	if in, err = os.Open(fileName); err != nil {
@@ -484,5 +491,6 @@ func (iv *View) LoadProject(fileName string) error {
 	iv.projName = proj.ProjName
 
 	iv.updateView()
+	sw.Stop("LoadProject")
 	return nil
 }
