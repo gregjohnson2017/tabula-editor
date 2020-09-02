@@ -169,12 +169,7 @@ func (iv *View) RenderCanvas() {
 
 	iv.program.Bind()
 	for _, layer := range iv.layers {
-		layer.Render(sdl.FRect{
-			X: float32(iv.canvas.X),
-			Y: float32(iv.canvas.Y),
-			W: float32(iv.canvas.W),
-			H: float32(iv.canvas.H),
-		})
+		layer.Render(ui.RectToFRect(iv.canvas))
 	}
 	iv.program.Unbind()
 
