@@ -14,8 +14,7 @@ const (
 		vec2 glSpace = vec2(2.0, 2.0) * (pos / canvasArea) + vec2(-1.0, -1.0);
 		gl_Position = vec4(glSpace, 0.0, 1.0);
 		color = uni_color;
-	}
-` + "\x00"
+	}`
 
 	OutlineFsh = `
 	#version 330
@@ -29,8 +28,7 @@ const (
 		vec4 col2 = vec4(0.3, 0.3, 0.3, 1.0);
 		vec4 checker = mx == my ? col1 : col2;
 		frag_color = checker;
-	}
-` + "\x00"
+	}`
 
 	SolidColorVertex = `
 	#version 330
@@ -40,8 +38,7 @@ const (
 	void main() {
 		gl_Position = vec4(position_in, 0.0, 1.0);
 		color = uni_color;
-	}
-` + "\x00"
+	}`
 
 	SolidColorFragment = `
 	#version 330
@@ -49,8 +46,7 @@ const (
 	out vec4 frag_color;
 	void main() {
 		frag_color = color;
-	}
-` + "\x00"
+	}`
 
 	VertexShaderSource = `
 	#version 330
@@ -62,8 +58,7 @@ const (
 		vec2 glSpace = vec2(2.0, -2.0) * (position_in / area) + vec2(-1.0, 1.0);
 		gl_Position = vec4(glSpace, 0.0, 1.0);
 		tex_coords = tex_coords_in;
-	}
-` + "\x00"
+	}`
 
 	FragmentShaderSource = `
 	#version 330
@@ -72,8 +67,7 @@ const (
 	out vec4 frag_color;
 	void main() {
 		frag_color = texture(frag_tex, tex_coords);
-	}
-` + "\x00"
+	}`
 
 	VshTexturePassthrough = `
 	#version 330
@@ -83,8 +77,7 @@ const (
 	void main() {
 		gl_Position = vec4(position_in, 0.0, 1.0);
 		tex_coords = tex_coords_in;
-	}
-` + "\x00"
+	}`
 
 	// Uniform `tex_size` is the (width, height) of the texture.
 	// Input `position_in` is typical openGL position coordinates.
@@ -102,8 +95,7 @@ const (
 		vec2 glSpace = vec2(2.0, 2.0) * (position_in / screen_size) + vec2(-1.0, -1.0);
 		gl_Position = vec4(glSpace, 0.0, 1.0);
 		tex_coords = vec2(tex_pixels.x / tex_size.x, tex_pixels.y / tex_size.y);
-	}
-` + "\x00"
+	}`
 
 	GlyphShaderFragment = `
 	#version 330
@@ -113,8 +105,7 @@ const (
 	out vec4 frag_color;
 	void main() {
 		frag_color = vec4(text_color.xyz, texture(frag_tex, tex_coords).r * text_color.w);
-	}
-` + "\x00"
+	}`
 
 	CheckerShaderFragment = `
 	#version 330
@@ -130,6 +121,5 @@ const (
 		vec4 checker = mx == my ? col1 : col2;
 		vec4 tex = texture(frag_tex, tex_coords);
 		frag_color = mix(checker, tex, tex.a);
-	}
-` + "\x00"
+	}`
 )
