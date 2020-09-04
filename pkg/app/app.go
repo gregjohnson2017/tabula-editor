@@ -6,6 +6,7 @@ import (
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/comms"
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
+	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
 	"github.com/gregjohnson2017/tabula-editor/pkg/image"
 	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/gregjohnson2017/tabula-editor/pkg/menu"
@@ -38,7 +39,7 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 		}
 	}
 
-	imageViewArea := &sdl.Rect{
+	imageViewArea := sdl.Rect{
 		X: 0,
 		Y: 0,
 		W: cfg.ScreenWidth,
@@ -50,37 +51,25 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 		W: cfg.ScreenWidth,
 		H: cfg.BottomBarHeight,
 	}
-	buttonAreaCenter := &sdl.Rect{
-		X: 0,
-		Y: 30,
-		W: 125,
-		H: 20,
-	}
 
 	bottomBarComms := make(chan comms.Image)
 	toolComms := make(chan image.Tool)
 	actionComms := make(chan func())
 
-	iv, err := image.NewView(imageViewArea, fileName, bottomBarComms, toolComms, cfg)
+	iv, err := image.NewView(imageViewArea, bottomBarComms, toolComms, cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
+	tex, err := gfx.NewTextureFromFile(fileName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	iv.AddLayer(tex)
+
 	bottomBar, err := NewBottomBar(bottomBarArea, bottomBarComms, cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
-	centerButton, err := menu.NewButton(buttonAreaCenter, cfg, "Center Image", func() {
-		go func() {
-			actionComms <- func() {
-				iv.CenterImage()
-			}
-		}()
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	centerButton.SetHighlightBackgroundColor([4]float32{1.0, 0.0, 0.0, 1.0})
-	centerButton.SetDefaultTextColor([4]float32{0.0, 0.0, 1.0, 1.0})
 
 	menuBar, err := menu.NewBar(cfg, []menu.Definition{
 		{
@@ -96,9 +85,11 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 						}
 						go func() {
 							actionComms <- func() {
-								if err := iv.LoadFromFile(newFileName); err != nil {
+								tex, err := gfx.NewTextureFromFile(newFileName)
+								if err != nil {
 									log.Fatal(err)
 								}
+								iv.AddLayer(tex)
 							}
 						}()
 					},
@@ -114,9 +105,6 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 						go func() {
 							actionComms <- func() {
 								if err := iv.WriteToFile(newFileName); err != nil {
-									log.Fatal(err)
-								}
-								if err := iv.LoadFromFile(newFileName); err != nil {
 									log.Fatal(err)
 								}
 							}
@@ -169,6 +157,21 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 				},
 			},
 		},
+		{
+			Text: "Image",
+			Children: []menu.Definition{
+				{
+					Text: "Center Canvas",
+					Action: func() {
+						go func() {
+							actionComms <- func() {
+								iv.CenterCanvas()
+							}
+						}()
+					},
+				},
+			},
+		},
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -180,7 +183,7 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 
 	return &Application{
 		running:     false,
-		comps:       []ui.Component{iv, bottomBar, centerButton, menuBar},
+		comps:       []ui.Component{iv, bottomBar, menuBar},
 		cfg:         cfg,
 		postEvtActs: actionComms,
 		ticker:      ticker,

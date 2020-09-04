@@ -138,7 +138,7 @@ func (bb *BottomBar) Render() {
 	// second render text on top
 	// TODO optimize rendering by no-oping if string hasn't changed (or window size)
 	fileNameMessage := msg.FileName
-	zoomMessage := fmt.Sprintf("%vx", msg.Mult)
+	zoomMessage := fmt.Sprintf("2^(%v)", msg.Mult)
 	mousePixMessage := fmt.Sprintf("(%v, %v)", msg.MousePix.X, msg.MousePix.Y)
 
 	pos := sdl.Point{X: 0, Y: bb.cfg.BottomBarHeight / 2}

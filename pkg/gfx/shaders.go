@@ -120,7 +120,7 @@ const (
 	#version 330
 	uniform sampler2D frag_tex;
 	in vec2 tex_coords;
-	out vec4 frag_color;
+	layout(location = 0) out vec4 frag_color;
 	void main() {
 		float scale = 10.0;
 		float mx = floor(mod(gl_FragCoord.x / scale, 2.0));
