@@ -123,48 +123,6 @@ const (
 		frag_color = mix(checker, tex, tex.a);
 	}`
 
-	ComputeSelsPerChunk = `
-	#version 430
-	layout(local_size_x = 1, local_size_y = 1) in;
-	layout(std430, binding = 0) buffer ssbo_data
-	{
-		int chunkIndices[];
-	};
-	uniform sampler2D selTex;
-
-	void main() {
-		ivec2 dims = textureSize(tex, 0);
-		ivec2 coords = ivec2(gl_GlobalInvocationID.xy);
-		int max_x = max(coords.x * 10 + 10, dims.x);
-		int max_y = max(coords.y * 10 + 10, dims.y);
-		int n_selected = 0;
-		for (int x = coords.x * 10; x < max_x; x++) {
-			for (int y = coords.y * 10; y < max_y; y++) {
-				if (texelFetch(selTex, ivec2(x, y), 0).x == 1) {
-					n_selected++;
-				}
-			}
-		}
-		chunkIndices[nXWorkers * coords.y + coords.x] = n_selected;
-	}`
-
-	ComputeIndices = `
-	#version 430
-	layout(local_size_x = 1, local_size_y = 1) in;
-	layout(std430, binding = 0) buffer ssbo_data
-	{
-		int chunkIndices[];
-	};
-
-	void main() {
-		int currentIdx = 0;
-		for (int i = 0; i < chunkIndices.length() - 1; i++) {
-			int temp = chunkIndices[i];
-			chunkIndices[i] = currentIdx;
-			currentIdx += temp;
-		}
-	}`
-
 	VshPassthrough = `
 	#version 330
 	in vec2 position_in;

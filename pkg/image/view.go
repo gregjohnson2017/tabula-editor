@@ -135,22 +135,6 @@ func NewView(area sdl.Rect, bbComms chan<- comms.Image, toolComms <-chan Tool, c
 	iv.CenterCanvas()
 	iv.projName = "New Project"
 
-	// xWorkers := iv.canvasLayer.GetSelTex().GetWidth() / 10
-	// yWorkers := iv.canvasLayer.GetSelTex().GetHeight() / 10
-
-	// ssboData := make([]int32, xWorkers*yWorkers)
-	// var ssbo uint32
-	// gl.GenBuffers(1, &ssbo)
-	// gl.BindBuffer(gl.SHADER_STORAGE_BUFFER, ssbo)
-	// gl.BufferData(gl.SHADER_STORAGE_BUFFER, 4*len(ssboData), gl.Ptr(&ssboData[0]), gl.STATIC_DRAW)
-	// gl.BindBufferBase(gl.SHADER_STORAGE_BUFFER, 0, ssbo)
-	// gl.BindBuffer(gl.SHADER_STORAGE_BUFFER, 0)
-	// var x, y, z int32
-	// gl.GetIntegeri_v(gl.MAX_COMPUTE_WORK_GROUP_COUNT, 0, &x)
-	// gl.GetIntegeri_v(gl.MAX_COMPUTE_WORK_GROUP_COUNT, 1, &y)
-	// gl.GetIntegeri_v(gl.MAX_COMPUTE_WORK_GROUP_COUNT, 2, &z)
-	// log.Infof("x,y,z =  %v,%v,%v\n", x, y, z)
-
 	return iv, nil
 }
 
