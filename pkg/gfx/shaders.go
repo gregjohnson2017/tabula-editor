@@ -153,38 +153,35 @@ const (
 	void main() {
 		vec2 texel = gl_in[0].gl_Position.xy;
 		vec2 texelPos = layerArea - view.xy + texel;
-		
+
 		vec2 tl = toGlSpace(vec2(texelPos.x, texelPos.y));
 		vec2 bl = toGlSpace(vec2(texelPos.x, texelPos.y + 1));
 		vec2 tr = toGlSpace(vec2(texelPos.x + 1, texelPos.y));
 		vec2 br = toGlSpace(vec2(texelPos.x + 1, texelPos.y + 1));
-		// emitLine(tl, bl);
-		// emitLine(tr, br);
-		// emitLine(tl, tr);
-		// emitLine(bl, br);
+		
 		// left line
 		if (texel.x == 0 || texelFetch(selTex, ivec2(texel.x-1, texel.y), 0).r == 0) {
-		// 	if (texelPix.x >= intersect.x && texelPix.x <= intersect.x + intersect.z) {
+			if (texelPos.x >= 0 && texelPos.x <= view.z) {
 				emitLine(tl, bl);
-		// 	}
+			}
 		}
 		// right line
 		if (texel.x == textureSize(selTex, 0).x - 1 || texelFetch(selTex, ivec2(texel.x+1, texel.y), 0).r == 0) {
-		// 	if (texelPix.x + mult >= intersect.x && texelPix.x + mult <= intersect.x + intersect.z) {
+			if (texelPos.x + 1 >= 0 && texelPos.x + 1 <= view.z) {
 				emitLine(tr, br);
-		// 	}
+			}
 		}
 		// top line
 		if (texel.y == 0 || texelFetch(selTex, ivec2(texel.x, texel.y-1), 0).r == 0) {
-		// 	if (texelPix.y >= intersect.y && texelPix.y <= intersect.y + intersect.w) {
+			if (texelPos.y >= 0 && texelPos.y <= view.w) {
 				emitLine(tl, tr);
-		// 	}
+			}
 		}
 		// bottom line
 		if (texel.y == textureSize(selTex, 0).y - 1 || texelFetch(selTex, ivec2(texel.x, texel.y+1), 0).r == 0) {
-		// 	if (texelPix.y >= intersect.y && texelPix.y <= intersect.y + intersect.w) {
+			if (texelPos.y + 1 >= 0 && texelPos.y + 1 <= view.w) {
 				emitLine(bl, br);
-		// 	}
+			}
 		}
 	}
 
