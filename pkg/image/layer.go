@@ -134,7 +134,7 @@ func (l *Layer) RenderSelection(view sdl.FRect, program gfx.Program) {
 		})
 		l.selDirty = false
 	}
-	sw.StopRecordAverage("selection set")
+		sw.StopRecordAverage("selection set")
 
 	if len(l.selData) == 0 {
 		return
@@ -177,6 +177,32 @@ func (l *Layer) SelectRegion(r sdl.Rect) error {
 	data := make([]byte, r.W*r.H)
 	for i := range data {
 		data[i] = 1
+	}
+	l.selDirty = true
+	return l.selTex.SetPixelArea(r, data, false)
+}
+
+func (l *Layer) SelectWorstCase() error {
+	r := sdl.Rect{
+		X: 0,
+		Y: 0,
+		W: l.area.W,
+		H: l.area.H,
+	}
+	if r.X < 0 || r.Y < 0 || r.X >= l.area.W || r.Y >= l.area.H {
+		return fmt.Errorf("SelectRegion(%v, %v, %v, %v): %w", r.X, r.Y, r.W, r.H, ErrCoordOutOfRange)
+	}
+	if r.W > l.area.W || r.H > l.area.H {
+		return fmt.Errorf("SelectRegion(%v, %v, %v, %v): %w", r.X, r.Y, r.W, r.H, ErrCoordOutOfRange)
+	}
+	data := make([]byte, r.W*r.H)
+	for i := r.X; i < r.X+r.W; i++ {
+		for j := r.Y; j < r.Y+r.H; j++ {
+			if i%2 == j%2 {
+				l.selSet.Add(i + j*l.area.W)
+				data[i+j*l.area.W] = 1
+			}
+		}
 	}
 	l.selDirty = true
 	return l.selTex.SetPixelArea(r, data, false)
