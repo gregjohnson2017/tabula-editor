@@ -122,8 +122,8 @@ func (l *Layer) RenderSelection(view sdl.FRect, program gfx.Program) {
 	}
 	// selections
 	// *2 for x,y
-	sw := util.Start()
 	if l.selDirty {
+		sw := util.Start()
 		l.selData = make([]float32, 0, l.selSet.Size()*2)
 		l.selSet.Range(func(i int32) bool {
 			// i is every y*width+x index
@@ -133,14 +133,13 @@ func (l *Layer) RenderSelection(view sdl.FRect, program gfx.Program) {
 			return true
 		})
 		l.selDirty = false
-	}
 		sw.StopRecordAverage("selection set")
+	}
 
 	if len(l.selData) == 0 {
 		return
 	}
 	program.UploadUniform("layerArea", fArea.X, fArea.Y)
-
 	err := l.selBuf.Load(l.selData, gl.STATIC_DRAW)
 	if err != nil {
 		log.Warnf("failed to load selection points: %v", err)
@@ -148,7 +147,9 @@ func (l *Layer) RenderSelection(view sdl.FRect, program gfx.Program) {
 
 	program.Bind()
 	l.selTex.Bind()
+	glq := util.StartGLQuery()
 	l.selBuf.Draw()
+	glq.Stop("selection shaders")
 	l.selTex.Unbind()
 	program.Unbind()
 }
