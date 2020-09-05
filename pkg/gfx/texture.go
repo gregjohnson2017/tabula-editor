@@ -15,10 +15,11 @@ import (
 )
 
 type Texture struct {
-	id     uint32
-	width  int32
-	height int32
-	format uint32
+	id        uint32
+	width     int32
+	height    int32
+	format    uint32
+	alignment int32
 }
 
 // NewTextureFromFile creates a new Texture, loading data from fileName
@@ -72,9 +73,10 @@ func NewTextureFromFile(fileName string) (Texture, error) {
 // format example: gl.RGBA
 func NewTexture(width, height int32, data []byte, format int, alignment int32) (Texture, error) {
 	t := Texture{
-		width:  width,
-		height: height,
-		format: uint32(format),
+		width:     width,
+		height:    height,
+		format:    uint32(format),
+		alignment: alignment,
 	}
 	var ptr unsafe.Pointer
 	if data != nil {
@@ -106,8 +108,23 @@ func (t Texture) SetPixel(p sdl.Point, col color.RGBA) error {
 	if p.X < 0 || p.Y < 0 || p.X >= t.width || p.Y >= t.height {
 		return fmt.Errorf("setPixel(%v, %v): %w", p.X, p.Y, ErrCoordOutOfRange)
 	}
-	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 4)
-	gl.TextureSubImage2D(t.id, 0, p.X, p.Y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, unsafe.Pointer(&col))
+	gl.PixelStorei(gl.UNPACK_ALIGNMENT, t.alignment)
+	gl.TextureSubImage2D(t.id, 0, p.X, p.Y, 1, 1, t.format, gl.UNSIGNED_BYTE, unsafe.Pointer(&col))
+	// TODO update mipmap textures only when needed ?
+	t.Bind()
+	gl.GenerateMipmap(gl.TEXTURE_2D)
+	t.Unbind()
+	return nil
+}
+
+// TODO combine these 2 functions
+// SetPixel sets a texel of a texture at coordinate p to color col
+func (t Texture) SetPixelByte(p sdl.Point, data byte) error {
+	if p.X < 0 || p.Y < 0 || p.X >= t.width || p.Y >= t.height {
+		return fmt.Errorf("setPixel(%v, %v): %w", p.X, p.Y, ErrCoordOutOfRange)
+	}
+	gl.PixelStorei(gl.UNPACK_ALIGNMENT, t.alignment)
+	gl.TextureSubImage2D(t.id, 0, p.X, p.Y, 1, 1, t.format, gl.UNSIGNED_BYTE, unsafe.Pointer(&data))
 	// TODO update mipmap textures only when needed ?
 	t.Bind()
 	gl.GenerateMipmap(gl.TEXTURE_2D)
