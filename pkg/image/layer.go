@@ -211,22 +211,27 @@ func (l *Layer) UnmarshalBinary(data []byte) error {
 	var err error
 	dec := gob.NewDecoder(bytes.NewReader(data))
 
-	if err = dec.Decode(&l.area); err != nil {
+	var area sdl.Rect
+	if err = dec.Decode(&area); err != nil {
 		return err
 	}
-	l.buffer = gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2})
 
-	var texData = make([]byte, l.area.W*l.area.H*4)
+	var texData = make([]byte, area.W*area.H*4)
 	if err = dec.Decode(&texData); err != nil {
 		return err
 	}
-	tex, err := gfx.NewTexture(l.area.W, l.area.H, texData, gl.RGBA, 4)
+	tex, err := gfx.NewTexture(area.W, area.H, texData, gl.RGBA, 4)
 	if err != nil {
 		return err
 	}
 	tex.SetParameter(gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST)
 	tex.SetParameter(gl.TEXTURE_MAG_FILTER, gl.NEAREST)
-	l.texture = tex
 
+	layer, err := NewLayer(sdl.Point{X: area.X, Y: area.Y}, tex)
+	if err != nil {
+		return err
+	}
+
+	*l = *layer
 	return nil
 }
