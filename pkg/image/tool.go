@@ -2,7 +2,6 @@ package image
 
 import (
 	"fmt"
-	"image/color"
 
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/veandco/go-sdl2/sdl"
@@ -75,7 +74,7 @@ type PixelColorTool struct {
 // tool is currently active for the image view.
 func (t *PixelColorTool) OnClick(evt *sdl.MouseButtonEvent, iv *View) {
 	if evt.Button == sdl.BUTTON_LEFT && evt.State == sdl.PRESSED {
-		_ = iv.setPixel(iv.mousePix, color.RGBA{R: 0xFF, G: 0x00, B: 0xFF, A: 0xFF})
+		_ = iv.setPixel(iv.mousePix, []byte{0xFF, 0x00, 0xFF, 0xFF})
 		t.lastDrag = iv.mousePix
 	}
 }
@@ -85,7 +84,7 @@ func (t *PixelColorTool) OnClick(evt *sdl.MouseButtonEvent, iv *View) {
 func (t *PixelColorTool) OnMotion(evt *sdl.MouseMotionEvent, iv *View) {
 	if evt.State == sdl.ButtonLMask() {
 		for _, p := range ui.Interpolate(iv.mousePix, t.lastDrag) {
-			_ = iv.setPixel(p, color.RGBA{R: 0xFF, G: 0x00, B: 0xFF, A: 0xFF})
+			_ = iv.setPixel(p, []byte{0xFF, 0x00, 0xFF, 0xFF})
 		}
 		t.lastDrag = iv.mousePix
 	}

@@ -9,17 +9,20 @@ import (
 	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
 	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
+	"github.com/gregjohnson2017/tabula-editor/pkg/util"
 	set "github.com/kroppt/Int32Set"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
 type Layer struct {
-	area    sdl.Rect
-	buffer  *gfx.BufferArray
-	selBuf  *gfx.BufferArray
-	texture gfx.Texture
-	selTex  gfx.Texture
-	selSet  set.Set
+	area     sdl.Rect
+	buffer   *gfx.BufferArray
+	selBuf   *gfx.BufferArray
+	texture  gfx.Texture
+	selTex   gfx.Texture
+	selSet   set.Set
+	selDirty bool
+	selData  []float32
 }
 
 func NewLayer(offset sdl.Point, texture gfx.Texture) (*Layer, error) {
@@ -110,7 +113,7 @@ func (l Layer) Render(view sdl.FRect, program gfx.Program) {
 
 }
 
-func (l Layer) RenderSelection(view sdl.FRect, program gfx.Program) {
+func (l *Layer) RenderSelection(view sdl.FRect, program gfx.Program) {
 	fArea := ui.RectToFRect(l.area)
 	_, ok := view.Intersect(&fArea)
 	if !ok {
@@ -119,20 +122,26 @@ func (l Layer) RenderSelection(view sdl.FRect, program gfx.Program) {
 	}
 	// selections
 	// *2 for x,y
-	data := make([]float32, 0, l.selSet.Size()*2)
-	l.selSet.Range(func(i int32) bool {
-		// i is every y*width+x index
-		texelX := float32(i % l.area.W)
-		texelY := float32((float32(i) - texelX) / float32(l.area.W))
-		data = append(data, texelX, texelY)
-		return true
-	})
-	if len(data) == 0 {
+	sw := util.Start()
+	if l.selDirty {
+		l.selData = make([]float32, 0, l.selSet.Size()*2)
+		l.selSet.Range(func(i int32) bool {
+			// i is every y*width+x index
+			texelX := float32(i % l.area.W)
+			texelY := float32((float32(i) - texelX) / float32(l.area.W))
+			l.selData = append(l.selData, texelX, texelY)
+			return true
+		})
+		l.selDirty = false
+	}
+	sw.StopRecordAverage("selection set")
+
+	if len(l.selData) == 0 {
 		return
 	}
 	program.UploadUniform("layerArea", fArea.X, fArea.Y)
 
-	err := l.selBuf.Load(data, gl.STATIC_DRAW)
+	err := l.selBuf.Load(l.selData, gl.STATIC_DRAW)
 	if err != nil {
 		log.Warnf("failed to load selection points: %v", err)
 	}
@@ -144,19 +153,20 @@ func (l Layer) RenderSelection(view sdl.FRect, program gfx.Program) {
 	program.Unbind()
 }
 
-func (l Layer) SelectTexel(p sdl.Point) error {
+func (l *Layer) SelectTexel(p sdl.Point) error {
 	if p.X < 0 || p.Y < 0 || p.X >= l.area.W || p.Y >= l.area.H {
 		return fmt.Errorf("SelectTexel(%v, %v): %w", p.X, p.Y, ErrCoordOutOfRange)
 	}
 	l.selSet.Add(p.X + p.Y*l.area.W)
-	return l.selTex.SetPixelByte(p, 1)
+	l.selDirty = true
+	return l.selTex.SetPixel(p, []byte{1}, false)
 }
 
-func (l Layer) SelectRegion(r sdl.Rect) error {
+func (l *Layer) SelectRegion(r sdl.Rect) error {
 	if r.X < 0 || r.Y < 0 || r.X >= l.area.W || r.Y >= l.area.H {
 		return fmt.Errorf("SelectRegion(%v, %v, %v, %v): %w", r.X, r.Y, r.W, r.H, ErrCoordOutOfRange)
 	}
-	if r.W >= l.area.W || r.H >= l.area.H {
+	if r.W > l.area.W || r.H > l.area.H {
 		return fmt.Errorf("SelectRegion(%v, %v, %v, %v): %w", r.X, r.Y, r.W, r.H, ErrCoordOutOfRange)
 	}
 	for i := r.X; i < r.X+r.W; i++ {
@@ -168,7 +178,8 @@ func (l Layer) SelectRegion(r sdl.Rect) error {
 	for i := range data {
 		data[i] = 1
 	}
-	return l.selTex.SetPixelBytes(r, data)
+	l.selDirty = true
+	return l.selTex.SetPixelArea(r, data, false)
 }
 
 func (l Layer) GetSelTex() gfx.Texture {

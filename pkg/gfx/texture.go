@@ -103,49 +103,23 @@ func (t Texture) SetParameter(paramName uint32, param int32) {
 // ErrCoordOutOfRange indicates that given coordinates are out of range
 const ErrCoordOutOfRange log.ConstErr = "coordinates out of range"
 
-// SetPixel sets a texel of a texture at coordinate p to color col
-func (t Texture) SetPixel(p sdl.Point, col color.RGBA) error {
-	if p.X < 0 || p.Y < 0 || p.X >= t.width || p.Y >= t.height {
-		return fmt.Errorf("setPixel(%v, %v): %w", p.X, p.Y, ErrCoordOutOfRange)
-	}
-	gl.PixelStorei(gl.UNPACK_ALIGNMENT, t.alignment)
-	gl.TextureSubImage2D(t.id, 0, p.X, p.Y, 1, 1, t.format, gl.UNSIGNED_BYTE, unsafe.Pointer(&col))
-	// TODO update mipmap textures only when needed ?
-	t.Bind()
-	gl.GenerateMipmap(gl.TEXTURE_2D)
-	t.Unbind()
-	return nil
-}
-
-// TODO combine these 2 functions
 // SetPixelByte sets a texel of a texture at a given point p to the given byte b.
-func (t Texture) SetPixelByte(p sdl.Point, b byte) error {
-	if p.X < 0 || p.Y < 0 || p.X >= t.width || p.Y >= t.height {
-		return fmt.Errorf("setPixel(%v, %v): %w", p.X, p.Y, ErrCoordOutOfRange)
+func (t Texture) SetPixelArea(r sdl.Rect, b []byte, genMipmap bool) error {
+	if r.X < 0 || r.Y < 0 || r.X >= t.width || r.Y >= t.height {
+		return fmt.Errorf("SetPixelArea(%v): %w", r, ErrCoordOutOfRange)
 	}
 	gl.PixelStorei(gl.UNPACK_ALIGNMENT, t.alignment)
-	gl.TextureSubImage2D(t.id, 0, p.X, p.Y, 1, 1, t.format, gl.UNSIGNED_BYTE, unsafe.Pointer(&b))
-	// TODO update mipmap textures only when needed ?
-	t.Bind()
-	gl.GenerateMipmap(gl.TEXTURE_2D)
-	t.Unbind()
+	gl.TextureSubImage2D(t.id, 0, r.X, r.Y, r.W, r.H, t.format, gl.UNSIGNED_BYTE, unsafe.Pointer(&b[0]))
+	if genMipmap {
+		t.Bind()
+		gl.GenerateMipmap(gl.TEXTURE_2D)
+		t.Unbind()
+	}
 	return nil
 }
 
-// SetPixelBytes sets the texels of a texture in the given rectangle r to given data.
-func (t Texture) SetPixelBytes(r sdl.Rect, data []byte) error {
-	if r.X < 0 || r.Y < 0 || r.X >= t.width || r.Y >= t.height {
-		return fmt.Errorf("SetPixelBytes(%v, %v, %v, %v): %w", r.X, r.Y, r.W, r.H, ErrCoordOutOfRange)
-	}
-	if len(data) == 0 {
-		return fmt.Errorf("SetPixelBytes(%v, %v, %v, %v): %w", r.X, r.Y, r.W, r.H, ErrEmptyData)
-	}
-	gl.PixelStorei(gl.UNPACK_ALIGNMENT, t.alignment)
-	gl.TextureSubImage2D(t.id, 0, r.X, r.Y, r.W, r.H, t.format, gl.UNSIGNED_BYTE, unsafe.Pointer(&data[0]))
-	t.Bind()
-	gl.GenerateMipmap(gl.TEXTURE_2D)
-	t.Unbind()
-	return nil
+func (t Texture) SetPixel(p sdl.Point, b []byte, genMipmap bool) error {
+	return t.SetPixelArea(sdl.Rect{X: p.X, Y: p.Y, W: 1, H: 1}, b, genMipmap)
 }
 
 // GetData returns a byte slice of all the texture data

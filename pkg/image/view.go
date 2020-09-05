@@ -6,7 +6,6 @@ import (
 	"encoding/gob"
 	"fmt"
 	"image"
-	"image/color"
 	"image/jpeg"
 	"image/png"
 	"math"
@@ -246,11 +245,11 @@ func (iv *View) CenterCanvas() {
 
 // setPixel sets the currently hovered texel of the selected layer
 // to the specified color
-func (iv *View) setPixel(p sdl.Point, col color.RGBA) error {
+func (iv *View) setPixel(p sdl.Point, col []byte) error {
 	if iv.selLayer != nil {
 		p.X -= iv.selLayer.area.X
 		p.Y -= iv.selLayer.area.Y
-		return iv.selLayer.texture.SetPixel(p, col)
+		return iv.selLayer.texture.SetPixel(p, col, true)
 	}
 	return nil
 }
