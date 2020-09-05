@@ -60,7 +60,10 @@ func New(fileName, project string, win *sdl.Window, cfg *config.Config) *Applica
 		if err != nil {
 			log.Fatal(err)
 		}
-		iv.AddLayer(tex)
+		err = iv.AddLayer(tex)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 	if project != "" {
 		if err = iv.LoadProject(project); err != nil {
@@ -91,7 +94,10 @@ func New(fileName, project string, win *sdl.Window, cfg *config.Config) *Applica
 								if err != nil {
 									log.Fatal(err)
 								}
-								iv.AddLayer(tex)
+								err = iv.AddLayer(tex)
+								if err != nil {
+									log.Fatal(err)
+								}
 							}
 						}()
 					},

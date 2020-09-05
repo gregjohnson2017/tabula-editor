@@ -3,21 +3,31 @@ package image
 import (
 	"bytes"
 	"encoding/gob"
+	"fmt"
 
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
 	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
+	set "github.com/kroppt/Int32Set"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
 type Layer struct {
 	area    sdl.Rect
 	buffer  *gfx.BufferArray
+	selBuf  *gfx.BufferArray
 	texture gfx.Texture
+	selTex  gfx.Texture
+	selSet  set.Set
 }
 
-func NewLayer(offset sdl.Point, texture gfx.Texture) *Layer {
+func NewLayer(offset sdl.Point, texture gfx.Texture) (*Layer, error) {
+	selData := make([]byte, texture.GetWidth()*texture.GetHeight())
+	selTex, err := gfx.NewTexture(texture.GetWidth(), texture.GetHeight(), selData, gl.RED, 1)
+	if err != nil {
+		return nil, err
+	}
 	return &Layer{
 		area: sdl.Rect{
 			X: offset.X,
@@ -26,12 +36,14 @@ func NewLayer(offset sdl.Point, texture gfx.Texture) *Layer {
 			H: texture.GetHeight(),
 		},
 		buffer:  gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2}),
+		selBuf:  gfx.NewBufferArray(gl.POINTS, []int32{2}),
 		texture: texture,
-	}
+		selTex:  selTex,
+		selSet:  set.NewSet(),
+	}, nil
 }
 
-// Render draws the ui.Component
-func (l Layer) Render(view sdl.FRect) {
+func (l Layer) Render(view sdl.FRect, program gfx.Program) {
 	fArea := ui.RectToFRect(l.area)
 	rect, ok := view.Intersect(&fArea)
 	if !ok {
@@ -90,9 +102,58 @@ func (l Layer) Render(view sdl.FRect) {
 	}
 
 	// draw image
+	program.Bind()
 	l.texture.Bind()
 	l.buffer.Draw()
 	l.texture.Unbind()
+	program.Unbind()
+
+}
+
+func (l Layer) RenderSelection(view sdl.FRect, program gfx.Program) {
+	fArea := ui.RectToFRect(l.area)
+	_, ok := view.Intersect(&fArea)
+	if !ok {
+		// not in view
+		return
+	}
+	// selections
+	// *2 for x,y
+	data := make([]float32, 0, l.selSet.Size()*2)
+	l.selSet.Range(func(i int32) bool {
+		// i is every y*width+x index
+		texelX := float32(i % l.area.W)
+		texelY := float32((float32(i) - texelX) / float32(l.area.W))
+		data = append(data, texelX, texelY)
+		return true
+	})
+	if len(data) == 0 {
+		return
+	}
+	program.UploadUniform("layerArea", fArea.X, fArea.Y)
+
+	err := l.selBuf.Load(data, gl.STATIC_DRAW)
+	if err != nil {
+		log.Warnf("failed to load selection points: %v", err)
+	}
+
+	program.Bind()
+	l.selTex.Bind()
+	l.selBuf.Draw()
+	l.selTex.Unbind()
+	program.Unbind()
+}
+
+func (l Layer) SelectTexel(p sdl.Point) error {
+	if p.X < 0 || p.Y < 0 || p.X >= l.area.W || p.Y >= l.area.H {
+		return fmt.Errorf("SelectTexel(%v, %v): %w", p.X, p.Y, ErrCoordOutOfRange)
+	}
+	l.selSet.Add(p.X + p.Y*l.area.W)
+	return l.selTex.SetPixelByte(p, 1)
+}
+
+func (l Layer) GetSelTex() gfx.Texture {
+	return l.selTex
 }
 
 // Destroy destroys OpenGL assets associated with the Layer
