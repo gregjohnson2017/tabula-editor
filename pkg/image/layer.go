@@ -152,6 +152,25 @@ func (l Layer) SelectTexel(p sdl.Point) error {
 	return l.selTex.SetPixelByte(p, 1)
 }
 
+func (l Layer) SelectRegion(r sdl.Rect) error {
+	if r.X < 0 || r.Y < 0 || r.X >= l.area.W || r.Y >= l.area.H {
+		return fmt.Errorf("SelectRegion(%v, %v, %v, %v): %w", r.X, r.Y, r.W, r.H, ErrCoordOutOfRange)
+	}
+	if r.W >= l.area.W || r.H >= l.area.H {
+		return fmt.Errorf("SelectRegion(%v, %v, %v, %v): %w", r.X, r.Y, r.W, r.H, ErrCoordOutOfRange)
+	}
+	for i := r.X; i < r.X+r.W; i++ {
+		for j := r.Y; j < r.Y+r.H; j++ {
+			l.selSet.Add(i + j*l.area.W)
+		}
+	}
+	data := make([]byte, r.W*r.H)
+	for i := range data {
+		data[i] = 1
+	}
+	return l.selTex.SetPixelBytes(r, data)
+}
+
 func (l Layer) GetSelTex() gfx.Texture {
 	return l.selTex
 }
