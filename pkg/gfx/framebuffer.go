@@ -22,7 +22,7 @@ func NewFrameBuffer(width, height int32) (FrameBuffer, error) {
 	bufs := uint32(gl.COLOR_ATTACHMENT0)
 	gl.DrawBuffers(1, &bufs)
 
-	fb.tex, err = NewTexture(width, height, nil, gl.RGBA, 4)
+	fb.tex, err = NewTexture(width, height, nil, gl.RGBA, 4, 4)
 	if err != nil {
 		return FrameBuffer{}, err
 	}

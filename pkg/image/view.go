@@ -76,7 +76,7 @@ func NewView(area sdl.Rect, bbComms chan<- comms.Image, toolComms <-chan Tool, c
 	}
 
 	var data = make([]byte, iv.canvas.W*iv.canvas.H*4)
-	canvasTex, err := gfx.NewTexture(iv.canvas.W, iv.canvas.H, data, gl.RGBA, 4)
+	canvasTex, err := gfx.NewTexture(iv.canvas.W, iv.canvas.H, data, gl.RGBA, 4, 4)
 	if err != nil {
 		return nil, err
 	}

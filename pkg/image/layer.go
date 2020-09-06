@@ -27,7 +27,7 @@ type Layer struct {
 
 func NewLayer(offset sdl.Point, texture gfx.Texture) (*Layer, error) {
 	selData := make([]byte, texture.GetWidth()*texture.GetHeight())
-	selTex, err := gfx.NewTexture(texture.GetWidth(), texture.GetHeight(), selData, gl.RED, 1)
+	selTex, err := gfx.NewTexture(texture.GetWidth(), texture.GetHeight(), selData, gl.RED, 1, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -247,7 +247,7 @@ func (l *Layer) UnmarshalBinary(data []byte) error {
 	if err = dec.Decode(&texData); err != nil {
 		return err
 	}
-	tex, err := gfx.NewTexture(area.W, area.H, texData, gl.RGBA, 4)
+	tex, err := gfx.NewTexture(area.W, area.H, texData, gl.RGBA, 4, 4)
 	if err != nil {
 		return err
 	}

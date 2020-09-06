@@ -300,7 +300,7 @@ func LoadFontTexture(fontName string, fontSize int32) (Info, error) {
 	// writeFontToFile(fontName+"-"+strconv.Itoa(int(fontSize))+"-texture.png", glyphBytes, int(texWidth), int(texHeight))
 
 	// pass glyphBytes to OpenGL texture
-	fontTexture, err := gfx.NewTexture(texWidth, texHeight, glyphBytes, gl.RED, 1)
+	fontTexture, err := gfx.NewTexture(texWidth, texHeight, glyphBytes, gl.RED, 1, 1)
 	if err != nil {
 		return Info{}, err
 	}
