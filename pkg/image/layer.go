@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"runtime"
+	"sync"
 
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
@@ -123,15 +125,12 @@ func (l *Layer) RenderSelection(view sdl.FRect, program gfx.Program) {
 	// selections
 	// *2 for x,y
 	if l.selDirty {
+		if runtime.NumCPU() == 1 || l.selSet.Size() < 3000 {
+			l.genSelectionPointsSequential()
+		} else {
+			l.genSelectionPointsParallel()
+		}
 		sw := util.Start()
-		l.selData = make([]float32, 0, l.selSet.Size()*2)
-		l.selSet.Range(func(i int32) bool {
-			// i is every y*width+x index
-			texelX := float32(i % l.area.W)
-			texelY := float32((float32(i) - texelX) / float32(l.area.W))
-			l.selData = append(l.selData, texelX, texelY)
-			return true
-		})
 		l.selDirty = false
 		sw.StopRecordAverage("selection set")
 	}
@@ -152,6 +151,82 @@ func (l *Layer) RenderSelection(view sdl.FRect, program gfx.Program) {
 	glq.Stop("selection shaders")
 	l.selTex.Unbind()
 	program.Unbind()
+}
+
+func (l *Layer) getChunkNumSels(data []byte, workers int) []int {
+	numSels := make([]int, workers)
+	workSize := len(data) / workers
+	var wg sync.WaitGroup
+
+	wg.Add(workers)
+	for w := 0; w < workers; w++ {
+		go func(w int) {
+			var edge int
+			if w == workers-1 {
+				edge = len(data) % workSize
+			}
+			for i := w * workSize; i < (w+1)*workSize+edge; i++ {
+				numSels[w] += int(data[i])
+			}
+			wg.Done()
+		}(w)
+	}
+	wg.Wait()
+
+	return numSels
+}
+
+func (l *Layer) genSelectionPointsParallel() {
+	workers := runtime.NumCPU()
+
+	data := l.selTex.GetData()
+
+	chunkSels := l.getChunkNumSels(data, workers)
+	chunkOffs := chunkSels
+
+	var sum int
+	for i, num := range chunkSels {
+		chunkOffs[i] = sum
+		sum += num * 2
+	}
+
+	workSize := len(data) / workers
+	var wg sync.WaitGroup
+
+	l.selData = make([]float32, sum)
+	wg.Add(workers)
+	for w, off := range chunkOffs {
+		go func(w int, off int) {
+			var edge int
+			if w == workers-1 {
+				edge = len(data) % workSize
+			}
+			var j int
+			for i := w * workSize; i < (w+1)*workSize+edge; i++ {
+				if data[i] == 0 {
+					continue
+				}
+				texelX := float32(i % int(l.area.W))
+				texelY := float32((float32(i) - texelX) / float32(l.area.W))
+				l.selData[off+j] = texelX
+				l.selData[off+j+1] = texelY
+				j += 2
+			}
+			wg.Done()
+		}(w, off)
+	}
+	wg.Wait()
+}
+
+func (l *Layer) genSelectionPointsSequential() {
+	l.selData = make([]float32, 0, l.selSet.Size()*2)
+	l.selSet.Range(func(i int32) bool {
+		// i is every y*width+x index
+		texelX := float32(i % l.area.W)
+		texelY := float32((float32(i) - texelX) / float32(l.area.W))
+		l.selData = append(l.selData, texelX, texelY)
+		return true
+	})
 }
 
 func (l *Layer) SelectTexel(p sdl.Point) error {
@@ -190,15 +265,12 @@ func (l *Layer) SelectWorstCase() error {
 		W: l.area.W,
 		H: l.area.H,
 	}
-	if r.X < 0 || r.Y < 0 || r.X >= l.area.W || r.Y >= l.area.H {
-		return fmt.Errorf("SelectRegion(%v, %v, %v, %v): %w", r.X, r.Y, r.W, r.H, ErrCoordOutOfRange)
-	}
 	if r.W > l.area.W || r.H > l.area.H {
-		return fmt.Errorf("SelectRegion(%v, %v, %v, %v): %w", r.X, r.Y, r.W, r.H, ErrCoordOutOfRange)
+		return fmt.Errorf("SelectWorstCase(%v, %v): %w", r.W, r.H, ErrCoordOutOfRange)
 	}
 	data := make([]byte, r.W*r.H)
-	for i := r.X; i < r.X+r.W; i++ {
-		for j := r.Y; j < r.Y+r.H; j++ {
+	for i := int32(0); i < r.W; i++ {
+		for j := int32(0); j < r.H; j++ {
 			if i%2 == j%2 {
 				l.selSet.Add(i + j*l.area.W)
 				data[i+j*l.area.W] = 1
