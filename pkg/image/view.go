@@ -1,6 +1,9 @@
 package image
 
 import (
+	"bytes"
+	"compress/zlib"
+	"encoding/gob"
 	"fmt"
 	"image"
 	"image/color"
@@ -9,6 +12,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/comms"
@@ -42,6 +46,7 @@ type View struct {
 	toolComms   <-chan Tool
 	checkerProg gfx.Program
 	program     gfx.Program
+	projName    string
 }
 
 func (iv *View) AddLayer(tex gfx.Texture) {
@@ -103,6 +108,7 @@ func NewView(area sdl.Rect, bbComms chan<- comms.Image, toolComms <-chan Tool, c
 	iv.activeTool = &EmptyTool{}
 
 	iv.CenterCanvas()
+	iv.projName = "New Project"
 
 	return iv, nil
 }
@@ -125,7 +131,7 @@ func (iv *View) InBoundary(pt sdl.Point) bool {
 func (iv *View) Render() {
 	sw := util.Start()
 	go func() {
-		iv.bbComms <- comms.Image{FileName: "layer", MousePix: iv.mousePix, Mult: iv.mult}
+		iv.bbComms <- comms.Image{FileName: iv.projName, MousePix: iv.mousePix, Mult: iv.mult}
 	}()
 
 	// TODO selection outline
@@ -156,27 +162,25 @@ func (iv *View) Render() {
 
 // RenderCanvas draws what is on the canvas or area, whichever is larger
 func (iv *View) RenderCanvas() {
-
+	sw := util.Start()
 	iv.program.UploadUniform("area", float32(iv.canvas.W), float32(iv.canvas.H))
 	// gl viewport 0, 0 is bottom left
 	gl.Viewport(0, 0, iv.canvas.W, iv.canvas.H)
 
 	iv.program.Bind()
 	for _, layer := range iv.layers {
-		layer.Render(sdl.FRect{
-			X: float32(iv.canvas.X),
-			Y: float32(iv.canvas.Y),
-			W: float32(iv.canvas.W),
-			H: float32(iv.canvas.H),
-		})
+		layer.Render(ui.RectToFRect(iv.canvas))
 	}
 	iv.program.Unbind()
 
 	iv.updateView()
+	sw.Stop("RenderCanvas")
 }
 
 const maxZoom = 8
 
+// updateView updates the view rectangle according to the zoom multiplier,
+// while maintaining the current pan
 func (iv *View) updateView() {
 	frac := float32(math.Pow(2, float64(-iv.mult)))
 	newView := sdl.FRect{}
@@ -189,6 +193,7 @@ func (iv *View) updateView() {
 	iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
 }
 
+// CenterCanvas updates the view so the canvas is in the center of the window
 func (iv *View) CenterCanvas() {
 	iv.view = sdl.FRect{
 		X: float32(iv.canvas.X) - (float32(iv.area.W)/2 - float32(iv.canvas.W)/2),
@@ -201,6 +206,8 @@ func (iv *View) CenterCanvas() {
 	iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
 }
 
+// setPixel sets the currently hovered texel of the selected layer
+// to the specified color
 func (iv *View) setPixel(p sdl.Point, col color.RGBA) error {
 	if iv.selLayer != nil {
 		p.X -= iv.selLayer.area.X
@@ -314,6 +321,8 @@ func (iv *View) OnScroll(evt *sdl.MouseWheelEvent) bool {
 	return true
 }
 
+// selectLayer sets the currently selected layer to nil, and sets the layer
+// that the mouse is currently hovering over, if any.
 func (iv *View) selectLayer() {
 	iv.selLayer = nil
 	for i := len(iv.layers) - 1; i >= 0; i-- {
@@ -355,8 +364,10 @@ func (iv *View) String() string {
 // ErrWriteFormat indicates that an unsupported image format was trying to be written to
 const ErrWriteFormat log.ConstErr = "unsupported image format"
 
-// WriteToFile writes the image data stored in the OpenGL texture to a file specified by fileName
+// WriteToFile uses an OpenGL Frame Buffer Object to render the data in the canvas
+// to a texture, and then write the data in that texture to the specified file
 func (iv *View) WriteToFile(fileName string) error {
+	sw := util.Start()
 	// TODO after canvas figured out
 	w, h := iv.canvas.W, iv.canvas.H
 
@@ -399,5 +410,95 @@ func (iv *View) WriteToFile(fileName string) error {
 	default:
 		return fmt.Errorf("writing to file extension %v: %w", ext, ErrWriteFormat)
 	}
+
+	sw.Stop("WriteToFile")
+	return nil
+}
+
+type Project struct {
+	ProjName string
+	Mult     int32
+	Canvas   sdl.Rect
+	View     sdl.FRect
+	Layers   []*Layer
+}
+
+const ErrInvalidFormat log.ConstErr = "invalid project file (not .tabula)"
+
+// SaveProject saves the relevant project data at the specified file location
+// in a compressed format. The fileName must end with '.tabula'
+func (iv *View) SaveProject(fileName string) error {
+	sw := util.Start()
+	var ext string
+	if ext = filepath.Ext(fileName); ext != ".tabula" {
+		return fmt.Errorf("%w: %v", ErrInvalidFormat, fileName)
+	}
+	out, err := os.Create(fileName)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	proj := Project{
+		ProjName: strings.TrimSuffix(filepath.Base(fileName), ext),
+		Mult:     iv.mult,
+		Canvas:   iv.canvas,
+		View:     iv.view,
+		Layers:   iv.layers,
+	}
+
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	if err = enc.Encode(proj); err != nil {
+		return err
+	}
+
+	zw := zlib.NewWriter(out)
+	if _, err = zw.Write(buf.Bytes()); err != nil {
+		return err
+	}
+	defer zw.Close()
+
+	iv.projName = proj.ProjName
+	sw.Stop("SaveProject")
+	return nil
+}
+
+// LoadProject loads the project data at the specified file location,
+// decompresses and decodes the data and populates the relevant fields in
+// the image view. The fileName must end with '.tabula'
+func (iv *View) LoadProject(fileName string) error {
+	sw := util.Start()
+	var err error
+	var in *os.File
+	if in, err = os.Open(fileName); err != nil {
+		return err
+	}
+	defer in.Close()
+	if ext := filepath.Ext(fileName); ext != ".tabula" {
+		return fmt.Errorf("%w: %v", ErrInvalidFormat, fileName)
+	}
+
+	zr, err := zlib.NewReader(in)
+	if err != nil {
+		return fmt.Errorf("zlib reader error: %w", err)
+	}
+	defer zr.Close()
+
+	var proj Project
+	dec := gob.NewDecoder(zr)
+	if err = dec.Decode(&proj); err != nil {
+		return fmt.Errorf("gob decoder error: %w", err)
+	}
+
+	iv.layers = proj.Layers
+	iv.canvasLayer = proj.Layers[0]
+	iv.mult = proj.Mult
+	iv.view = proj.View
+	iv.canvas = proj.Canvas
+	iv.projName = proj.ProjName
+
+	iv.updateView()
+	sw.Stop("LoadProject")
 	return nil
 }

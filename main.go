@@ -112,10 +112,12 @@ func main() {
 	var perform bool
 	var quiet bool
 	var file string
+	var project string
 	flag.Usage = func() {
 		fmt.Fprintln(flag.CommandLine.Output(), "Usage:")
 		fmt.Fprintf(flag.CommandLine.Output(), "  %v [OPTIONS]\n", filepath.Base(os.Args[0]))
-		fmt.Fprintln(flag.CommandLine.Output(), "  Specify a file name with -file to open immediately.")
+		fmt.Fprintln(flag.CommandLine.Output(), "  Specify a file name with -file to open image as a layer.")
+		fmt.Fprintln(flag.CommandLine.Output(), "  Specify a project file (.tabula) with -project.")
 		fmt.Fprintln(flag.CommandLine.Output(), "  Otherwise, an open file dialog will be used, if supported.")
 		fmt.Fprintln(flag.CommandLine.Output(), "\nOptions:")
 		flag.PrintDefaults()
@@ -123,6 +125,7 @@ func main() {
 	flag.BoolVar(&color, "color", true, "colorize the output logs")
 	flag.BoolVar(&debug, "debug", false, "show debug logging")
 	flag.StringVar(&file, "file", "", "name of the file to open without prompt")
+	flag.StringVar(&project, "project", "", "name of the project file (.tabula) to open")
 	flag.IntVar(&fps, "fps", 144, "the frames per second to render at")
 	flag.IntVar(&height, "height", 720, "the initial height of the window")
 	flag.BoolVar(&info, "info", true, "show info logging")
@@ -160,6 +163,7 @@ func main() {
 
 	log.Debugf("args: [ %v ]", strings.Join(flag.Args(), ", "))
 	log.Debugf("file option: \"%v\"", file)
+	log.Debugf("project option: \"%v\"", project)
 	log.Debugf("enabled loggers: %v", strings.Join(loggers, ", "))
 	log.Debugf("output colorized: %v", color)
 
@@ -187,7 +191,7 @@ func main() {
 		log.Warnf("framerate %v not within set refresh rate range %v-%v", fps, lowHz, highHz)
 	}
 
-	app := app.New(file, win, cfg)
+	app := app.New(file, project, win, cfg)
 	app.Start()
 
 	for app.Running() {

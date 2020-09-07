@@ -74,7 +74,7 @@ func (p Program) Unbind() {
 	gl.UseProgram(0)
 }
 
-// Delete tells OpenGL to delete the program ID
+// Destroy destroys OpenGL assets associated with the Shader
 func (p Program) Destroy() {
 	gl.DeleteProgram(p.id)
 }

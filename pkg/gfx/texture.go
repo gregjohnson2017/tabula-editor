@@ -21,6 +21,9 @@ type Texture struct {
 	format uint32
 }
 
+// NewTextureFromFile creates a new Texture, loading data from fileName
+// with the assumption that it is an image that can be converted to RGBA
+// (alpha is black for jpegs)
 func NewTextureFromFile(fileName string) (Texture, error) {
 	in, err := os.Open(fileName)
 	if err != nil {
@@ -64,6 +67,9 @@ func NewTextureFromFile(fileName string) (Texture, error) {
 	return t, err
 }
 
+// NewTexture creates a Texture object that wraps the OpenGL texture functions
+// alignment is in bytes and is passed to gl.PixelStorei() for unpacking
+// format example: gl.RGBA
 func NewTexture(width, height int32, data []byte, format int, alignment int32) (Texture, error) {
 	t := Texture{
 		width:  width,
@@ -85,6 +91,7 @@ func NewTexture(width, height int32, data []byte, format int, alignment int32) (
 	return t, nil
 }
 
+// SetParameter wraps gl.TexParameteri()
 func (t Texture) SetParameter(paramName uint32, param int32) {
 	t.Bind()
 	gl.TexParameteri(gl.TEXTURE_2D, paramName, param)
@@ -94,6 +101,7 @@ func (t Texture) SetParameter(paramName uint32, param int32) {
 // ErrCoordOutOfRange indicates that given coordinates are out of range
 const ErrCoordOutOfRange log.ConstErr = "coordinates out of range"
 
+// SetPixel sets a texel of a texture at coordinate p to color col
 func (t Texture) SetPixel(p sdl.Point, col color.RGBA) error {
 	if p.X < 0 || p.Y < 0 || p.X >= t.width || p.Y >= t.height {
 		return fmt.Errorf("setPixel(%v, %v): %w", p.X, p.Y, ErrCoordOutOfRange)
@@ -107,6 +115,7 @@ func (t Texture) SetPixel(p sdl.Point, col color.RGBA) error {
 	return nil
 }
 
+// GetData returns a byte slice of all the texture data
 func (t Texture) GetData() []byte {
 	// TODO do this in batches/stream to avoid memory limitations
 	var data = make([]byte, t.width*t.height*4)
@@ -116,6 +125,8 @@ func (t Texture) GetData() []byte {
 	return data
 }
 
+// GetSubData returns a portion of the texture data starting at x, y and going
+// w in the x diretion and h in the y direction
 func (t Texture) GetSubData(x, y, w, h int32) []byte {
 	// TODO do this in batches/stream to avoid memory limitations
 	var data = make([]byte, w*h*4)
@@ -141,6 +152,7 @@ func (t Texture) GetHeight() int32 {
 	return t.height
 }
 
+// Destroy destroys OpenGL assets associated with the Texture
 func (t Texture) Destroy() {
 	gl.DeleteTextures(1, &t.id)
 }

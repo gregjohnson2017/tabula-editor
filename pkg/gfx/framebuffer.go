@@ -12,6 +12,8 @@ type FrameBuffer struct {
 
 const ErrFrameBuffer log.ConstErr = "incomplete framebuffer"
 
+// NewFrameBuffer creates an FBO of the specified size that renders to
+// a texture
 func NewFrameBuffer(width, height int32) (FrameBuffer, error) {
 	var fb FrameBuffer
 	var err error
@@ -38,10 +40,12 @@ func (fb FrameBuffer) GetTexture() Texture {
 	return fb.tex
 }
 
+// Bind tells OpenGL to use this framebuffer instead of the default one
 func (fb FrameBuffer) Bind() {
 	gl.BindFramebuffer(gl.FRAMEBUFFER, fb.id)
 }
 
+// Unbind tells OpenGL to stop rendering to this FBO and go back to the screen
 func (fb FrameBuffer) Unbind() {
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
 }

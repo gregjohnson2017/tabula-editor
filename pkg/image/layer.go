@@ -1,6 +1,9 @@
 package image
 
 import (
+	"bytes"
+	"encoding/gob"
+
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
 	"github.com/gregjohnson2017/tabula-editor/pkg/log"
@@ -10,8 +13,6 @@ import (
 
 type Layer struct {
 	area    sdl.Rect
-	origW   int32
-	origH   int32
 	buffer  *gfx.BufferArray
 	texture gfx.Texture
 }
@@ -24,8 +25,6 @@ func NewLayer(offset sdl.Point, texture gfx.Texture) *Layer {
 			W: texture.GetWidth(),
 			H: texture.GetHeight(),
 		},
-		origW:   texture.GetWidth(),
-		origH:   texture.GetHeight(),
 		buffer:  gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2}),
 		texture: texture,
 	}
@@ -96,7 +95,47 @@ func (l Layer) Render(view sdl.FRect) {
 	l.texture.Unbind()
 }
 
+// Destroy destroys OpenGL assets associated with the Layer
 func (l Layer) Destroy() {
 	l.buffer.Destroy()
 	l.texture.Destroy()
+}
+
+// MarshalBinary fulfills a requirement for gob to encode Layer
+func (l Layer) MarshalBinary() ([]byte, error) {
+	var buf bytes.Buffer
+	var err error
+	enc := gob.NewEncoder(&buf)
+	if err = enc.Encode(l.area); err != nil {
+		return nil, err
+	}
+	if err = enc.Encode(l.texture.GetData()); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// UnmarshalBinary fulfills a requirement for gob to decode Layer
+func (l *Layer) UnmarshalBinary(data []byte) error {
+	var err error
+	dec := gob.NewDecoder(bytes.NewReader(data))
+
+	if err = dec.Decode(&l.area); err != nil {
+		return err
+	}
+	l.buffer = gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2})
+
+	var texData = make([]byte, l.area.W*l.area.H*4)
+	if err = dec.Decode(&texData); err != nil {
+		return err
+	}
+	tex, err := gfx.NewTexture(l.area.W, l.area.H, texData, gl.RGBA, 4)
+	if err != nil {
+		return err
+	}
+	tex.SetParameter(gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST)
+	tex.SetParameter(gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+	l.texture = tex
+
+	return nil
 }

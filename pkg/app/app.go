@@ -30,14 +30,8 @@ type Application struct {
 }
 
 // New returns a newly instantiated application state struct
-func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
+func New(fileName, project string, win *sdl.Window, cfg *config.Config) *Application {
 	var err error
-	if fileName == "" {
-		log.Info("Using file dialog to get file name")
-		if fileName, err = util.OpenFileDialog(win); err != nil {
-			log.Fatal(err)
-		}
-	}
 
 	imageViewArea := sdl.Rect{
 		X: 0,
@@ -60,11 +54,19 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 	if err != nil {
 		log.Fatal(err)
 	}
-	tex, err := gfx.NewTextureFromFile(fileName)
-	if err != nil {
-		log.Fatal(err)
+
+	if fileName != "" {
+		tex, err := gfx.NewTextureFromFile(fileName)
+		if err != nil {
+			log.Fatal(err)
+		}
+		iv.AddLayer(tex)
 	}
-	iv.AddLayer(tex)
+	if project != "" {
+		if err = iv.LoadProject(project); err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	bottomBar, err := NewBottomBar(bottomBarArea, bottomBarComms, cfg)
 	if err != nil {
@@ -76,7 +78,7 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 			Text: "File",
 			Children: []menu.Definition{
 				{
-					Text: "Open",
+					Text: "Open as Layer",
 					Action: func() {
 						newFileName, err := util.OpenFileDialog(win)
 						if err != nil {
@@ -95,7 +97,7 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 					},
 				},
 				{
-					Text: "Save As",
+					Text: "Export Canvas",
 					Action: func() {
 						newFileName, err := util.SaveFileDialog(win)
 						if err != nil {
@@ -105,6 +107,42 @@ func New(fileName string, win *sdl.Window, cfg *config.Config) *Application {
 						go func() {
 							actionComms <- func() {
 								if err := iv.WriteToFile(newFileName); err != nil {
+									log.Fatal(err)
+								}
+							}
+						}()
+					},
+				},
+				{
+					Text: "Save Project",
+					Action: func() {
+						go func() {
+							newFileName, err := util.SaveFileDialog(win)
+							if err != nil {
+								log.Warn(err)
+								return
+							}
+							actionComms <- func() {
+								err = iv.SaveProject(newFileName)
+								if err != nil {
+									log.Fatal(err)
+								}
+							}
+						}()
+					},
+				},
+				{
+					Text: "Load Project",
+					Action: func() {
+						go func() {
+							newFileName, err := util.OpenFileDialog(win)
+							if err != nil {
+								log.Warn(err)
+								return
+							}
+							actionComms <- func() {
+								err = iv.LoadProject(newFileName)
+								if err != nil {
 									log.Fatal(err)
 								}
 							}
