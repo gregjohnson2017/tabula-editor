@@ -28,7 +28,7 @@ func NewShader(source string, shaderType uint32) (Shader, error) {
 		return Shader{}, ErrCreateShader
 	}
 
-	csources, free := gl.Strs(source)
+	csources, free := gl.Strs(source + "\x00")
 	gl.ShaderSource(shader, 1, csources, nil)
 	free()
 	gl.CompileShader(shader)

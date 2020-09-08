@@ -6,7 +6,6 @@ import (
 	"encoding/gob"
 	"fmt"
 	"image"
-	"image/color"
 	"image/jpeg"
 	"image/png"
 	"math"
@@ -45,12 +44,21 @@ type View struct {
 	bbComms     chan<- comms.Image
 	toolComms   <-chan Tool
 	checkerProg gfx.Program
+	selProg     gfx.Program
 	program     gfx.Program
+	cs1         gfx.Program
+	cs2         gfx.Program
+	cs3         gfx.Program
 	projName    string
 }
 
-func (iv *View) AddLayer(tex gfx.Texture) {
-	iv.layers = append(iv.layers, NewLayer(sdl.Point{X: 0, Y: 0}, tex))
+func (iv *View) AddLayer(tex gfx.Texture) error {
+	layer, err := NewLayer(sdl.Point{X: 0, Y: 0}, tex)
+	if err != nil {
+		return err
+	}
+	iv.layers = append(iv.layers, layer)
+	return nil
 }
 
 // NewView returns a pointer to a new View struct that implements ui.Component
@@ -71,13 +79,16 @@ func NewView(area sdl.Rect, bbComms chan<- comms.Image, toolComms <-chan Tool, c
 	}
 
 	var data = make([]byte, iv.canvas.W*iv.canvas.H*4)
-	canvasTex, err := gfx.NewTexture(iv.canvas.W, iv.canvas.H, data, gl.RGBA, 4)
+	canvasTex, err := gfx.NewTexture(iv.canvas.W, iv.canvas.H, data, gl.RGBA, 4, 4)
 	if err != nil {
 		return nil, err
 	}
 	canvasTex.SetParameter(gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST)
 	canvasTex.SetParameter(gl.TEXTURE_MAG_FILTER, gl.NEAREST)
-	iv.canvasLayer = NewLayer(sdl.Point{X: iv.canvas.X, Y: iv.canvas.Y}, canvasTex)
+	iv.canvasLayer, err = NewLayer(sdl.Point{X: iv.canvas.X, Y: iv.canvas.Y}, canvasTex)
+	if err != nil {
+		return nil, err
+	}
 	iv.layers = append(iv.layers, iv.canvasLayer)
 
 	v1, err := gfx.NewShader(gfx.VertexShaderSource, gl.VERTEX_SHADER)
@@ -102,13 +113,55 @@ func NewView(area sdl.Rect, bbComms chan<- comms.Image, toolComms <-chan Tool, c
 		return nil, err
 	}
 
+	outlineVsh, err := gfx.NewShader(gfx.VshPassthrough, gl.VERTEX_SHADER)
+	if err != nil {
+		return nil, err
+	}
+	outlineFsh, err := gfx.NewShader(gfx.OutlineFsh, gl.FRAGMENT_SHADER)
+	if err != nil {
+		return nil, err
+	}
+	outlineGeo, err := gfx.NewShader(gfx.OutlineGeometry, gl.GEOMETRY_SHADER_ARB)
+	if err != nil {
+		return nil, err
+	}
+	if iv.selProg, err = gfx.NewProgram(outlineVsh, outlineFsh, outlineGeo); err != nil {
+		return nil, err
+	}
+
 	iv.checkerProg.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
 	iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
+	iv.selProg.UploadUniform("view", float32(iv.view.X), float32(iv.view.Y), float32(iv.view.W), float32(iv.view.H))
 
 	iv.activeTool = &EmptyTool{}
 
 	iv.CenterCanvas()
 	iv.projName = "New Project"
+
+	comp1, err := gfx.NewShader(gfx.ComputeCountSels, gl.COMPUTE_SHADER)
+	if err != nil {
+		return nil, err
+	}
+	iv.cs1, err = gfx.NewProgram(comp1)
+	if err != nil {
+		return nil, err
+	}
+	comp2, err := gfx.NewShader(gfx.ComputePrefixSum, gl.COMPUTE_SHADER)
+	if err != nil {
+		return nil, err
+	}
+	iv.cs2, err = gfx.NewProgram(comp2)
+	if err != nil {
+		return nil, err
+	}
+	comp3, err := gfx.NewShader(gfx.ComputeSelCoords, gl.COMPUTE_SHADER)
+	if err != nil {
+		return nil, err
+	}
+	iv.cs3, err = gfx.NewProgram(comp3)
+	if err != nil {
+		return nil, err
+	}
 
 	return iv, nil
 }
@@ -139,17 +192,14 @@ func (iv *View) Render() {
 	// gl viewport 0, 0 is bottom left
 	gl.Viewport(iv.area.X, iv.cfg.BottomBarHeight, iv.area.W, iv.area.H)
 
-	iv.program.Bind()
 	for _, layer := range iv.layers {
 		if layer == iv.canvasLayer {
-			iv.checkerProg.Bind()
-			iv.canvasLayer.Render(iv.view)
-			iv.program.Bind()
+			layer.Render(iv.view, iv.checkerProg)
 		} else {
-			layer.Render(iv.view)
+			layer.Render(iv.view, iv.program)
 		}
+		layer.RenderSelection(iv.view, iv.selProg, iv.cs1, iv.cs2, iv.cs3)
 	}
-	iv.program.Unbind()
 
 	select {
 	case tool := <-iv.toolComms:
@@ -167,11 +217,9 @@ func (iv *View) RenderCanvas() {
 	// gl viewport 0, 0 is bottom left
 	gl.Viewport(0, 0, iv.canvas.W, iv.canvas.H)
 
-	iv.program.Bind()
 	for _, layer := range iv.layers {
-		layer.Render(ui.RectToFRect(iv.canvas))
+		layer.Render(ui.RectToFRect(iv.canvas), iv.program)
 	}
-	iv.program.Unbind()
 
 	iv.updateView()
 	sw.Stop("RenderCanvas")
@@ -191,6 +239,7 @@ func (iv *View) updateView() {
 	iv.view = newView
 	iv.checkerProg.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
 	iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
+	iv.selProg.UploadUniform("view", float32(iv.view.X), float32(iv.view.Y), float32(iv.view.W), float32(iv.view.H))
 }
 
 // CenterCanvas updates the view so the canvas is in the center of the window
@@ -208,11 +257,11 @@ func (iv *View) CenterCanvas() {
 
 // setPixel sets the currently hovered texel of the selected layer
 // to the specified color
-func (iv *View) setPixel(p sdl.Point, col color.RGBA) error {
+func (iv *View) setPixel(p sdl.Point, col []byte) error {
 	if iv.selLayer != nil {
 		p.X -= iv.selLayer.area.X
 		p.Y -= iv.selLayer.area.Y
-		return iv.selLayer.texture.SetPixel(p, col)
+		return iv.selLayer.texture.SetPixel(p, col, true)
 	}
 	return nil
 }
@@ -241,8 +290,8 @@ func (iv *View) OnLeave() {
 // OnClick is called when the user clicks within the ui.Component's region
 func (iv *View) OnClick(evt *sdl.MouseButtonEvent) bool {
 	iv.updateMousePos(evt.X, evt.Y)
-	iv.activeTool.OnClick(evt, iv)
 	iv.selectLayer()
+	iv.activeTool.OnClick(evt, iv)
 	if evt.Button == sdl.BUTTON_RIGHT {
 		if evt.State == sdl.PRESSED {
 			if iv.selLayer == nil {
@@ -296,6 +345,7 @@ func (iv *View) OnMotion(evt *sdl.MouseMotionEvent) bool {
 		if iv.panning {
 			iv.view.X += float32(iv.panLoc.X-evt.X) * float32(iv.view.W) / float32(iv.area.W)
 			iv.view.Y += float32(iv.panLoc.Y-evt.Y) * float32(iv.view.W) / float32(iv.area.W)
+			iv.updateView()
 			iv.panLoc.X = evt.X
 			iv.panLoc.Y = evt.Y
 		}
@@ -339,13 +389,11 @@ const ErrCoordOutOfRange log.ConstErr = "coordinates out of range"
 
 // SelectPixel adds the given x, y pixel to the
 func (iv *View) SelectPixel(p sdl.Point) error {
-	if iv.selLayer == nil {
-		return nil
+	if iv.selLayer != nil {
+		p.X -= iv.selLayer.area.X
+		p.Y -= iv.selLayer.area.Y
+		return iv.selLayer.SelectTexel(p)
 	}
-	if !ui.InBounds(iv.selLayer.area, p) {
-		return nil
-	}
-	// TODO
 	return nil
 }
 
