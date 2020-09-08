@@ -20,12 +20,10 @@ type Layer struct {
 	texture   gfx.Texture
 	selTex    gfx.Texture
 	selDirty  bool
-	prog1     gfx.Program
-	prog2     gfx.Program
-	prog3     gfx.Program
 	setupBuf  *gfx.BufferObject
 	offsetBuf *gfx.BufferObject
 	vertsBuf  *gfx.BufferObject
+	chunkSize int32
 	workers   int32
 }
 
@@ -37,6 +35,7 @@ func NewLayer(offset sdl.Point, texture gfx.Texture) (*Layer, error) {
 	}
 	var maxWorkers int32
 	gl.GetIntegeri_v(gl.MAX_COMPUTE_WORK_GROUP_COUNT, 0, &maxWorkers)
+	// TODO calculate intelligent chunk size on a per-image basis
 	chunkSize := int32(256)
 	workers := texture.GetWidth() * texture.GetHeight() / chunkSize
 	if workers > maxWorkers {
@@ -53,33 +52,7 @@ func NewLayer(offset sdl.Point, texture gfx.Texture) (*Layer, error) {
 	vertsBuf := gfx.NewBufferObject()
 	selVAO := gfx.NewVAO(gl.POINTS, []int32{2})
 	selVAO.SetVBO(vertsBuf)
-	// TODO centralize the compute shader setup code across layers (in view.go)
-	comp1, err := gfx.NewShader(gfx.ComputeCountSels, gl.COMPUTE_SHADER)
-	if err != nil {
-		log.Fatal(err)
-	}
-	prog1, err := gfx.NewProgram(comp1)
-	if err != nil {
-		log.Fatal(err)
-	}
-	comp2, err := gfx.NewShader(gfx.ComputePrefixSum, gl.COMPUTE_SHADER)
-	if err != nil {
-		log.Fatal(err)
-	}
-	prog2, err := gfx.NewProgram(comp2)
-	if err != nil {
-		log.Fatal(err)
-	}
-	comp3, err := gfx.NewShader(gfx.ComputeSelCoords, gl.COMPUTE_SHADER)
-	if err != nil {
-		log.Fatal(err)
-	}
-	prog3, err := gfx.NewProgram(comp3)
-	if err != nil {
-		log.Fatal(err)
-	}
-	prog1.UploadUniformui("chunkSize", uint32(chunkSize))
-	prog3.UploadUniformui("chunkSize", uint32(chunkSize))
+
 	return &Layer{
 		area: sdl.Rect{
 			X: offset.X,
@@ -91,12 +64,10 @@ func NewLayer(offset sdl.Point, texture gfx.Texture) (*Layer, error) {
 		selVAO:    selVAO,
 		texture:   texture,
 		selTex:    selTex,
-		prog1:     prog1,
-		prog2:     prog2,
-		prog3:     prog3,
 		setupBuf:  setupBuf,
 		offsetBuf: offsetBuf,
 		vertsBuf:  vertsBuf,
+		chunkSize: chunkSize,
 		workers:   workers,
 	}, nil
 }
@@ -168,7 +139,7 @@ func (l Layer) Render(view sdl.FRect, program gfx.Program) {
 
 }
 
-func (l *Layer) RenderSelection(view sdl.FRect, program gfx.Program) {
+func (l *Layer) RenderSelection(view sdl.FRect, program, cs1, cs2, cs3 gfx.Program) {
 	fArea := ui.RectToFRect(l.area)
 	_, ok := view.Intersect(&fArea)
 	if !ok {
@@ -176,7 +147,7 @@ func (l *Layer) RenderSelection(view sdl.FRect, program gfx.Program) {
 		return
 	}
 	if l.selDirty {
-		l.genPointsComputeShader()
+		l.genPointsComputeShader(cs1, cs2, cs3)
 		l.selDirty = false
 	}
 	program.UploadUniform("layerArea", fArea.X, fArea.Y)
@@ -188,26 +159,28 @@ func (l *Layer) RenderSelection(view sdl.FRect, program gfx.Program) {
 	program.Unbind()
 }
 
-func (l *Layer) genPointsComputeShader() {
+func (l *Layer) genPointsComputeShader(cs1, cs2, cs3 gfx.Program) {
 	l.setupBuf.BindBufferBase(gl.SHADER_STORAGE_BUFFER, 0)
 	l.vertsBuf.BindBufferBase(gl.SHADER_STORAGE_BUFFER, 1)
 	l.offsetBuf.BindBufferBase(gl.SHADER_STORAGE_BUFFER, 2)
+	cs1.UploadUniformui("chunkSize", uint32(l.chunkSize))
+	cs3.UploadUniformui("chunkSize", uint32(l.chunkSize))
 	// workers count selections in their respective chunks
-	l.prog1.Bind()
+	cs1.Bind()
 	l.selTex.Bind()
 	gl.DispatchCompute(uint32(l.workers), 1, 1)
 	l.selTex.Unbind()
-	l.prog1.Unbind()
+	cs1.Unbind()
 
 	gl.MemoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT)
 	// parallel prefix algorithm on compute shader
 	// to determine worker indices to fill in final answer
 	passes := int(math.Ceil(math.Log2(float64(l.workers))))
 	for i := 0; i <= passes; i++ {
-		l.prog2.UploadUniformi("pass", int32(i))
-		l.prog2.Bind()
+		cs2.UploadUniformi("pass", int32(i))
+		cs2.Bind()
 		gl.DispatchCompute(uint32(l.workers), 1, 1)
-		l.prog2.Unbind()
+		cs2.Unbind()
 
 		gl.MemoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT)
 	}
@@ -217,11 +190,11 @@ func (l *Layer) genPointsComputeShader() {
 	l.vertsBuf.BufferData(gl.SHADER_STORAGE_BUFFER, 4*sum, gl.Ptr(nil), gl.DYNAMIC_READ)
 	// workers fill in final answer in an SSBO, where the final answer
 	// is an array of (X,Y) points, where each point is a selected texel
-	l.prog3.Bind()
+	cs3.Bind()
 	l.selTex.Bind()
 	gl.DispatchCompute(uint32(l.workers), 1, 1)
 	l.selTex.Unbind()
-	l.prog3.Unbind()
+	cs3.Unbind()
 	gl.MemoryBarrier(gl.ALL_BARRIER_BITS)
 }
 

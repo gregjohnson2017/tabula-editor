@@ -46,6 +46,9 @@ type View struct {
 	checkerProg gfx.Program
 	selProg     gfx.Program
 	program     gfx.Program
+	cs1         gfx.Program
+	cs2         gfx.Program
+	cs3         gfx.Program
 	projName    string
 }
 
@@ -135,6 +138,31 @@ func NewView(area sdl.Rect, bbComms chan<- comms.Image, toolComms <-chan Tool, c
 	iv.CenterCanvas()
 	iv.projName = "New Project"
 
+	comp1, err := gfx.NewShader(gfx.ComputeCountSels, gl.COMPUTE_SHADER)
+	if err != nil {
+		return nil, err
+	}
+	iv.cs1, err = gfx.NewProgram(comp1)
+	if err != nil {
+		return nil, err
+	}
+	comp2, err := gfx.NewShader(gfx.ComputePrefixSum, gl.COMPUTE_SHADER)
+	if err != nil {
+		return nil, err
+	}
+	iv.cs2, err = gfx.NewProgram(comp2)
+	if err != nil {
+		return nil, err
+	}
+	comp3, err := gfx.NewShader(gfx.ComputeSelCoords, gl.COMPUTE_SHADER)
+	if err != nil {
+		return nil, err
+	}
+	iv.cs3, err = gfx.NewProgram(comp3)
+	if err != nil {
+		return nil, err
+	}
+
 	return iv, nil
 }
 
@@ -170,7 +198,7 @@ func (iv *View) Render() {
 		} else {
 			layer.Render(iv.view, iv.program)
 		}
-		layer.RenderSelection(iv.view, iv.selProg)
+		layer.RenderSelection(iv.view, iv.selProg, iv.cs1, iv.cs2, iv.cs3)
 	}
 
 	select {
