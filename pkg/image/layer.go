@@ -5,15 +5,11 @@ import (
 	"encoding/gob"
 	"fmt"
 	"math"
-	"runtime"
-	"sync"
 
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
 	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
-	"github.com/gregjohnson2017/tabula-editor/pkg/util"
-	set "github.com/kroppt/Int32Set"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -23,9 +19,7 @@ type Layer struct {
 	selVAO    *gfx.VAO
 	texture   gfx.Texture
 	selTex    gfx.Texture
-	selSet    set.Set
 	selDirty  bool
-	selData   []float32
 	prog1     gfx.Program
 	prog2     gfx.Program
 	prog3     gfx.Program
@@ -59,6 +53,7 @@ func NewLayer(offset sdl.Point, texture gfx.Texture) (*Layer, error) {
 	vertsBuf := gfx.NewBufferObject()
 	selVAO := gfx.NewVAO(gl.POINTS, []int32{2})
 	selVAO.SetVBO(vertsBuf)
+	// TODO centralize the compute shader setup code across layers (in view.go)
 	comp1, err := gfx.NewShader(gfx.ComputeCountSels, gl.COMPUTE_SHADER)
 	if err != nil {
 		log.Fatal(err)
@@ -96,7 +91,6 @@ func NewLayer(offset sdl.Point, texture gfx.Texture) (*Layer, error) {
 		selVAO:    selVAO,
 		texture:   texture,
 		selTex:    selTex,
-		selSet:    set.NewSet(),
 		prog1:     prog1,
 		prog2:     prog2,
 		prog3:     prog3,
@@ -181,108 +175,24 @@ func (l *Layer) RenderSelection(view sdl.FRect, program gfx.Program) {
 		// not in view
 		return
 	}
-	// selections
 	if l.selDirty {
-		// sws := util.Start()
-		// l.genPointsSequential()
-		// _ = l.selVAO.Load(l.selData, gl.DYNAMIC_READ)
-		// sws.StopRecordAverage("genPointsSequential")
-		// swp := util.Start()
-		// l.genPointsParallel()
-		// _ = l.selVAO.Load(l.selData, gl.DYNAMIC_READ)
-		// swp.StopRecordAverage("genPointsParallel")
-		swaa := util.Start()
 		l.genPointsComputeShader()
-		swaa.StopRecordAverage("genPointsComputeShader")
-
 		l.selDirty = false
 	}
 	program.UploadUniform("layerArea", fArea.X, fArea.Y)
 
 	program.Bind()
 	l.selTex.Bind()
-	glq := util.StartGLQuery()
 	l.selVAO.Draw()
-	glq.Stop("selection shaders")
 	l.selTex.Unbind()
 	program.Unbind()
 }
 
-func (l *Layer) getChunkNumSels(data []byte, workers int) []int {
-	numSels := make([]int, workers)
-	workSize := len(data) / workers
-	var wg sync.WaitGroup
-
-	wg.Add(workers)
-	for w := 0; w < workers; w++ {
-		go func(w int) {
-			var edge int
-			if w == workers-1 {
-				edge = len(data) - (workSize * workers)
-			}
-			for i := w * workSize; i < (w+1)*workSize+edge; i++ {
-				numSels[w] += int(data[i])
-			}
-			wg.Done()
-		}(w)
-	}
-	wg.Wait()
-
-	return numSels
-}
-
-func (l *Layer) genPointsParallel() {
-	workers := runtime.NumCPU()
-
-	data := l.selTex.GetData()
-	if workers > len(data) {
-		workers = len(data)
-	}
-
-	chunkSels := l.getChunkNumSels(data, workers)
-	chunkOffs := chunkSels
-
-	var sum int
-	for i, num := range chunkSels {
-		chunkOffs[i] = sum
-		sum += num * 2
-	}
-
-	workSize := len(data) / workers
-	var wg sync.WaitGroup
-
-	l.selData = make([]float32, sum)
-	wg.Add(workers)
-	for w, off := range chunkOffs {
-		go func(w int, off int) {
-			var edge int
-			if w == workers-1 {
-				edge = len(data) - (workSize * workers)
-			}
-			var j int
-			for i := w * workSize; i < (w+1)*workSize+edge; i++ {
-				if data[i] == 0 {
-					continue
-				}
-				texelX := float32(i % int(l.area.W))
-				texelY := float32((float32(i) - texelX) / float32(l.area.W))
-				l.selData[off+j] = texelX
-				l.selData[off+j+1] = texelY
-				j += 2
-			}
-			wg.Done()
-		}(w, off)
-	}
-	wg.Wait()
-}
-
 func (l *Layer) genPointsComputeShader() {
-	// use current layer's ssbos
-	// glq1 := util.StartGLQuery()
 	l.setupBuf.BindBufferBase(gl.SHADER_STORAGE_BUFFER, 0)
 	l.vertsBuf.BindBufferBase(gl.SHADER_STORAGE_BUFFER, 1)
 	l.offsetBuf.BindBufferBase(gl.SHADER_STORAGE_BUFFER, 2)
-
+	// workers count selections in their respective chunks
 	l.prog1.Bind()
 	l.selTex.Bind()
 	gl.DispatchCompute(uint32(l.workers), 1, 1)
@@ -290,12 +200,9 @@ func (l *Layer) genPointsComputeShader() {
 	l.prog1.Unbind()
 
 	gl.MemoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT)
-	// glq1.Stop("zzComputeCountSels")
-
-	// glq2 := util.StartGLQuery()
+	// parallel prefix algorithm on compute shader
+	// to determine worker indices to fill in final answer
 	passes := int(math.Ceil(math.Log2(float64(l.workers))))
-	// log.Infof("passes=%v", passes)
-
 	for i := 0; i <= passes; i++ {
 		l.prog2.UploadUniformi("pass", int32(i))
 		l.prog2.Bind()
@@ -304,39 +211,24 @@ func (l *Layer) genPointsComputeShader() {
 
 		gl.MemoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT)
 	}
-	// glq2.Stop("zzComputePrefixSum")
-
-	// glq3 := util.StartGLQuery()
+	// allocate space for final answer in SSBO
 	var sum uint32
 	l.offsetBuf.GetSubData(gl.SHADER_STORAGE_BUFFER, 0, 4, gl.Ptr(&sum))
-
 	l.vertsBuf.BufferData(gl.SHADER_STORAGE_BUFFER, 4*sum, gl.Ptr(nil), gl.DYNAMIC_READ)
-
+	// workers fill in final answer in an SSBO, where the final answer
+	// is an array of (X,Y) points, where each point is a selected texel
 	l.prog3.Bind()
 	l.selTex.Bind()
 	gl.DispatchCompute(uint32(l.workers), 1, 1)
 	l.selTex.Unbind()
 	l.prog3.Unbind()
 	gl.MemoryBarrier(gl.ALL_BARRIER_BITS)
-	// glq3.Stop("zzComputeSelCoords")
-}
-
-func (l *Layer) genPointsSequential() {
-	l.selData = make([]float32, 0, l.selSet.Size()*2)
-	l.selSet.Range(func(i int32) bool {
-		// i is every y*width+x index
-		texelX := float32(i % l.area.W)
-		texelY := float32((float32(i) - texelX) / float32(l.area.W))
-		l.selData = append(l.selData, texelX, texelY)
-		return true
-	})
 }
 
 func (l *Layer) SelectTexel(p sdl.Point) error {
 	if p.X < 0 || p.Y < 0 || p.X >= l.area.W || p.Y >= l.area.H {
 		return fmt.Errorf("SelectTexel(%v, %v): %w", p.X, p.Y, ErrCoordOutOfRange)
 	}
-	l.selSet.Add(p.X + p.Y*l.area.W)
 	l.selDirty = true
 	return l.selTex.SetPixel(p, []byte{1}, false)
 }
@@ -347,11 +239,6 @@ func (l *Layer) SelectRegion(r sdl.Rect) error {
 	}
 	if r.W > l.area.W || r.H > l.area.H {
 		return fmt.Errorf("SelectRegion(%v, %v, %v, %v): %w", r.X, r.Y, r.W, r.H, ErrCoordOutOfRange)
-	}
-	for i := r.X; i < r.X+r.W; i++ {
-		for j := r.Y; j < r.Y+r.H; j++ {
-			l.selSet.Add(i + j*l.area.W)
-		}
 	}
 	data := make([]byte, r.W*r.H)
 	for i := range data {
@@ -375,7 +262,6 @@ func (l *Layer) SelectWorstCase() error {
 	for i := int32(0); i < r.W; i++ {
 		for j := int32(0); j < r.H; j++ {
 			if i%2 == j%2 {
-				l.selSet.Add(i + j*l.area.W)
 				data[i+j*l.area.W] = 1
 			}
 		}
