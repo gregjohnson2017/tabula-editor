@@ -22,8 +22,8 @@ type BottomBar struct {
 	comms       <-chan comms.Image
 	backProgram gfx.Program
 	textProgram gfx.Program
-	backBuf     *gfx.BufferArray
-	textBuf     *gfx.BufferArray
+	backBuf     *gfx.VAO
+	textBuf     *gfx.VAO
 	fontInfo    font.Info
 	cfg         *config.Config
 }
@@ -82,14 +82,14 @@ func NewBottomBar(area *sdl.Rect, comms <-chan comms.Image, cfg *config.Config) 
 		+1.0, -1.0, // bottom-right
 	}
 
-	backBuf := gfx.NewBufferArray(gl.TRIANGLES, []int32{2})
+	backBuf := gfx.NewVAO(gl.TRIANGLES, []int32{2})
 
 	err = backBuf.Load(backTriangles, gl.STATIC_DRAW)
 	if err != nil {
 		log.Warnf("failed to load bottom bar background triangles: %v", err)
 	}
 
-	textBuf := gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2})
+	textBuf := gfx.NewVAO(gl.TRIANGLES, []int32{2, 2})
 
 	return &BottomBar{
 		area:        area,

@@ -22,8 +22,8 @@ type Button struct {
 	strTriangles       []float32
 	backProgram        gfx.Program
 	textProgram        gfx.Program
-	backBuf            *gfx.BufferArray
-	textBuf            *gfx.BufferArray
+	backBuf            *gfx.VAO
+	textBuf            *gfx.VAO
 	fontInfo           font.Info
 	text               string
 	pressed            bool
@@ -92,13 +92,13 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 	align := ui.Align{V: ui.AlignMiddle, H: ui.AlignCenter}
 	textTriangles := font.MapString(text, fnt, pos, align)
 
-	backBuf := gfx.NewBufferArray(gl.TRIANGLES, []int32{2})
+	backBuf := gfx.NewVAO(gl.TRIANGLES, []int32{2})
 	err = backBuf.Load(backTriangles, gl.STATIC_DRAW)
 	if err != nil {
 		log.Warnf("failed to load button background triangles: %v", err)
 	}
 
-	textBuf := gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2})
+	textBuf := gfx.NewVAO(gl.TRIANGLES, []int32{2, 2})
 	err = textBuf.Load(textTriangles, gl.STATIC_DRAW)
 	if err != nil {
 		log.Warnf("failed to load button text triangles: %v", err)

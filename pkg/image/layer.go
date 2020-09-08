@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"math"
 	"runtime"
 	"sync"
 
@@ -17,14 +18,21 @@ import (
 )
 
 type Layer struct {
-	area     sdl.Rect
-	buffer   *gfx.BufferArray
-	selBuf   *gfx.BufferArray
-	texture  gfx.Texture
-	selTex   gfx.Texture
-	selSet   set.Set
-	selDirty bool
-	selData  []float32
+	area      sdl.Rect
+	imgVAO    *gfx.VAO
+	selVAO    *gfx.VAO
+	texture   gfx.Texture
+	selTex    gfx.Texture
+	selSet    set.Set
+	selDirty  bool
+	selData   []float32
+	prog1     gfx.Program
+	prog2     gfx.Program
+	prog3     gfx.Program
+	setupBuf  *gfx.BufferObject
+	offsetBuf *gfx.BufferObject
+	vertsBuf  *gfx.BufferObject
+	workers   int32
 }
 
 func NewLayer(offset sdl.Point, texture gfx.Texture) (*Layer, error) {
@@ -33,6 +41,50 @@ func NewLayer(offset sdl.Point, texture gfx.Texture) (*Layer, error) {
 	if err != nil {
 		return nil, err
 	}
+	var maxWorkers int32
+	gl.GetIntegeri_v(gl.MAX_COMPUTE_WORK_GROUP_COUNT, 0, &maxWorkers)
+	chunkSize := int32(256)
+	workers := texture.GetWidth() * texture.GetHeight() / chunkSize
+	if workers > maxWorkers {
+		workers = maxWorkers
+	} else if workers == 0 {
+		workers = 1
+	}
+	log.Debugf("compute shader workers = %v", workers)
+
+	setupBuf := gfx.NewBufferObject()
+	setupBuf.BufferData(gl.SHADER_STORAGE_BUFFER, uint32(4*workers), gl.Ptr(nil), gl.DYNAMIC_READ)
+	offsetBuf := gfx.NewBufferObject()
+	offsetBuf.BufferData(gl.SHADER_STORAGE_BUFFER, uint32(4*(workers+1)), gl.Ptr(nil), gl.DYNAMIC_READ)
+	vertsBuf := gfx.NewBufferObject()
+	selVAO := gfx.NewVAO(gl.POINTS, []int32{2})
+	selVAO.SetVBO(vertsBuf)
+	comp1, err := gfx.NewShader(gfx.ComputeCountSels, gl.COMPUTE_SHADER)
+	if err != nil {
+		log.Fatal(err)
+	}
+	prog1, err := gfx.NewProgram(comp1)
+	if err != nil {
+		log.Fatal(err)
+	}
+	comp2, err := gfx.NewShader(gfx.ComputePrefixSum, gl.COMPUTE_SHADER)
+	if err != nil {
+		log.Fatal(err)
+	}
+	prog2, err := gfx.NewProgram(comp2)
+	if err != nil {
+		log.Fatal(err)
+	}
+	comp3, err := gfx.NewShader(gfx.ComputeSelCoords, gl.COMPUTE_SHADER)
+	if err != nil {
+		log.Fatal(err)
+	}
+	prog3, err := gfx.NewProgram(comp3)
+	if err != nil {
+		log.Fatal(err)
+	}
+	prog1.UploadUniformui("chunkSize", uint32(chunkSize))
+	prog3.UploadUniformui("chunkSize", uint32(chunkSize))
 	return &Layer{
 		area: sdl.Rect{
 			X: offset.X,
@@ -40,11 +92,18 @@ func NewLayer(offset sdl.Point, texture gfx.Texture) (*Layer, error) {
 			W: texture.GetWidth(),
 			H: texture.GetHeight(),
 		},
-		buffer:  gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2}),
-		selBuf:  gfx.NewBufferArray(gl.POINTS, []int32{2}),
-		texture: texture,
-		selTex:  selTex,
-		selSet:  set.NewSet(),
+		imgVAO:    gfx.NewVAO(gl.TRIANGLES, []int32{2, 2}),
+		selVAO:    selVAO,
+		texture:   texture,
+		selTex:    selTex,
+		selSet:    set.NewSet(),
+		prog1:     prog1,
+		prog2:     prog2,
+		prog3:     prog3,
+		setupBuf:  setupBuf,
+		offsetBuf: offsetBuf,
+		vertsBuf:  vertsBuf,
+		workers:   workers,
 	}, nil
 }
 
@@ -101,7 +160,7 @@ func (l Layer) Render(view sdl.FRect, program gfx.Program) {
 		brx, bry, brs, brt, // bottom-right
 	}
 
-	err := l.buffer.Load(triangles, gl.STATIC_DRAW)
+	err := l.imgVAO.Load(triangles, gl.STATIC_DRAW)
 	if err != nil {
 		log.Warnf("failed to load image triangles: %v", err)
 	}
@@ -109,7 +168,7 @@ func (l Layer) Render(view sdl.FRect, program gfx.Program) {
 	// draw image
 	program.Bind()
 	l.texture.Bind()
-	l.buffer.Draw()
+	l.imgVAO.Draw()
 	l.texture.Unbind()
 	program.Unbind()
 
@@ -123,31 +182,27 @@ func (l *Layer) RenderSelection(view sdl.FRect, program gfx.Program) {
 		return
 	}
 	// selections
-	// *2 for x,y
 	if l.selDirty {
-		if runtime.NumCPU() == 1 || l.selSet.Size() < 3000 {
-			l.genSelectionPointsSequential()
-		} else {
-			l.genSelectionPointsParallel()
-		}
-		sw := util.Start()
-		l.selDirty = false
-		sw.StopRecordAverage("selection set")
-	}
+		// sws := util.Start()
+		// l.genPointsSequential()
+		// _ = l.selVAO.Load(l.selData, gl.DYNAMIC_READ)
+		// sws.StopRecordAverage("genPointsSequential")
+		// swp := util.Start()
+		// l.genPointsParallel()
+		// _ = l.selVAO.Load(l.selData, gl.DYNAMIC_READ)
+		// swp.StopRecordAverage("genPointsParallel")
+		swaa := util.Start()
+		l.genPointsComputeShader()
+		swaa.StopRecordAverage("genPointsComputeShader")
 
-	if len(l.selData) == 0 {
-		return
+		l.selDirty = false
 	}
 	program.UploadUniform("layerArea", fArea.X, fArea.Y)
-	err := l.selBuf.Load(l.selData, gl.STATIC_DRAW)
-	if err != nil {
-		log.Warnf("failed to load selection points: %v", err)
-	}
 
 	program.Bind()
 	l.selTex.Bind()
 	glq := util.StartGLQuery()
-	l.selBuf.Draw()
+	l.selVAO.Draw()
 	glq.Stop("selection shaders")
 	l.selTex.Unbind()
 	program.Unbind()
@@ -163,7 +218,7 @@ func (l *Layer) getChunkNumSels(data []byte, workers int) []int {
 		go func(w int) {
 			var edge int
 			if w == workers-1 {
-				edge = len(data) % workSize
+				edge = len(data) - (workSize * workers)
 			}
 			for i := w * workSize; i < (w+1)*workSize+edge; i++ {
 				numSels[w] += int(data[i])
@@ -176,10 +231,13 @@ func (l *Layer) getChunkNumSels(data []byte, workers int) []int {
 	return numSels
 }
 
-func (l *Layer) genSelectionPointsParallel() {
+func (l *Layer) genPointsParallel() {
 	workers := runtime.NumCPU()
 
 	data := l.selTex.GetData()
+	if workers > len(data) {
+		workers = len(data)
+	}
 
 	chunkSels := l.getChunkNumSels(data, workers)
 	chunkOffs := chunkSels
@@ -199,7 +257,7 @@ func (l *Layer) genSelectionPointsParallel() {
 		go func(w int, off int) {
 			var edge int
 			if w == workers-1 {
-				edge = len(data) % workSize
+				edge = len(data) - (workSize * workers)
 			}
 			var j int
 			for i := w * workSize; i < (w+1)*workSize+edge; i++ {
@@ -218,7 +276,52 @@ func (l *Layer) genSelectionPointsParallel() {
 	wg.Wait()
 }
 
-func (l *Layer) genSelectionPointsSequential() {
+func (l *Layer) genPointsComputeShader() {
+	// use current layer's ssbos
+	// glq1 := util.StartGLQuery()
+	l.setupBuf.BindBufferBase(gl.SHADER_STORAGE_BUFFER, 0)
+	l.vertsBuf.BindBufferBase(gl.SHADER_STORAGE_BUFFER, 1)
+	l.offsetBuf.BindBufferBase(gl.SHADER_STORAGE_BUFFER, 2)
+
+	l.prog1.Bind()
+	l.selTex.Bind()
+	gl.DispatchCompute(uint32(l.workers), 1, 1)
+	l.selTex.Unbind()
+	l.prog1.Unbind()
+
+	gl.MemoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT)
+	// glq1.Stop("zzComputeCountSels")
+
+	// glq2 := util.StartGLQuery()
+	passes := int(math.Ceil(math.Log2(float64(l.workers))))
+	// log.Infof("passes=%v", passes)
+
+	for i := 0; i <= passes; i++ {
+		l.prog2.UploadUniformi("pass", int32(i))
+		l.prog2.Bind()
+		gl.DispatchCompute(uint32(l.workers), 1, 1)
+		l.prog2.Unbind()
+
+		gl.MemoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT)
+	}
+	// glq2.Stop("zzComputePrefixSum")
+
+	// glq3 := util.StartGLQuery()
+	var sum uint32
+	l.offsetBuf.GetSubData(gl.SHADER_STORAGE_BUFFER, 0, 4, gl.Ptr(&sum))
+
+	l.vertsBuf.BufferData(gl.SHADER_STORAGE_BUFFER, 4*sum, gl.Ptr(nil), gl.DYNAMIC_READ)
+
+	l.prog3.Bind()
+	l.selTex.Bind()
+	gl.DispatchCompute(uint32(l.workers), 1, 1)
+	l.selTex.Unbind()
+	l.prog3.Unbind()
+	gl.MemoryBarrier(gl.ALL_BARRIER_BITS)
+	// glq3.Stop("zzComputeSelCoords")
+}
+
+func (l *Layer) genPointsSequential() {
 	l.selData = make([]float32, 0, l.selSet.Size()*2)
 	l.selSet.Range(func(i int32) bool {
 		// i is every y*width+x index
@@ -287,7 +390,7 @@ func (l Layer) GetSelTex() gfx.Texture {
 
 // Destroy destroys OpenGL assets associated with the Layer
 func (l Layer) Destroy() {
-	l.buffer.Destroy()
+	l.imgVAO.Destroy()
 	l.texture.Destroy()
 }
 

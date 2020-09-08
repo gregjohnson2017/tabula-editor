@@ -54,6 +54,9 @@ func (iv *View) AddLayer(tex gfx.Texture) error {
 	if err != nil {
 		return err
 	}
+	// if err = layer.SelectWorstCase(); err != nil {
+	// 	return err
+	// }
 	iv.layers = append(iv.layers, layer)
 	return nil
 }
@@ -517,7 +520,7 @@ func (iv *View) LoadProject(fileName string) error {
 	iv.view = proj.View
 	iv.canvas = proj.Canvas
 	iv.projName = proj.ProjName
-
+	// _ = iv.layers[1].SelectWorstCase()
 	iv.updateView()
 	sw.Stop("LoadProject")
 	return nil

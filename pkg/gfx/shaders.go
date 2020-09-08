@@ -183,7 +183,132 @@ const (
 				emitLine(bl, br);
 			}
 		}
-	}
+	}`
 
-	`
+	ComputeCountSels = `
+	#version 430
+	layout(local_size_x = 1) in;
+	layout(std430, binding = 0) buffer setup
+	{
+		uint chunkIndices[];
+	};
+	layout(std430, binding = 2) buffer offsets
+	{
+		uint sum;
+		uint next[];
+	};
+	// TODO 1d sampler, 1d texture fix
+	uniform usampler2D selTex;
+	uniform uint chunkSize;
+
+	void main() {
+		uvec2 dims = uvec2(textureSize(selTex, 0));
+		uint wid = uint(gl_WorkGroupID.x);
+		uint edge = 0;
+		if (wid == gl_NumWorkGroups.x - 1) {
+			edge = dims.x*dims.y - chunkSize*gl_NumWorkGroups.x;
+		}
+		for (uint i = wid * chunkSize; i < (wid+1)*chunkSize+edge; i++) {
+			if (i == wid * chunkSize) {
+				chunkIndices[wid] = 0;
+				next[wid] = 0;
+			}
+			uint tx = i % dims.x;
+			uint ty = i / dims.x;
+			if (texelFetch(selTex, ivec2(tx,ty), 0).r != 0) {
+				chunkIndices[wid] += 1;
+				next[wid] += 1;
+			}
+		}
+	}`
+
+	ComputePrefixSum = `
+	#version 430
+	layout(local_size_x = 1) in;
+	layout(std430, binding = 0) buffer setup
+	{
+		uint chunkOffs[];
+	};
+	layout(std430, binding = 2) buffer offsets
+	{
+		uint sum;
+		uint next[];
+	};
+	uniform int pass;
+
+	void main() {
+		uint wid = uint(gl_WorkGroupID.x);
+		if (pass == uint(ceil(log2(gl_NumWorkGroups.x)))) {
+			if (pass % 2 == 0) { 
+				if (wid == gl_NumWorkGroups.x - 1) {
+					sum = chunkOffs[wid]*2;
+				}
+				next[wid] = wid == 0 ? 0 : (chunkOffs[wid-1]) * 2;
+			} else {
+				if (wid == gl_NumWorkGroups.x - 1) {
+					sum = next[wid]*2;
+				}
+				chunkOffs[wid] = wid == 0 ? 0 : (next[wid-1]) * 2;
+			}
+		} else {
+			if (pass % 2 == 0) {
+				if (wid < uint(exp2(pass))) {
+					next[wid] = chunkOffs[wid];
+				} else {
+					next[wid] = chunkOffs[wid] + chunkOffs[wid-uint(exp2(pass))];
+				}
+			} else {
+				if (wid < uint(exp2(pass))) {
+					chunkOffs[wid] = next[wid];
+				} else {
+					chunkOffs[wid] = next[wid] + next[wid-uint(exp2(pass))];
+				}
+			}
+		}
+	}`
+
+	ComputeSelCoords = `
+	#version 430
+	layout(local_size_x = 1) in;
+	layout(std430, binding = 2) buffer offsets
+	{
+		uint sum;
+		uint next[];
+	};
+	layout(std430, binding = 1) buffer verts
+	{
+		float finalAnswer[];
+	};
+	layout(std430, binding = 0) buffer setup
+	{
+		uint chunkOffs[];
+	};
+	uniform usampler2D selTex;
+	uniform uint chunkSize;
+
+	void main() {
+		uvec2 dims = uvec2(textureSize(selTex, 0));
+		uint wid = uint(gl_WorkGroupID.x);
+		uint edge = 0;
+		if (wid == gl_NumWorkGroups.x - 1) {
+			edge = dims.x*dims.y - chunkSize*gl_NumWorkGroups.x;
+		}
+		uint passes = uint(ceil(log2(chunkOffs.length())));
+		uint off;
+		if (passes%2==0) {
+			off = next[wid];
+		} else {
+			off = chunkOffs[wid];
+		}
+		uint j = 0;
+		for (uint i = wid * chunkSize; i < (wid+1)*chunkSize+edge; i++) {
+			uint tx = i % dims.x;
+			uint ty = i / dims.x;
+			if (texelFetch(selTex, ivec2(tx,ty), 0).r != 0) {
+				finalAnswer[off+j] = float(tx);
+				finalAnswer[off+j+1] = float(ty);
+				j += 2;
+			}
+		}
+	}`
 )

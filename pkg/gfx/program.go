@@ -64,6 +64,48 @@ func (p Program) UploadUniform(uniformName string, data ...float32) {
 	gl.UseProgram(0)
 }
 
+func (p Program) UploadUniformi(uniformName string, data ...int32) {
+	uniformID := gl.GetUniformLocation(p.id, &[]byte(uniformName + "\x00")[0])
+	if uniformID == -1 {
+		log.Fatalf("\"%s\" is an invalid uniform name", uniformName)
+	}
+	gl.UseProgram(p.id)
+	switch len(data) {
+	case 1:
+		gl.Uniform1i(uniformID, data[0])
+	case 2:
+		gl.Uniform2i(uniformID, data[0], data[1])
+	case 3:
+		gl.Uniform3i(uniformID, data[0], data[1], data[2])
+	case 4:
+		gl.Uniform4i(uniformID, data[0], data[1], data[2], data[3])
+	default:
+		log.Fatal("Invalid number of arguments to uploadUniform")
+	}
+	gl.UseProgram(0)
+}
+
+func (p Program) UploadUniformui(uniformName string, data ...uint32) {
+	uniformID := gl.GetUniformLocation(p.id, &[]byte(uniformName + "\x00")[0])
+	if uniformID == -1 {
+		log.Fatalf("\"%s\" is an invalid uniform name", uniformName)
+	}
+	gl.UseProgram(p.id)
+	switch len(data) {
+	case 1:
+		gl.Uniform1uiEXT(uniformID, data[0])
+	case 2:
+		gl.Uniform2uiEXT(uniformID, data[0], data[1])
+	case 3:
+		gl.Uniform3uiEXT(uniformID, data[0], data[1], data[2])
+	case 4:
+		gl.Uniform4uiEXT(uniformID, data[0], data[1], data[2], data[3])
+	default:
+		log.Fatal("Invalid number of arguments to uploadUniform")
+	}
+	gl.UseProgram(0)
+}
+
 // Bind makes OpenGL use this program
 func (p Program) Bind() {
 	gl.UseProgram(p.id)
