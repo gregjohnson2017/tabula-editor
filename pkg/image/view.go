@@ -141,8 +141,6 @@ func (iv *View) Render() {
 		iv.bbComms <- comms.Image{FileName: iv.projName, MousePix: iv.mousePix, Mult: iv.mult}
 	}()
 
-	// TODO selection outline
-
 	// gl viewport 0, 0 is bottom left
 	gl.Viewport(iv.area.X, iv.cfg.BottomBarHeight, iv.area.W, iv.area.H)
 
@@ -370,7 +368,6 @@ const ErrWriteFormat log.ConstErr = "unsupported image format"
 // to a texture, and then write the data in that texture to the specified file
 func (iv *View) WriteToFile(fileName string) error {
 	sw := util.Start()
-	// TODO after canvas figured out
 	w, h := iv.canvas.W, iv.canvas.H
 
 	fb, err := gfx.NewFrameBuffer(iv.canvas.W, iv.canvas.H)

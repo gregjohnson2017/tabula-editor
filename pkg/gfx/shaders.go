@@ -181,7 +181,6 @@ const (
 		uint sum;
 		uint next[];
 	};
-	// TODO 1d sampler, 1d texture fix
 	uniform usampler2D selTex;
 	uniform uint chunkSize;
 
