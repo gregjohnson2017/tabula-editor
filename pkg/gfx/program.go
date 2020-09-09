@@ -120,3 +120,54 @@ func (p Program) Unbind() {
 func (p Program) Destroy() {
 	gl.DeleteProgram(p.id)
 }
+
+type ShaderInfo struct {
+	Source     string
+	ShaderType uint32
+}
+
+var sharedPrograms map[Program][]ShaderInfo
+
+func doShadersMatch(arr1, arr2 []ShaderInfo) bool {
+	if len(arr1) != len(arr2) {
+		return false
+	}
+	for _, s1 := range arr1 {
+		match := false
+		for _, s2 := range arr2 {
+			if s1 == s2 {
+				match = true
+				break
+			}
+		}
+		if !match {
+			return false
+		}
+	}
+	return true
+}
+
+func GetSharedProgram(requested ...ShaderInfo) (Program, error) {
+	if sharedPrograms == nil {
+		sharedPrograms = make(map[Program][]ShaderInfo)
+	}
+	for prog, shaders := range sharedPrograms {
+		if doShadersMatch(shaders, requested) {
+			return prog, nil
+		}
+	}
+	shaderList := make([]Shader, len(requested))
+	for i, request := range requested {
+		shader, err := NewShader(request.Source, request.ShaderType)
+		if err != nil {
+			return Program{}, err
+		}
+		shaderList[i] = shader
+	}
+	newProg, err := NewProgram(shaderList...)
+	if err != nil {
+		return Program{}, err
+	}
+	sharedPrograms[newProg] = requested
+	return newProg, nil
+}

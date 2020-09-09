@@ -194,9 +194,9 @@ func (iv *View) Render() {
 
 	for _, layer := range iv.layers {
 		if layer == iv.canvasLayer {
-			layer.Render(iv.view, iv.checkerProg)
+			layer.Render(iv.view, ui.RectToFRect(iv.canvas), iv.checkerProg)
 		} else {
-			layer.Render(iv.view, iv.program)
+			layer.Render(iv.view, ui.RectToFRect(iv.canvas), iv.program)
 		}
 		layer.RenderSelection(iv.view, iv.selProg, iv.cs1, iv.cs2, iv.cs3)
 	}
@@ -218,7 +218,7 @@ func (iv *View) RenderCanvas() {
 	gl.Viewport(0, 0, iv.canvas.W, iv.canvas.H)
 
 	for _, layer := range iv.layers {
-		layer.Render(ui.RectToFRect(iv.canvas), iv.program)
+		layer.Render(ui.RectToFRect(iv.canvas), ui.RectToFRect(iv.canvas), iv.program)
 	}
 
 	iv.updateView()

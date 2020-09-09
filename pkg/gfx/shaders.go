@@ -3,17 +3,11 @@ package gfx
 const (
 	OutlineVsh = `
 	#version 330
-	uniform vec4 uni_color;
-	uniform vec2 origDims;
-	uniform float mult;
-	in vec2 position_in;
-	out vec4 color;
+	uniform vec2 area;
+	layout(location = 0) in vec2 position_in;
 	void main() {
-		vec2 canvasArea = mult * origDims;
-		vec2 pos = vec2(mult * position_in.x, canvasArea.y - mult * position_in.y);
-		vec2 glSpace = vec2(2.0, 2.0) * (pos / canvasArea) + vec2(-1.0, -1.0);
+		vec2 glSpace = vec2(2.0, -2.0) * (position_in / area) + vec2(-1.0, 1.0);
 		gl_Position = vec4(glSpace, 0.0, 1.0);
-		color = uni_color;
 	}`
 
 	OutlineFsh = `
@@ -30,22 +24,12 @@ const (
 		frag_color = checker;
 	}`
 
-	SolidColorVertex = `
-	#version 330
-	uniform vec4 uni_color;
-	in vec2 position_in;
-	out vec4 color;
-	void main() {
-		gl_Position = vec4(position_in, 0.0, 1.0);
-		color = uni_color;
-	}`
-
 	SolidColorFragment = `
 	#version 330
-	in vec4 color;
+	uniform vec4 uni_color;
 	out vec4 frag_color;
 	void main() {
-		frag_color = color;
+		frag_color = uni_color;
 	}`
 
 	VertexShaderSource = `

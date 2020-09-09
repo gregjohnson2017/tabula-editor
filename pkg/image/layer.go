@@ -14,17 +14,19 @@ import (
 )
 
 type Layer struct {
-	area      sdl.Rect
-	imgVAO    *gfx.VAO
-	selVAO    *gfx.VAO
-	texture   gfx.Texture
-	selTex    gfx.Texture
-	selDirty  bool
-	setupBuf  *gfx.BufferObject
-	offsetBuf *gfx.BufferObject
-	vertsBuf  *gfx.BufferObject
-	chunkSize int32
-	workers   int32
+	area        sdl.Rect
+	imgVAO      *gfx.VAO
+	selVAO      *gfx.VAO
+	outlineVAO  *gfx.VAO
+	texture     gfx.Texture
+	selTex      gfx.Texture
+	selDirty    bool
+	setupBuf    *gfx.BufferObject
+	offsetBuf   *gfx.BufferObject
+	vertsBuf    *gfx.BufferObject
+	outlineProg gfx.Program
+	chunkSize   int32
+	workers     int32
 }
 
 func NewLayer(offset sdl.Point, texture gfx.Texture) (*Layer, error) {
@@ -52,7 +54,17 @@ func NewLayer(offset sdl.Point, texture gfx.Texture) (*Layer, error) {
 	vertsBuf := gfx.NewBufferObject()
 	selVAO := gfx.NewVAO(gl.POINTS, []int32{2})
 	selVAO.SetVBO(vertsBuf)
-
+	outlineVAO := gfx.NewVAO(gl.LINES, []int32{2})
+	outlineProg, err := gfx.GetSharedProgram(gfx.ShaderInfo{
+		Source:     gfx.OutlineVsh,
+		ShaderType: gl.VERTEX_SHADER,
+	}, gfx.ShaderInfo{
+		Source:     gfx.SolidColorFragment,
+		ShaderType: gl.FRAGMENT_SHADER,
+	})
+	if err != nil {
+		return nil, err
+	}
 	return &Layer{
 		area: sdl.Rect{
 			X: offset.X,
@@ -60,23 +72,28 @@ func NewLayer(offset sdl.Point, texture gfx.Texture) (*Layer, error) {
 			W: texture.GetWidth(),
 			H: texture.GetHeight(),
 		},
-		imgVAO:    gfx.NewVAO(gl.TRIANGLES, []int32{2, 2}),
-		selVAO:    selVAO,
-		texture:   texture,
-		selTex:    selTex,
-		setupBuf:  setupBuf,
-		offsetBuf: offsetBuf,
-		vertsBuf:  vertsBuf,
-		chunkSize: chunkSize,
-		workers:   workers,
+		imgVAO:      gfx.NewVAO(gl.TRIANGLES, []int32{2, 2}),
+		selVAO:      selVAO,
+		outlineVAO:  outlineVAO,
+		texture:     texture,
+		selTex:      selTex,
+		setupBuf:    setupBuf,
+		offsetBuf:   offsetBuf,
+		vertsBuf:    vertsBuf,
+		outlineProg: outlineProg,
+		chunkSize:   chunkSize,
+		workers:     workers,
 	}, nil
 }
 
-func (l Layer) Render(view sdl.FRect, program gfx.Program) {
+func (l Layer) Render(view, canvas sdl.FRect, program gfx.Program) {
 	fArea := ui.RectToFRect(l.area)
-	rect, ok := view.Intersect(&fArea)
-	if !ok {
-		// not in view
+	rect, inView := view.Intersect(&fArea)
+	rect, inCanvas := rect.Intersect(&canvas)
+	if !inView {
+		return
+	} else if !inCanvas {
+		l.DrawOutline(view)
 		return
 	}
 
@@ -137,6 +154,29 @@ func (l Layer) Render(view sdl.FRect, program gfx.Program) {
 	l.texture.Unbind()
 	program.Unbind()
 
+	l.DrawOutline(view)
+}
+
+func (l *Layer) DrawOutline(view sdl.FRect) {
+	fArea := ui.RectToFRect(l.area)
+	blx, bly := fArea.X-view.X, fArea.H+fArea.Y-view.Y
+	tlx, tly := fArea.X-view.X, fArea.Y-view.Y
+	trx, try := fArea.X+fArea.W-view.X, fArea.Y-view.Y
+	brx, bry := fArea.X+fArea.W-view.X, fArea.H+fArea.Y-view.Y
+	lines := []float32{
+		tlx, tly, trx, try,
+		tlx, tly, blx, bly,
+		blx, bly, brx, bry,
+		trx, try, brx, bry,
+	}
+	l.outlineProg.UploadUniform("area", view.W, view.H)
+	l.outlineProg.UploadUniform("uni_color", 0.0, 0.0, 0.0, 1.0)
+	if err := l.outlineVAO.Load(lines, gl.STATIC_DRAW); err != nil {
+		log.Warn("Failed to load layer outline lines")
+	}
+	l.outlineProg.Bind()
+	l.outlineVAO.Draw()
+	l.outlineProg.Unbind()
 }
 
 func (l *Layer) RenderSelection(view sdl.FRect, program, cs1, cs2, cs3 gfx.Program) {

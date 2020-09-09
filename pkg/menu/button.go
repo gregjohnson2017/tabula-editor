@@ -37,7 +37,7 @@ var _ ui.Component = ui.Component(&Button{})
 // defaultColor and highlightColor default to light grey (0xD6CFCFFF) and blue (0X0046AFFF) respectively, if nil
 func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (*Button, error) {
 	var err error
-	v1, err := gfx.NewShader(gfx.SolidColorVertex, gl.VERTEX_SHADER)
+	v1, err := gfx.NewShader(gfx.VshPassthrough, gl.VERTEX_SHADER)
 	if err != nil {
 		return nil, err
 	}

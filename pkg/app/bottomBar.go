@@ -33,7 +33,7 @@ type BottomBar struct {
 func NewBottomBar(area *sdl.Rect, comms <-chan comms.Image, cfg *config.Config) (*BottomBar, error) {
 	var err error
 
-	v1, err := gfx.NewShader(gfx.SolidColorVertex, gl.VERTEX_SHADER)
+	v1, err := gfx.NewShader(gfx.VshPassthrough, gl.VERTEX_SHADER)
 	if err != nil {
 		return nil, err
 	}
