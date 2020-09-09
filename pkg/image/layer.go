@@ -25,6 +25,10 @@ type Layer struct {
 	offsetBuf   *gfx.BufferObject
 	vertsBuf    *gfx.BufferObject
 	outlineProg gfx.Program
+	cs1         gfx.Program
+	cs2         gfx.Program
+	cs3         gfx.Program
+	selProg     gfx.Program
 	chunkSize   int32
 	workers     int32
 }
@@ -65,6 +69,40 @@ func NewLayer(offset sdl.Point, texture gfx.Texture) (*Layer, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs1, err := gfx.GetSharedProgram(gfx.ShaderInfo{
+		Source:     gfx.ComputeCountSels,
+		ShaderType: gl.COMPUTE_SHADER,
+	})
+	if err != nil {
+		return nil, err
+	}
+	cs2, err := gfx.GetSharedProgram(gfx.ShaderInfo{
+		Source:     gfx.ComputePrefixSum,
+		ShaderType: gl.COMPUTE_SHADER,
+	})
+	if err != nil {
+		return nil, err
+	}
+	cs3, err := gfx.GetSharedProgram(gfx.ShaderInfo{
+		Source:     gfx.ComputeSelCoords,
+		ShaderType: gl.COMPUTE_SHADER,
+	})
+	if err != nil {
+		return nil, err
+	}
+	selProg, err := gfx.GetSharedProgram(gfx.ShaderInfo{
+		Source:     gfx.VshPassthrough,
+		ShaderType: gl.VERTEX_SHADER,
+	}, gfx.ShaderInfo{
+		Source:     gfx.OutlineGeometry,
+		ShaderType: gl.GEOMETRY_SHADER_ARB,
+	}, gfx.ShaderInfo{
+		Source:     gfx.OutlineFsh,
+		ShaderType: gl.FRAGMENT_SHADER,
+	})
+	if err != nil {
+		return nil, err
+	}
 	return &Layer{
 		area: sdl.Rect{
 			X: offset.X,
@@ -81,6 +119,10 @@ func NewLayer(offset sdl.Point, texture gfx.Texture) (*Layer, error) {
 		offsetBuf:   offsetBuf,
 		vertsBuf:    vertsBuf,
 		outlineProg: outlineProg,
+		selProg:     selProg,
+		cs1:         cs1,
+		cs2:         cs2,
+		cs3:         cs3,
 		chunkSize:   chunkSize,
 		workers:     workers,
 	}, nil
@@ -179,7 +221,7 @@ func (l *Layer) DrawOutline(view sdl.FRect) {
 	l.outlineProg.Unbind()
 }
 
-func (l *Layer) RenderSelection(view sdl.FRect, program, cs1, cs2, cs3 gfx.Program) {
+func (l *Layer) RenderSelection(view sdl.FRect) {
 	fArea := ui.RectToFRect(l.area)
 	_, ok := view.Intersect(&fArea)
 	if !ok {
@@ -187,40 +229,40 @@ func (l *Layer) RenderSelection(view sdl.FRect, program, cs1, cs2, cs3 gfx.Progr
 		return
 	}
 	if l.selDirty {
-		l.genPointsComputeShader(cs1, cs2, cs3)
+		l.genPointsComputeShader()
 		l.selDirty = false
 	}
-	program.UploadUniform("layerArea", fArea.X, fArea.Y)
-
-	program.Bind()
+	l.selProg.UploadUniform("layerArea", fArea.X, fArea.Y)
+	l.selProg.UploadUniform("view", float32(view.X), float32(view.Y), float32(view.W), float32(view.H))
+	l.selProg.Bind()
 	l.selTex.Bind()
 	l.selVAO.Draw()
 	l.selTex.Unbind()
-	program.Unbind()
+	l.selProg.Unbind()
 }
 
-func (l *Layer) genPointsComputeShader(cs1, cs2, cs3 gfx.Program) {
+func (l *Layer) genPointsComputeShader() {
 	l.setupBuf.BindBufferBase(gl.SHADER_STORAGE_BUFFER, 0)
 	l.vertsBuf.BindBufferBase(gl.SHADER_STORAGE_BUFFER, 1)
 	l.offsetBuf.BindBufferBase(gl.SHADER_STORAGE_BUFFER, 2)
-	cs1.UploadUniformui("chunkSize", uint32(l.chunkSize))
-	cs3.UploadUniformui("chunkSize", uint32(l.chunkSize))
+	l.cs1.UploadUniformui("chunkSize", uint32(l.chunkSize))
+	l.cs3.UploadUniformui("chunkSize", uint32(l.chunkSize))
 	// workers count selections in their respective chunks
-	cs1.Bind()
+	l.cs1.Bind()
 	l.selTex.Bind()
 	gl.DispatchCompute(uint32(l.workers), 1, 1)
 	l.selTex.Unbind()
-	cs1.Unbind()
+	l.cs1.Unbind()
 
 	gl.MemoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT)
 	// parallel prefix algorithm on compute shader
 	// to determine worker indices to fill in final answer
 	passes := int(math.Ceil(math.Log2(float64(l.workers))))
 	for i := 0; i <= passes; i++ {
-		cs2.UploadUniformi("pass", int32(i))
-		cs2.Bind()
+		l.cs2.UploadUniformi("pass", int32(i))
+		l.cs2.Bind()
 		gl.DispatchCompute(uint32(l.workers), 1, 1)
-		cs2.Unbind()
+		l.cs2.Unbind()
 
 		gl.MemoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT)
 	}
@@ -230,11 +272,11 @@ func (l *Layer) genPointsComputeShader(cs1, cs2, cs3 gfx.Program) {
 	l.vertsBuf.BufferData(gl.SHADER_STORAGE_BUFFER, 4*sum, gl.Ptr(nil), gl.DYNAMIC_READ)
 	// workers fill in final answer in an SSBO, where the final answer
 	// is an array of (X,Y) points, where each point is a selected texel
-	cs3.Bind()
+	l.cs3.Bind()
 	l.selTex.Bind()
 	gl.DispatchCompute(uint32(l.workers), 1, 1)
 	l.selTex.Unbind()
-	cs3.Unbind()
+	l.cs3.Unbind()
 	gl.MemoryBarrier(gl.ALL_BARRIER_BITS)
 }
 

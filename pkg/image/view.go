@@ -44,11 +44,7 @@ type View struct {
 	bbComms     chan<- comms.Image
 	toolComms   <-chan Tool
 	checkerProg gfx.Program
-	selProg     gfx.Program
 	program     gfx.Program
-	cs1         gfx.Program
-	cs2         gfx.Program
-	cs3         gfx.Program
 	projName    string
 }
 
@@ -113,55 +109,13 @@ func NewView(area sdl.Rect, bbComms chan<- comms.Image, toolComms <-chan Tool, c
 		return nil, err
 	}
 
-	outlineVsh, err := gfx.NewShader(gfx.VshPassthrough, gl.VERTEX_SHADER)
-	if err != nil {
-		return nil, err
-	}
-	outlineFsh, err := gfx.NewShader(gfx.OutlineFsh, gl.FRAGMENT_SHADER)
-	if err != nil {
-		return nil, err
-	}
-	outlineGeo, err := gfx.NewShader(gfx.OutlineGeometry, gl.GEOMETRY_SHADER_ARB)
-	if err != nil {
-		return nil, err
-	}
-	if iv.selProg, err = gfx.NewProgram(outlineVsh, outlineFsh, outlineGeo); err != nil {
-		return nil, err
-	}
-
 	iv.checkerProg.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
 	iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
-	iv.selProg.UploadUniform("view", float32(iv.view.X), float32(iv.view.Y), float32(iv.view.W), float32(iv.view.H))
 
 	iv.activeTool = &EmptyTool{}
 
 	iv.CenterCanvas()
 	iv.projName = "New Project"
-
-	comp1, err := gfx.NewShader(gfx.ComputeCountSels, gl.COMPUTE_SHADER)
-	if err != nil {
-		return nil, err
-	}
-	iv.cs1, err = gfx.NewProgram(comp1)
-	if err != nil {
-		return nil, err
-	}
-	comp2, err := gfx.NewShader(gfx.ComputePrefixSum, gl.COMPUTE_SHADER)
-	if err != nil {
-		return nil, err
-	}
-	iv.cs2, err = gfx.NewProgram(comp2)
-	if err != nil {
-		return nil, err
-	}
-	comp3, err := gfx.NewShader(gfx.ComputeSelCoords, gl.COMPUTE_SHADER)
-	if err != nil {
-		return nil, err
-	}
-	iv.cs3, err = gfx.NewProgram(comp3)
-	if err != nil {
-		return nil, err
-	}
 
 	return iv, nil
 }
@@ -198,7 +152,7 @@ func (iv *View) Render() {
 		} else {
 			layer.Render(iv.view, ui.RectToFRect(iv.canvas), iv.program)
 		}
-		layer.RenderSelection(iv.view, iv.selProg, iv.cs1, iv.cs2, iv.cs3)
+		layer.RenderSelection(iv.view)
 	}
 
 	select {
@@ -239,7 +193,7 @@ func (iv *View) updateView() {
 	iv.view = newView
 	iv.checkerProg.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
 	iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
-	iv.selProg.UploadUniform("view", float32(iv.view.X), float32(iv.view.Y), float32(iv.view.W), float32(iv.view.H))
+
 }
 
 // CenterCanvas updates the view so the canvas is in the center of the window
