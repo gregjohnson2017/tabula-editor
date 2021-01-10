@@ -17,10 +17,11 @@ import (
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/comms"
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
-	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
 	"github.com/gregjohnson2017/tabula-editor/pkg/log"
+	"github.com/gregjohnson2017/tabula-editor/pkg/shaders"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/gregjohnson2017/tabula-editor/pkg/util"
+	"github.com/kroppt/gfx"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -71,7 +72,7 @@ func NewView(area sdl.Rect, bbComms chan<- comms.Image, toolComms <-chan Tool, c
 	}
 
 	var data = make([]byte, iv.canvas.W*iv.canvas.H*4)
-	canvasTex, err := gfx.NewTexture(iv.canvas.W, iv.canvas.H, data, gl.RGBA, 4)
+	canvasTex, err := gfx.NewTexture(iv.canvas.W, iv.canvas.H, data, gl.RGBA, 4, 4)
 	if err != nil {
 		return nil, err
 	}
@@ -80,11 +81,11 @@ func NewView(area sdl.Rect, bbComms chan<- comms.Image, toolComms <-chan Tool, c
 	iv.canvasLayer = NewLayer(sdl.Point{X: iv.canvas.X, Y: iv.canvas.Y}, canvasTex)
 	iv.layers = append(iv.layers, iv.canvasLayer)
 
-	v1, err := gfx.NewShader(gfx.VertexShaderSource, gl.VERTEX_SHADER)
+	v1, err := gfx.NewShader(shaders.VertexShaderSource, gl.VERTEX_SHADER)
 	if err != nil {
 		return nil, err
 	}
-	f1, err := gfx.NewShader(gfx.CheckerShaderFragment, gl.FRAGMENT_SHADER)
+	f1, err := gfx.NewShader(shaders.CheckerShaderFragment, gl.FRAGMENT_SHADER)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +94,7 @@ func NewView(area sdl.Rect, bbComms chan<- comms.Image, toolComms <-chan Tool, c
 		return nil, err
 	}
 
-	f2, err := gfx.NewShader(gfx.FragmentShaderSource, gl.FRAGMENT_SHADER)
+	f2, err := gfx.NewShader(shaders.FragmentShaderSource, gl.FRAGMENT_SHADER)
 	if err != nil {
 		return nil, err
 	}
@@ -102,8 +103,14 @@ func NewView(area sdl.Rect, bbComms chan<- comms.Image, toolComms <-chan Tool, c
 		return nil, err
 	}
 
-	iv.checkerProg.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
-	iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
+	err = iv.checkerProg.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
+	if err != nil {
+		log.Warnf("failed to upload uniform \"%v\": %v", "area", err)
+	}
+	err = iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
+	if err != nil {
+		log.Warnf("failed to upload uniform \"%v\": %v", "area", err)
+	}
 
 	iv.activeTool = &EmptyTool{}
 
@@ -163,7 +170,10 @@ func (iv *View) Render() {
 // RenderCanvas draws what is on the canvas or area, whichever is larger
 func (iv *View) RenderCanvas() {
 	sw := util.Start()
-	iv.program.UploadUniform("area", float32(iv.canvas.W), float32(iv.canvas.H))
+	err := iv.program.UploadUniform("area", float32(iv.canvas.W), float32(iv.canvas.H))
+	if err != nil {
+		log.Warnf("failed to upload uniform \"%v\": %v", "area", err)
+	}
 	// gl viewport 0, 0 is bottom left
 	gl.Viewport(0, 0, iv.canvas.W, iv.canvas.H)
 
@@ -189,8 +199,14 @@ func (iv *View) updateView() {
 	newView.X = (iv.view.W-newView.W)/2 + iv.view.X
 	newView.Y = (iv.view.H-newView.H)/2 + iv.view.Y
 	iv.view = newView
-	iv.checkerProg.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
-	iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
+	err := iv.checkerProg.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
+	if err != nil {
+		log.Warnf("failed to upload uniform \"%v\": %v", "area", err)
+	}
+	err = iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
+	if err != nil {
+		log.Warnf("failed to upload uniform \"%v\": %v", "area", err)
+	}
 }
 
 // CenterCanvas updates the view so the canvas is in the center of the window
@@ -202,8 +218,14 @@ func (iv *View) CenterCanvas() {
 		H: float32(iv.area.H),
 	}
 	iv.updateView()
-	iv.checkerProg.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
-	iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
+	err := iv.checkerProg.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
+	if err != nil {
+		log.Warnf("failed to upload uniform \"%v\": %v", "area", err)
+	}
+	err = iv.program.UploadUniform("area", float32(iv.view.W), float32(iv.view.H))
+	if err != nil {
+		log.Warnf("failed to upload uniform \"%v\": %v", "area", err)
+	}
 }
 
 // setPixel sets the currently hovered texel of the selected layer
@@ -212,7 +234,9 @@ func (iv *View) setPixel(p sdl.Point, col color.RGBA) error {
 	if iv.selLayer != nil {
 		p.X -= iv.selLayer.area.X
 		p.Y -= iv.selLayer.area.Y
-		return iv.selLayer.texture.SetPixel(p, col)
+		pt := gfx.Point{X: p.X, Y: p.Y}
+		bs := []byte{col.R, col.G, col.B, col.A}
+		return iv.selLayer.texture.SetPixel(pt, bs, true)
 	}
 	return nil
 }

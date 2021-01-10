@@ -13,10 +13,10 @@ import (
 
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/golang/freetype/truetype"
-	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
 	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/gregjohnson2017/tabula-editor/pkg/util"
+	"github.com/kroppt/gfx"
 	"github.com/veandco/go-sdl2/sdl"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
@@ -300,7 +300,7 @@ func LoadFontTexture(fontName string, fontSize int32) (Info, error) {
 	// writeFontToFile(fontName+"-"+strconv.Itoa(int(fontSize))+"-texture.png", glyphBytes, int(texWidth), int(texHeight))
 
 	// pass glyphBytes to OpenGL texture
-	fontTexture, err := gfx.NewTexture(texWidth, texHeight, glyphBytes, gl.RED, 1)
+	fontTexture, err := gfx.NewTexture(texWidth, texHeight, glyphBytes, gl.RED, 1, 1)
 	if err != nil {
 		return Info{}, err
 	}

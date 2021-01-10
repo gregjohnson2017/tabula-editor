@@ -4,10 +4,11 @@ import (
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
 	"github.com/gregjohnson2017/tabula-editor/pkg/font"
-	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
 	"github.com/gregjohnson2017/tabula-editor/pkg/log"
+	"github.com/gregjohnson2017/tabula-editor/pkg/shaders"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/gregjohnson2017/tabula-editor/pkg/util"
+	"github.com/kroppt/gfx"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -22,8 +23,8 @@ type Button struct {
 	strTriangles       []float32
 	backProgram        gfx.Program
 	textProgram        gfx.Program
-	backBuf            *gfx.BufferArray
-	textBuf            *gfx.BufferArray
+	backBuf            *gfx.VAO
+	textBuf            *gfx.VAO
 	fontInfo           font.Info
 	text               string
 	pressed            bool
@@ -37,11 +38,11 @@ var _ ui.Component = ui.Component(&Button{})
 // defaultColor and highlightColor default to light grey (0xD6CFCFFF) and blue (0X0046AFFF) respectively, if nil
 func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (*Button, error) {
 	var err error
-	v1, err := gfx.NewShader(gfx.SolidColorVertex, gl.VERTEX_SHADER)
+	v1, err := gfx.NewShader(shaders.SolidColorVertex, gl.VERTEX_SHADER)
 	if err != nil {
 		return nil, err
 	}
-	f1, err := gfx.NewShader(gfx.SolidColorFragment, gl.FRAGMENT_SHADER)
+	f1, err := gfx.NewShader(shaders.SolidColorFragment, gl.FRAGMENT_SHADER)
 	if err != nil {
 		return nil, err
 	}
@@ -51,11 +52,11 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 		return nil, err
 	}
 
-	v2, err := gfx.NewShader(gfx.GlyphShaderVertex, gl.VERTEX_SHADER)
+	v2, err := gfx.NewShader(shaders.GlyphShaderVertex, gl.VERTEX_SHADER)
 	if err != nil {
 		return nil, err
 	}
-	f2, err := gfx.NewShader(gfx.GlyphShaderFragment, gl.FRAGMENT_SHADER)
+	f2, err := gfx.NewShader(shaders.GlyphShaderFragment, gl.FRAGMENT_SHADER)
 	if err != nil {
 		return nil, err
 	}
@@ -73,11 +74,23 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 	backColor := [4]float32{0.8392, 0.8118, 0.8118, 1.0}
 	textColor := [4]float32{0.0, 0.0, 0.0, 1.0}
 
-	backProgram.UploadUniform("uni_color", backColor[0], backColor[1], backColor[2], backColor[3])
-	textProgram.UploadUniform("screen_size", float32(cfg.ScreenWidth), float32(cfg.ScreenHeight))
-	textProgram.UploadUniform("tex_size", float32(fnt.GetTexture().GetWidth()),
+	err = backProgram.UploadUniform("uni_color", backColor[0], backColor[1], backColor[2], backColor[3])
+	if err != nil {
+		log.Warnf("failed to upload uniform \"%v\": %v", "uni_color", err)
+	}
+	err = textProgram.UploadUniform("screen_size", float32(cfg.ScreenWidth), float32(cfg.ScreenHeight))
+	if err != nil {
+		log.Warnf("failed to upload uniform \"%v\": %v", "screen_size", err)
+	}
+	err = textProgram.UploadUniform("tex_size", float32(fnt.GetTexture().GetWidth()),
 		float32(fnt.GetTexture().GetHeight()))
-	textProgram.UploadUniform("text_color", textColor[0], textColor[1], textColor[2], textColor[3])
+	if err != nil {
+		log.Warnf("failed to upload uniform \"%v\": %v", "tex_size", err)
+	}
+	err = textProgram.UploadUniform("text_color", textColor[0], textColor[1], textColor[2], textColor[3])
+	if err != nil {
+		log.Warnf("failed to upload uniform \"%v\": %v", "text_color", err)
+	}
 
 	backTriangles := []float32{
 		-1.0, -1.0, // bottom-left
@@ -92,13 +105,13 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 	align := ui.Align{V: ui.AlignMiddle, H: ui.AlignCenter}
 	textTriangles := font.MapString(text, fnt, pos, align)
 
-	backBuf := gfx.NewBufferArray(gl.TRIANGLES, []int32{2})
+	backBuf := gfx.NewVAO(gl.TRIANGLES, []int32{2})
 	err = backBuf.Load(backTriangles, gl.STATIC_DRAW)
 	if err != nil {
 		log.Warnf("failed to load button background triangles: %v", err)
 	}
 
-	textBuf := gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2})
+	textBuf := gfx.NewVAO(gl.TRIANGLES, []int32{2, 2})
 	err = textBuf.Load(textTriangles, gl.STATIC_DRAW)
 	if err != nil {
 		log.Warnf("failed to load button text triangles: %v", err)
@@ -131,7 +144,10 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 // SetDefaultBackgroundColor changes the default background color
 func (b *Button) SetDefaultBackgroundColor(color [4]float32) {
 	b.defaultBackColor = color
-	b.backProgram.UploadUniform("text_color", b.defaultBackColor[0], b.defaultBackColor[1], b.defaultBackColor[2], b.defaultBackColor[3])
+	err := b.backProgram.UploadUniform("text_color", b.defaultBackColor[0], b.defaultBackColor[1], b.defaultBackColor[2], b.defaultBackColor[3])
+	if err != nil {
+		log.Warnf("failed to upload uniform \"%v\": %v", "text_color", err)
+	}
 }
 
 // SetHighlightBackgroundColor changes the highlight background color
@@ -142,7 +158,10 @@ func (b *Button) SetHighlightBackgroundColor(color [4]float32) {
 // SetDefaultTextColor changes the default text color
 func (b *Button) SetDefaultTextColor(color [4]float32) {
 	b.defaultTextColor = color
-	b.textProgram.UploadUniform("text_color", b.defaultTextColor[0], b.defaultTextColor[1], b.defaultTextColor[2], b.defaultTextColor[3])
+	err := b.textProgram.UploadUniform("text_color", b.defaultTextColor[0], b.defaultTextColor[1], b.defaultTextColor[2], b.defaultTextColor[3])
+	if err != nil {
+		log.Warnf("failed to upload uniform \"%v\": %v", "text_color", err)
+	}
 }
 
 // SetHighlightTextColor changes the highlight text color
@@ -186,9 +205,15 @@ func (b *Button) Render() {
 func (b *Button) OnEnter() {
 	b.hovering = true
 
-	b.backProgram.UploadUniform("uni_color", b.highlightBackColor[0], b.highlightBackColor[1], b.highlightBackColor[2], b.highlightBackColor[3])
+	err := b.backProgram.UploadUniform("uni_color", b.highlightBackColor[0], b.highlightBackColor[1], b.highlightBackColor[2], b.highlightBackColor[3])
+	if err != nil {
+		log.Warnf("failed to upload uniform \"%v\": %v", "uni_color", err)
+	}
 
-	b.textProgram.UploadUniform("text_color", b.highlightTextColor[0], b.highlightTextColor[1], b.highlightTextColor[2], b.highlightTextColor[3])
+	err = b.textProgram.UploadUniform("text_color", b.highlightTextColor[0], b.highlightTextColor[1], b.highlightTextColor[2], b.highlightTextColor[3])
+	if err != nil {
+		log.Warnf("failed to upload uniform \"%v\": %v", "text_color", err)
+	}
 }
 
 // OnLeave is called when the cursor leaves the ui.Component's region
@@ -196,8 +221,14 @@ func (b *Button) OnLeave() {
 	b.hovering = false
 	b.pressed = false
 
-	b.backProgram.UploadUniform("uni_color", b.defaultBackColor[0], b.defaultBackColor[1], b.defaultBackColor[2], b.defaultBackColor[3])
-	b.textProgram.UploadUniform("text_color", b.defaultTextColor[0], b.defaultTextColor[1], b.defaultTextColor[2], b.defaultTextColor[3])
+	err := b.backProgram.UploadUniform("uni_color", b.defaultBackColor[0], b.defaultBackColor[1], b.defaultBackColor[2], b.defaultBackColor[3])
+	if err != nil {
+		log.Warnf("failed to upload uniform \"%v\": %v", "uni_color", err)
+	}
+	err = b.textProgram.UploadUniform("text_color", b.defaultTextColor[0], b.defaultTextColor[1], b.defaultTextColor[2], b.defaultTextColor[3])
+	if err != nil {
+		log.Warnf("failed to upload uniform \"%v\": %v", "text_color", err)
+	}
 }
 
 // OnMotion is called when the cursor moves within the ui.Component's region
@@ -224,12 +255,15 @@ func (b *Button) OnClick(evt *sdl.MouseButtonEvent) bool {
 // OnResize is called when the user resizes the window
 func (b *Button) OnResize(x, y int32) {
 	// recompute text triangles
-	b.textProgram.UploadUniform("screen_size", float32(b.cfg.ScreenWidth), float32(b.cfg.ScreenHeight))
+	err := b.textProgram.UploadUniform("screen_size", float32(b.cfg.ScreenWidth), float32(b.cfg.ScreenHeight))
+	if err != nil {
+		log.Warnf("failed to upload uniform \"%v\": %v", "screen_size", err)
+	}
 
 	pos := sdl.Point{X: b.area.X + b.area.W/2, Y: b.cfg.ScreenHeight - b.area.Y - b.area.H/2}
 	align := ui.Align{V: ui.AlignMiddle, H: ui.AlignCenter}
 	textTriangles := font.MapString(b.text, b.fontInfo, pos, align)
-	err := b.textBuf.Load(textTriangles, gl.STATIC_DRAW)
+	err = b.textBuf.Load(textTriangles, gl.STATIC_DRAW)
 	if err != nil {
 		log.Warnf("failed to load button text triangles: %v", err)
 	}
