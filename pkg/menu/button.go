@@ -3,7 +3,6 @@ package menu
 import (
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
-	"github.com/gregjohnson2017/tabula-editor/pkg/font"
 	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/gregjohnson2017/tabula-editor/pkg/shaders"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
@@ -25,7 +24,7 @@ type Button struct {
 	textProgram        gfx.Program
 	backBuf            *gfx.VAO
 	textBuf            *gfx.VAO
-	fontInfo           font.Info
+	font               *gfx.FontInfo
 	text               string
 	pressed            bool
 	hovering           bool
@@ -66,7 +65,7 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 		return nil, err
 	}
 
-	fnt, err := font.LoadFontTexture("NotoMono-Regular.ttf", 14)
+	fnt, err := gfx.LoadFontTexture("NotoMono-Regular.ttf", 14)
 	if err != nil {
 		return nil, err
 	}
@@ -101,9 +100,9 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 		+1.0, +1.0, // top-right
 		+1.0, -1.0, // bottom-right
 	}
-	pos := sdl.Point{X: area.X + area.W/2, Y: cfg.ScreenHeight - area.Y - area.H/2}
-	align := ui.Align{V: ui.AlignMiddle, H: ui.AlignCenter}
-	textTriangles := font.MapString(text, fnt, pos, align)
+	pos := gfx.Point{X: area.X + area.W/2, Y: cfg.ScreenHeight - area.Y - area.H/2}
+	align := gfx.Align{V: gfx.AlignMiddle, H: gfx.AlignCenter}
+	textTriangles := fnt.MapString(text, pos, align)
 
 	backBuf := gfx.NewVAO(gl.TRIANGLES, []int32{2})
 	err = backBuf.Load(backTriangles, gl.STATIC_DRAW)
@@ -132,7 +131,7 @@ func NewButton(area *sdl.Rect, cfg *config.Config, text string, action func()) (
 		textProgram:        textProgram,
 		backBuf:            backBuf,
 		textBuf:            textBuf,
-		fontInfo:           fnt,
+		font:               fnt,
 		text:               text,
 		cfg:                cfg,
 		pressed:            false,
@@ -193,9 +192,9 @@ func (b *Button) Render() {
 	// render text on top
 	gl.Viewport(0, 0, b.cfg.ScreenWidth, b.cfg.ScreenHeight)
 	b.textProgram.Bind()
-	b.fontInfo.GetTexture().Bind()
+	b.font.GetTexture().Bind()
 	b.textBuf.Draw()
-	b.fontInfo.GetTexture().Unbind()
+	b.font.GetTexture().Unbind()
 	b.textProgram.Unbind()
 
 	sw.StopRecordAverage(b.String() + ".Render")
@@ -260,9 +259,9 @@ func (b *Button) OnResize(x, y int32) {
 		log.Warnf("failed to upload uniform \"%v\": %v", "screen_size", err)
 	}
 
-	pos := sdl.Point{X: b.area.X + b.area.W/2, Y: b.cfg.ScreenHeight - b.area.Y - b.area.H/2}
-	align := ui.Align{V: ui.AlignMiddle, H: ui.AlignCenter}
-	textTriangles := font.MapString(b.text, b.fontInfo, pos, align)
+	pos := gfx.Point{X: b.area.X + b.area.W/2, Y: b.cfg.ScreenHeight - b.area.Y - b.area.H/2}
+	align := gfx.Align{V: gfx.AlignMiddle, H: gfx.AlignCenter}
+	textTriangles := b.font.MapString(b.text, pos, align)
 	err = b.textBuf.Load(textTriangles, gl.STATIC_DRAW)
 	if err != nil {
 		log.Warnf("failed to load button text triangles: %v", err)

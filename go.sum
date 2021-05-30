@@ -4,8 +4,8 @@ github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 h1:DACJavvAHhabrF0
 github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0/go.mod h1:E/TSTwGwJL78qG/PmXZO1EjYhfJinVAhrmmHX6Z8B9k=
 github.com/jcmuller/gozenity v0.0.1 h1:kHyXY48AJ1wrp6gJXhJ6af0oTJPyeahKzsDC4QSlOZo=
 github.com/jcmuller/gozenity v0.0.1/go.mod h1:Qu2VtrvA5dMiTSeP9meSs/JRg4BGViiMWiYh/P7iS4M=
-github.com/kroppt/gfx v0.0.0-20210110001547-7b65c5d4bab8 h1:AsDrl+fXaMbJrtKMn4io0h1tgW3qKKSSK1ewk0xxSkE=
-github.com/kroppt/gfx v0.0.0-20210110001547-7b65c5d4bab8/go.mod h1:P558HjDbQHWn1VpqPUZ5BmzS8WaJFLTPSmvKzkre+Lc=
+github.com/kroppt/gfx v0.0.0-20210530031959-b265f606735b h1:NPXQCEgN999J0mb8/YNwrcwQOO6bkY3pXFEb3P742kc=
+github.com/kroppt/gfx v0.0.0-20210530031959-b265f606735b/go.mod h1:rZUXQaNUEVHDtNxajcy58/2EYbQWSh+nDx69Mnp1frY=
 github.com/kroppt/winfileask v0.0.0-20200406172824-13c3807ac64f h1:/CnqsfHLkghAEFcpEHHSUwTO7pmGC876xOry2InuAec=
 github.com/kroppt/winfileask v0.0.0-20200406172824-13c3807ac64f/go.mod h1:biYF1MwJ7dNUHE4F6GtL67wQu1sFJdMUxG+PbKQQyGU=
 github.com/veandco/go-sdl2 v0.4.4 h1:coOJGftOdvNvGoUIZmm4XD+ZRQF4mg9ZVHmH3/42zFQ=

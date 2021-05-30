@@ -6,7 +6,6 @@ import (
 	"github.com/go-gl/gl/v2.1/gl"
 	"github.com/gregjohnson2017/tabula-editor/pkg/comms"
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
-	"github.com/gregjohnson2017/tabula-editor/pkg/font"
 	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/gregjohnson2017/tabula-editor/pkg/shaders"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
@@ -25,7 +24,7 @@ type BottomBar struct {
 	textProgram gfx.Program
 	backBuf     *gfx.VAO
 	textBuf     *gfx.VAO
-	fontInfo    font.Info
+	font        *gfx.FontInfo
 	cfg         *config.Config
 }
 
@@ -59,7 +58,7 @@ func NewBottomBar(area *sdl.Rect, comms <-chan comms.Image, cfg *config.Config) 
 		return nil, err
 	}
 
-	fnt, err := font.LoadFontTexture("NotoMono-Regular.ttf", 24)
+	fnt, err := gfx.LoadFontTexture("NotoMono-Regular.ttf", 24)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +110,7 @@ func NewBottomBar(area *sdl.Rect, comms <-chan comms.Image, cfg *config.Config) 
 		textProgram: textProgram,
 		backBuf:     backBuf,
 		textBuf:     textBuf,
-		fontInfo:    fnt,
+		font:        fnt,
 		cfg:         cfg,
 	}, nil
 }
@@ -160,15 +159,15 @@ func (bb *BottomBar) Render() {
 	zoomMessage := fmt.Sprintf("2^(%v)", msg.Mult)
 	mousePixMessage := fmt.Sprintf("(%v, %v)", msg.MousePix.X, msg.MousePix.Y)
 
-	pos := sdl.Point{X: 0, Y: bb.cfg.BottomBarHeight / 2}
-	align := ui.Align{V: ui.AlignMiddle, H: ui.AlignLeft}
-	fileNameTriangles := font.MapString(fileNameMessage, bb.fontInfo, pos, align)
-	pos = sdl.Point{X: bb.cfg.ScreenWidth / 2, Y: bb.cfg.BottomBarHeight / 2}
-	align = ui.Align{V: ui.AlignMiddle, H: ui.AlignCenter}
-	zoomTriangles := font.MapString(zoomMessage, bb.fontInfo, pos, align)
-	pos = sdl.Point{X: bb.cfg.ScreenWidth, Y: bb.cfg.BottomBarHeight / 2}
-	align = ui.Align{V: ui.AlignMiddle, H: ui.AlignRight}
-	mousePixTriangles := font.MapString(mousePixMessage, bb.fontInfo, pos, align)
+	pos := gfx.Point{X: 0, Y: bb.cfg.BottomBarHeight / 2}
+	align := gfx.Align{V: gfx.AlignMiddle, H: gfx.AlignLeft}
+	fileNameTriangles := bb.font.MapString(fileNameMessage, pos, align)
+	pos = gfx.Point{X: bb.cfg.ScreenWidth / 2, Y: bb.cfg.BottomBarHeight / 2}
+	align = gfx.Align{V: gfx.AlignMiddle, H: gfx.AlignCenter}
+	zoomTriangles := bb.font.MapString(zoomMessage, pos, align)
+	pos = gfx.Point{X: bb.cfg.ScreenWidth, Y: bb.cfg.BottomBarHeight / 2}
+	align = gfx.Align{V: gfx.AlignMiddle, H: gfx.AlignRight}
+	mousePixTriangles := bb.font.MapString(mousePixMessage, pos, align)
 	triangles := make([]float32, 0, len(fileNameTriangles)+len(zoomTriangles)+len(mousePixTriangles))
 	triangles = append(triangles, fileNameTriangles...)
 	triangles = append(triangles, zoomTriangles...)
@@ -176,7 +175,7 @@ func (bb *BottomBar) Render() {
 
 	gl.Viewport(0, 0, bb.cfg.ScreenWidth, bb.cfg.ScreenHeight)
 	bb.textProgram.Bind()
-	bb.fontInfo.GetTexture().Bind()
+	bb.font.GetTexture().Bind()
 
 	err := bb.textBuf.Load(triangles, gl.STATIC_DRAW)
 	if err != nil {
@@ -185,7 +184,7 @@ func (bb *BottomBar) Render() {
 		bb.textBuf.Draw()
 	}
 
-	bb.fontInfo.GetTexture().Unbind()
+	bb.font.GetTexture().Unbind()
 	bb.textProgram.Unbind()
 
 	sw.StopRecordAverage(bb.String() + ".Render")

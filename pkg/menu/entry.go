@@ -2,8 +2,8 @@ package menu
 
 import (
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
-	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/gregjohnson2017/tabula-editor/pkg/util"
+	"github.com/kroppt/gfx"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -15,17 +15,17 @@ type entry struct {
 }
 
 // newEntry returns the struct with the given label and list
-func newEntry(cfg *config.Config, area *sdl.Rect, label string, align ui.Align, menus []Definition, act func()) (*entry, error) {
+func newEntry(cfg *config.Config, area *sdl.Rect, label string, align gfx.Align, menus []Definition, act func()) (*entry, error) {
 	btn, err := NewButton(area, cfg, label, act)
 	if err != nil {
 		return nil, err
 	}
 
 	pos := sdl.Point{X: area.X, Y: area.Y}
-	if align.H == ui.AlignRight {
+	if align.H == gfx.AlignRight {
 		pos.X += area.W
 	}
-	if align.V == ui.AlignBelow {
+	if align.V == gfx.AlignBelow {
 		pos.Y += area.H
 	}
 	list, err := newList(cfg, pos, menus)

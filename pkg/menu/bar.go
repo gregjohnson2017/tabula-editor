@@ -5,9 +5,8 @@ import (
 	"math"
 
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
-	"github.com/gregjohnson2017/tabula-editor/pkg/font"
-	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/gregjohnson2017/tabula-editor/pkg/util"
+	"github.com/kroppt/gfx"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -26,7 +25,7 @@ func NewBar(cfg *config.Config, menus []Definition) (*Bar, error) {
 	}
 
 	b.entries = make([]*entry, 0, len(menus))
-	fnt, err := font.LoadFontTexture("NotoMono-Regular.ttf", 14)
+	fnt, err := gfx.LoadFontTexture("NotoMono-Regular.ttf", 14)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +36,7 @@ func NewBar(cfg *config.Config, menus []Definition) (*Bar, error) {
 	// normalize height
 	var max int32
 	for _, c := range menus {
-		_, h := font.CalcStringDims(c.Text, fnt)
+		_, h := fnt.CalcStringDims(c.Text)
 		h32 := int32(math.Ceil(h)) + 10
 		if h32 > max {
 			max = h32
@@ -47,10 +46,10 @@ func NewBar(cfg *config.Config, menus []Definition) (*Bar, error) {
 	// populate list of menu entries with appropriate boundaries
 	var off int32
 	for _, child := range menus {
-		w, _ := font.CalcStringDims(child.Text, fnt)
+		w, _ := fnt.CalcStringDims(child.Text)
 		w32 := int32(math.Ceil(w)) + 14
 		area := &sdl.Rect{X: b.area.X + off, Y: b.area.Y, W: w32, H: max}
-		entry, err := newEntry(b.cfg, area, child.Text, ui.Align{V: ui.AlignBelow}, child.Children, child.Action)
+		entry, err := newEntry(b.cfg, area, child.Text, gfx.Align{V: gfx.AlignBelow}, child.Children, child.Action)
 		if err != nil {
 			return nil, err
 		}
