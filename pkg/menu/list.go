@@ -5,9 +5,8 @@ import (
 	"math"
 
 	"github.com/gregjohnson2017/tabula-editor/pkg/config"
-	"github.com/gregjohnson2017/tabula-editor/pkg/font"
-	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
 	"github.com/gregjohnson2017/tabula-editor/pkg/util"
+	"github.com/kroppt/gfx"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -26,7 +25,7 @@ func newList(cfg *config.Config, pos sdl.Point, menus []Definition) (*list, erro
 	}
 
 	l.entries = make([]*entry, 0, len(menus))
-	fnt, err := font.LoadFontTexture("NotoMono-Regular.ttf", 14)
+	fnt, err := gfx.LoadFontTexture("NotoMono-Regular.ttf", 14)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +36,7 @@ func newList(cfg *config.Config, pos sdl.Point, menus []Definition) (*list, erro
 	// normalize width
 	var max int32
 	for _, c := range menus {
-		w, _ := font.CalcStringDims(c.Text, fnt)
+		w, _ := fnt.CalcStringDims(c.Text)
 		w32 := int32(math.Ceil(w)) + 14
 		if w32 > max {
 			max = w32
@@ -47,10 +46,10 @@ func newList(cfg *config.Config, pos sdl.Point, menus []Definition) (*list, erro
 	// populate list of menu entries with appropriate boundaries
 	var off int32
 	for _, child := range menus {
-		_, h := font.CalcStringDims(child.Text, fnt)
+		_, h := fnt.CalcStringDims(child.Text)
 		h32 := int32(math.Ceil(h)) + 10
 		area := &sdl.Rect{X: l.area.X, Y: l.area.Y + off, W: max, H: h32}
-		entry, err := newEntry(l.cfg, area, child.Text, ui.Align{H: ui.AlignRight}, child.Children, child.Action)
+		entry, err := newEntry(l.cfg, area, child.Text, gfx.Align{H: gfx.AlignRight}, child.Children, child.Action)
 		if err != nil {
 			return nil, err
 		}

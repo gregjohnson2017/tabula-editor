@@ -5,15 +5,15 @@ import (
 	"encoding/gob"
 
 	"github.com/go-gl/gl/v2.1/gl"
-	"github.com/gregjohnson2017/tabula-editor/pkg/gfx"
 	"github.com/gregjohnson2017/tabula-editor/pkg/log"
 	"github.com/gregjohnson2017/tabula-editor/pkg/ui"
+	"github.com/kroppt/gfx"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
 type Layer struct {
 	area    sdl.Rect
-	buffer  *gfx.BufferArray
+	buffer  *gfx.VAO
 	texture gfx.Texture
 }
 
@@ -25,7 +25,7 @@ func NewLayer(offset sdl.Point, texture gfx.Texture) *Layer {
 			W: texture.GetWidth(),
 			H: texture.GetHeight(),
 		},
-		buffer:  gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2}),
+		buffer:  gfx.NewVAO(gl.TRIANGLES, []int32{2, 2}),
 		texture: texture,
 	}
 }
@@ -123,13 +123,13 @@ func (l *Layer) UnmarshalBinary(data []byte) error {
 	if err = dec.Decode(&l.area); err != nil {
 		return err
 	}
-	l.buffer = gfx.NewBufferArray(gl.TRIANGLES, []int32{2, 2})
+	l.buffer = gfx.NewVAO(gl.TRIANGLES, []int32{2, 2})
 
 	var texData = make([]byte, l.area.W*l.area.H*4)
 	if err = dec.Decode(&texData); err != nil {
 		return err
 	}
-	tex, err := gfx.NewTexture(l.area.W, l.area.H, texData, gl.RGBA, 4)
+	tex, err := gfx.NewTexture(l.area.W, l.area.H, texData, gl.RGBA, 4, 4)
 	if err != nil {
 		return err
 	}
